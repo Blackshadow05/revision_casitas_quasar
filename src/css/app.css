@@ -1,0 +1,84 @@
+:root {
+  --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --accent-color: #ff007a;
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.3);
+  --card-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+}
+
+body {
+  font-family: "Inter", "Roboto", sans-serif;
+  background-color: #f0f2f5;
+  color: #1a1a1b;
+}
+
+.glass-header {
+  background: rgba(255, 255, 255, 0.8) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--glass-border);
+  color: #333 !important;
+}
+
+.glass-footer {
+  background: rgba(255, 255, 255, 0.8) !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid var(--glass-border);
+}
+
+.native-card {
+  background: white;
+  border-radius: 20px;
+  box-shadow: var(--card-shadow);
+  border: 1px solid var(--glass-border);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+  margin-bottom: 16px;
+}
+
+.native-card:active {
+  transform: scale(0.98);
+}
+
+.gradient-btn {
+  background: var(--primary-gradient) !important;
+  color: white !important;
+  border-radius: 12px !important;
+  text-transform: none !important;
+  font-weight: 600 !important;
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.status-active {
+  background: #e3fcef;
+  color: #00875a;
+}
+
+.status-pending {
+  background: #fff0b3;
+  color: #172b4d;
+}
+
+/* Custom Scrollbar for a premium look */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0;
+}

@@ -112,11 +112,19 @@ export default defineComponent({
     const loading = ref(false)
     const menus = ref([])
 
+    // Función para obtener la fecha local en formato YYYY-MM-DD
+    const getLocalDateString = (date) => {
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    }
+
     const fetchMenus = async () => {
       loading.value = true
       try {
         const today = new Date()
-        const formattedToday = today.toISOString().split('T')[0]
+        const formattedToday = getLocalDateString(today)
 
         // Pedimos menús de los últimos 10 días ordenados por fecha
         const tenDaysAgo = new Date()
@@ -138,7 +146,7 @@ export default defineComponent({
     }
 
     const todayMenu = computed(() => {
-      const todayStr = new Date().toISOString().split('T')[0]
+      const todayStr = getLocalDateString(new Date())
       return menus.value.find(m => m.fecha_menu === todayStr) || (menus.value.length > 0 ? menus.value[0] : null)
     })
 

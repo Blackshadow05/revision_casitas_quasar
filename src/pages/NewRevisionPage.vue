@@ -550,6 +550,10 @@
           unelevated
           :loading="loading"
         />
+        <div v-if="missingFieldsCount > 0" class="text-center q-mt-sm text-negative" style="font-size: 0.85rem;">
+          <q-icon name="info_outline" size="16px" class="q-mr-xs" />
+          {{ missingFieldsCount }} campo{{ missingFieldsCount > 1 ? 's' : '' }} obligatorio{{ missingFieldsCount > 1 ? 's' : '' }} pendiente{{ missingFieldsCount > 1 ? 's' : '' }}
+        </div>
       </div>
     </q-form>
   </q-page>
@@ -654,11 +658,11 @@ export default defineComponent({
 
     // Computed properties for required evidencias
     const evidencia1Required = computed(() => {
-      return form.value.caja_fuerte === 'Check in' || form.value.caja_fuerte === 'Upsell'
+      return ['Check in', 'Upsell', 'Check out', 'Guardar Upsell'].includes(form.value.caja_fuerte)
     })
 
     const evidencia2Required = computed(() => {
-      return form.value.caja_fuerte === 'Check out' || form.value.caja_fuerte === 'Guardar Upsell'
+      return false // Evidencia 2 nunca es requerida
     })
 
     const showEvidencias = computed(() => {
@@ -671,6 +675,7 @@ export default defineComponent({
 
     const showEvidencia2 = computed(() => {
       if (!showEvidencias.value) return false
+      // Para Check out y Guardar Upsell solo se necesita evidencia 1
       if (['Check out', 'Guardar Upsell'].includes(form.value.caja_fuerte)) return false
       return ['Check in', 'Upsell', 'Room Move', 'Show Room', 'Back to Back'].includes(form.value.caja_fuerte) && !!form.value.evidencia_01
     })
@@ -746,6 +751,34 @@ export default defineComponent({
       }
       
       return errors
+    })
+
+    // Count missing required fields
+    const missingFieldsCount = computed(() => {
+      let count = 0
+      if (!form.value.casita) count++
+      if (!form.value.quien_revisa) count++
+      if (!form.value.caja_fuerte) count++
+      if (!form.value.puertas_ventanas) count++
+      if (!form.value.chromecast) count++
+      if (!form.value.speaker) count++
+      if (!form.value.usb_speaker) count++
+      if (!form.value.controles_tv) count++
+      if (!form.value.binoculares) count++
+      if (!form.value.trapo_binoculares) count++
+      if (!form.value.bolsa_vapor) count++
+      if (!form.value.secadora) count++
+      if (!form.value.steamer) count++
+      if (!form.value.accesorios_secadora) count++
+      if (!form.value.plancha_cabello) count++
+      if (!form.value.cola_caballo) count++
+      if (!form.value.bulto) count++
+      if (!form.value.sombrero) count++
+      if (!form.value.bolso_yute) count++
+      if (!form.value.camas_ordenadas) count++
+      if (evidencia1Required.value && !form.value.evidencia_01) count++
+      if (evidencia2Required.value && !form.value.evidencia_02) count++
+      return count
     })
 
     // Load users from Supabase
@@ -1281,6 +1314,7 @@ export default defineComponent({
       formatBytes,
       formSubmitted,
       validationErrors,
+      missingFieldsCount,
       goBack,
       openPhotoSheet,
       selectPhotoSource,

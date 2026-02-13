@@ -152,22 +152,6 @@
           <q-separator class="q-my-md q-mx-md" style="opacity: 0.3" />
 
           <q-card-section class="q-pt-sm scroll" style="max-height: 60vh;">
-            <!-- Caja Fuerte Section -->
-            <div class="text-subtitle1 text-weight-bold q-mb-sm text-dark">Caja Fuerte</div>
-            <div class="row q-gutter-sm q-mb-xl">
-              <q-btn
-                v-for="tag in ['Check in', 'Check out', 'Upsell', 'Back to back', 'Si', 'No']"
-                :key="tag"
-                :label="tag"
-                unelevated
-                rounded
-                no-caps
-                class="tag-button"
-                :class="selectedTags.includes(tag) ? 'tag-active' : 'tag-inactive'"
-                @click="toggleTag(tag)"
-              />
-            </div>
-
             <!-- Filtrar por Section -->
             <div class="text-subtitle1 text-weight-bold q-mb-sm text-dark">Filtrar por (última revisión por casita)</div>
             <q-select

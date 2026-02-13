@@ -35,7 +35,6 @@ export default configure((ctx) => {
     ],
     pwa: {
       workboxMode: 'GenerateSW',
-      injectPwaModule: true,
       swFilename: 'sw.js',
       manifestFilename: 'manifest.json',
       useCredentialsForManifestTag: false,

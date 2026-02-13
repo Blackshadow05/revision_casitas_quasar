@@ -22,15 +22,21 @@
         <q-tab name="settings" icon="settings" label="Configuración" class="tab-settings" />
       </q-tabs>
     </q-footer>
+
+    <install-prompt />
   </q-layout>
 </template>
 
 <script>
 import { ref, defineComponent, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
+import InstallPrompt from "../components/InstallPrompt.vue";
 
 export default defineComponent({
   name: "MainLayout",
+  components: {
+    InstallPrompt
+  },
   setup() {
     const tab = ref("home");
     const router = useRouter();

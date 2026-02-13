@@ -34,7 +34,7 @@ export default configure((ctx) => {
       'fadeOut'
     ],
     pwa: {
-      workboxMode: 'generateSW',
+      workboxMode: 'GenerateSW',
       injectPwaModule: true,
       swFilename: 'sw.js',
       manifestFilename: 'manifest.json',

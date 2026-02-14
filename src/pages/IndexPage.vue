@@ -317,7 +317,7 @@
             </div>
           </div>
           <template v-slot:loading>
-            <div class="row justify-center q-my-md">
+            <div v-if="casas.length > 0" class="row justify-center q-my-md">
               <q-spinner-dots color="primary" size="40px" />
             </div>
           </template>
@@ -477,7 +477,7 @@ export default defineComponent({
     
     const search = computed({
       get: () => store.search,
-      set: (val) => store.search = val
+      set: (val) => store.setSearch(val)
     })
 
     const casas = computed(() => store.filteredCasas)
@@ -544,7 +544,7 @@ export default defineComponent({
 
     onMounted(() => {
       if (isLoggedIn.value) {
-        loadData()
+        store.loadSavedSearch()
       }
     })
 
@@ -575,6 +575,7 @@ export default defineComponent({
       if (s.includes('upsell')) return 'theme-blue'
       if (s.includes('move')) return 'theme-orange'
       if (s === 'si' || s === 'no') return 'theme-gold'
+      if (s === 'back to back' || s === 'backtoback') return 'theme-brown'
       return 'theme-green'
     }
 
@@ -586,6 +587,7 @@ export default defineComponent({
       if (s.includes('upsell')) return 'bg-blue-action'
       if (s.includes('move')) return 'bg-orange-action'
       if (s === 'si' || s === 'no') return 'bg-gold-action'
+      if (s === 'back to back' || s === 'backtoback') return 'bg-brown-action'
       return 'bg-green-action'
     }
 
@@ -710,22 +712,58 @@ export default defineComponent({
   background: linear-gradient(135deg, #b3e5fc 0%, rgba(255, 255, 255, 0.85) 100%);
   box-shadow: 0 10px 20px rgba(33, 150, 243, 0.2);
 }
+.theme-brown {
+  background: linear-gradient(135deg, #d7ccc8 0%, rgba(255, 255, 255, 0.85) 100%);
+  box-shadow: 0 10px 20px rgba(121, 85, 72, 0.2);
+}
+
+.card-header {
+  min-height: 28px;
+  max-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
 
 .casita-number {
   font-size: 20px;
   font-weight: 800;
   color: #1a1a1a;
   line-height: 1;
+  flex-shrink: 0;
 }
 
 .status-chip {
-  padding: 6px 14px;
-  border-radius: 20px;
+  padding: 4px 10px;
+  border-radius: 16px;
   color: white;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+  line-height: 1;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+  transform-origin: center;
+  flex-shrink: 0;
+}
+
+.status-chip span {
+  font-size: 11px !important;
+  line-height: 1;
+  display: inline;
+  max-width: 100%;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+}
+
+.status-chip .q-icon {
+  font-size: 12px !important;
+  flex-shrink: 0;
 }
 
 .bg-green-action { background-color: #00D26A; }
@@ -735,6 +773,7 @@ export default defineComponent({
 .bg-yellow-action { background-color: #FACC15; }
 .bg-gold-action { background-color: #FFD700; }
 .bg-blue-action { background-color: #2196F3; }
+.bg-brown-action { background-color: #3e2723; }
 
 .card-content {
   margin: 16px 0;
@@ -764,6 +803,7 @@ export default defineComponent({
 .theme-yellow .circle-badge { background-color: #FACC15; box-shadow: 0 4px 10px rgba(250, 204, 21, 0.4); }
 .theme-gold .circle-badge { background-color: #FFD700; box-shadow: 0 4px 10px rgba(255, 215, 0, 0.4); }
 .theme-blue .circle-badge { background-color: #2196F3; box-shadow: 0 4px 10px rgba(33, 150, 243, 0.4); }
+.theme-brown .circle-badge { background-color: #795548; box-shadow: 0 4px 10px rgba(121, 85, 72, 0.4); }
 
 .note-text {
   font-size: 11px;

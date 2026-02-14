@@ -5,7 +5,7 @@ export const useCasasStore = defineStore('casas', {
   state: () => ({
     casas: [],
     loading: false,
-    search: '',
+    search: localStorage.getItem('searchQuery') || '',
     selectedCasa: JSON.parse(localStorage.getItem('selectedCasa')) || null,
     page: 0,
     hasMore: true,
@@ -211,6 +211,21 @@ export const useCasasStore = defineStore('casas', {
         console.error('Error searching in database:', error.message)
       } finally {
         this.loading = false
+      }
+    },
+    setSearch(value) {
+      this.search = value
+      if (value && value.trim()) {
+        localStorage.setItem('searchQuery', value)
+      } else {
+        localStorage.removeItem('searchQuery')
+      }
+    },
+    async loadSavedSearch() {
+      const savedSearch = localStorage.getItem('searchQuery')
+      if (savedSearch && savedSearch.trim()) {
+        this.search = savedSearch
+        await this.searchInDatabase(savedSearch)
       }
     }
   }

@@ -25,6 +25,7 @@ export default configure((ctx) => {
     framework: {
       config: {},
       plugins: [
+        'Dialog',
         'Notify',
         'Meta'
       ]

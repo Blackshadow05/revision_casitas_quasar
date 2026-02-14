@@ -1,8 +1,18 @@
 <template>
   <q-page class="bg-page">
     <!-- Header Personalizado (Azul como en la imagen) -->
-    <div class="top-nav-bar q-pa-md row items-center justify-center">
+    <div class="top-nav-bar q-pa-md row items-center justify-between">
+      <div style="width: 40px"></div>
       <div class="text-h6 text-white text-weight-medium">Menús</div>
+      <q-btn
+        flat
+        dense
+        color="white"
+        icon="document_scanner"
+        label="Escanear"
+        to="/menus/scan"
+        class="text-weight-bold"
+      />
     </div>
 
     <div class="q-pa-md">

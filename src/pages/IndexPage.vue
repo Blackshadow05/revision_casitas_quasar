@@ -290,7 +290,7 @@
                 @click="goToDetails(casa)"
               >
                 <div class="card-header row items-center justify-between no-wrap">
-                  <div class="casita-number">{{ casa.casita || '00' }}</div>
+                  <div class="casita-number" :class="{ 'has-nota-extra': casa.nota_extra }">{{ casa.casita || '00' }}</div>
                   <div class="status-chip row items-center justify-center animated fadeIn" :class="getActionBadgeClass(casa.caja_fuerte)">
                       <q-icon :name="getActionIcon(casa.caja_fuerte)" size="14px" class="q-mr-xs" />
                       <span>{{ casa.caja_fuerte || 'Check in' }}</span>
@@ -731,6 +731,10 @@ export default defineComponent({
   color: #1a1a1a;
   line-height: 1;
   flex-shrink: 0;
+}
+
+.casita-number.has-nota-extra {
+  color: #FF9800 !important;
 }
 
 .status-chip {

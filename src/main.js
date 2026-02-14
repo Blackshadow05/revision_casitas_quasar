@@ -1,5 +1,5 @@
 import { createApp } from 'vue'
-import { Quasar } from 'quasar'
+import { Quasar, Dialog } from 'quasar'
 import { createPinia } from 'pinia'
 import createRouter from './router'
 import App from './App.vue'
@@ -15,7 +15,7 @@ const router = createRouter()
 
 myApp.use(pinia)
 myApp.use(Quasar, {
-  plugins: {},
+  plugins: { Dialog },
 })
 
 myApp.use(router)

@@ -1184,6 +1184,8 @@ export default defineComponent({
           await navigator.share({
             files: filesToShare
           })
+          // Close modal after successful share
+          closeShareModal()
           return
         } catch (e) {
           console.log('Share with files failed:', e)
@@ -1197,6 +1199,8 @@ export default defineComponent({
           title: 'Evidencias de Revisión',
           text: 'Aquí están las imágenes de evidencia'
         })
+        // Close modal after successful share
+        closeShareModal()
       } catch (e) {
         console.log('Share cancelled or failed:', e)
         // User cancelled or not supported - do nothing

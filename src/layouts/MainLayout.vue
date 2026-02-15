@@ -19,7 +19,7 @@
       >
         <q-tab name="home" icon="home" label="Inicio" @click="goToHome" />
         <q-tab name="menus" icon="restaurant" label="Menús" @click="goToMenus" />
-        <q-tab name="settings" icon="settings" label="Configuración" class="tab-settings" />
+        <q-tab name="settings" icon="settings" label="Configuración" class="tab-settings" @click="goToConfig" />
       </q-tabs>
     </q-footer>
 
@@ -46,6 +46,7 @@ export default defineComponent({
     watch(() => route.path, (path) => {
       if (path === '/') tab.value = 'home';
       else if (path === '/menus') tab.value = 'menus';
+      else if (path === '/config') tab.value = 'settings';
       // Agregue más si es necesario
     }, { immediate: true });
 
@@ -57,10 +58,15 @@ export default defineComponent({
       router.push("/menus");
     };
 
+    const goToConfig = () => {
+      router.push("/config");
+    };
+
     return {
       tab,
       goToHome,
       goToMenus,
+      goToConfig,
     };
   },
 });

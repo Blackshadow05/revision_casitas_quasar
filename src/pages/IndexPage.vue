@@ -112,7 +112,7 @@
 
       <div class="text-h5 text-weight-bold q-mb-lg" style="color: #4CAF50;">Revisiones de Casitas</div>
 
-      <!-- Search & Filter Bar -->
+      <!-- Search Bar -->
       <div class="row items-center q-gutter-x-md q-mb-lg">
         <q-input
           v-model="search"
@@ -129,129 +129,34 @@
           </template>
         </q-input>
         <q-btn
-          unelevated
+          round
+          flat
           icon="filter_list"
           color="primary"
-          class="filter-btn"
+          class="filter-btn bg-white shadow-1"
           @click="showFilterModal = true"
-        />
+        >
+          <q-tooltip>Filtros</q-tooltip>
+        </q-btn>
       </div>
 
-      <!-- Filter Modal -->
-      <q-dialog v-model="showFilterModal" position="bottom" backdrop-filter="blur(4px)">
-        <q-card style="border-radius: 28px 28px 0 0; max-height: 90vh;">
-          <div class="row justify-center q-pt-sm">
-            <div style="width: 40px; height: 4px; background: #e0e0e0; border-radius: 2px;"></div>
-          </div>
-
-          <q-card-section class="row items-center justify-between q-pb-none">
-            <div class="text-h5 text-weight-bolder">Filtros</div>
-            <q-btn icon="close" flat round dense v-close-popup class="text-grey-7" />
-          </q-card-section>
-
-          <q-separator class="q-my-md q-mx-md" style="opacity: 0.3" />
-
-          <q-card-section class="q-pt-sm scroll" style="max-height: 60vh;">
-            <!-- Filtrar por Section -->
-            <div class="text-subtitle1 text-weight-bold q-mb-sm text-dark">Filtrar por (última revisión por casita)</div>
-            <q-select
-              v-model="filterBy"
-              :options="filterOptions"
-              option-label="label"
-              option-value="label"
-              emit-value
-              map-options
-              outlined
-              rounded
-              dense
-              bg-color="grey-1"
-              class="q-mb-xl custom-select"
-            />
-
-            <!-- Fecha Section -->
-            <div class="text-subtitle1 text-weight-bold q-mb-sm text-dark">Fecha</div>
-            <div class="date-selector row items-center justify-between q-pa-md q-mb-xl" @click="showDatePicker = true">
-              <div class="row items-center">
-                <q-icon name="calendar_today" color="blue" size="24px" class="q-mr-md" />
-                <div class="text-body1 text-grey-8">{{ selectedDate || 'Seleccionar fecha' }}</div>
-              </div>
-              <q-icon name="chevron_right" color="grey-5" />
-            </div>
-
-            <!-- Rapid Filters Space Placeholder -->
-            <div class="text-subtitle1 text-weight-bold q-mb-md text-dark">Filtros Rápidos</div>
-            <div class="row q-gutter-sm">
-              <q-btn
-                label="Última revisión por casita"
-                icon="today"
-                unelevated
-                rounded
-                no-caps
-                color="green-7"
-                class="rapid-filter-btn"
-                :loading="loading && rapidFilterLoading === 'today'"
-                @click="applyRapidFilter('today')"
-              />
-              <q-btn
-                label="Con notas"
-                icon="note"
-                unelevated
-                rounded
-                no-caps
-                color="amber-8"
-                class="rapid-filter-btn"
-                :loading="loading && rapidFilterLoading === 'notes'"
-                @click="applyRapidFilter('notes')"
-              />
-            </div>
-          </q-card-section>
-
-          <q-card-actions class="row q-col-gutter-sm q-px-md q-pb-lg">
-            <div class="col-4">
-              <q-btn
-                label="Limpiar"
-                outline
-                rounded
-                no-caps
-                class="full-width action-btn-cancel"
-                @click="clearFilters"
-              />
-            </div>
-            <div class="col-8">
-              <q-btn
-                color="blue"
-                unelevated
-                rounded
-                no-caps
-                class="full-width action-btn-apply"
-                :loading="loading"
-                @click="applyFilters"
-              >
-                <q-icon name="check" size="18px" class="q-mr-xs" />
-                Aplicar filtros
-              </q-btn>
-            </div>
-          </q-card-actions>
-        </q-card>
-      </q-dialog>
-
-      <q-dialog v-model="showDatePicker" backdrop-filter="blur(2px)">
-        <q-date v-model="selectedDate" mask="DD/MM/YYYY" flat @update:model-value="showDatePicker = false" />
-      </q-dialog>
-
       <!-- Active Filter Badge -->
-      <div v-if="store.activeFilter" class="flex items-center q-mb-md q-gutter-sm">
-        <q-chip
-          color="blue"
-          text-color="white"
-          icon="filter_alt"
-          removable
-          @remove="clearFilters"
-          class="text-weight-bold"
-        >
-          {{ store.activeFilter.label }}
-        </q-chip>
-        <span v-if="!store.activeFilter.date && !store.activeFilter.hasNotes && !store.activeFilter.isToday" class="text-caption text-grey-6">(última revisión por casita)</span>
+      <div v-if="store.activeFilter" class="row items-center q-mb-md justify-center">
+        <div class="active-filter-badge">
+          <q-icon name="filter_alt" size="16px" class="q-mr-xs" />
+          <span>{{ store.activeFilter.label }}</span>
+          <q-btn
+            flat
+            round
+            dense
+            icon="close"
+            size="sm"
+            class="q-ml-xs"
+            @click="clearFiltersFromBadge"
+          >
+            <q-tooltip>Limpiar filtro</q-tooltip>
+          </q-btn>
+        </div>
       </div>
 
       <!-- Mostrando registros badge -->
@@ -325,15 +230,56 @@
       </q-pull-to-refresh>
     </div>
 
-    <!-- Floating Action Button (always visible) -->
-    <q-page-sticky position="bottom-right" :offset="[20, 20]">
-      <q-btn
-        fab
-        icon="add"
-        class="fab-btn"
-        @click="addNew"
-      />
-    </q-page-sticky>
+    <!-- Filter Modal -->
+    <q-dialog v-model="showFilterModal" persistent backdrop-filter="blur(4px)">
+      <q-card style="width: 90%; max-width: 400px; border-radius: 20px;">
+        <q-card-section class="row items-center q-pb-none">
+          <div class="text-h6">Filtros</div>
+          <q-space />
+          <q-btn icon="close" flat round dense v-close-popup @click="showFilterModal = false" />
+        </q-card-section>
+
+        <q-card-section>
+          <!-- Date Filter (always visible) -->
+          <div class="text-subtitle2 text-grey-7 q-mb-sm">Filtrar por fecha</div>
+          <q-input
+            v-model="filterDate"
+            type="date"
+            label="Seleccionar fecha"
+            outlined
+            rounded
+            dense
+            class="q-mb-lg"
+          >
+            <template v-slot:prepend>
+              <q-icon name="calendar_today" />
+            </template>
+          </q-input>
+
+          <div class="text-subtitle2 text-grey-7 q-mb-sm">Otros filtros</div>
+          <q-select
+            v-model="selectedFilter"
+            :options="filterOptions"
+            label="Filtrar por"
+            outlined
+            rounded
+            dense
+            emit-value
+            map-options
+          >
+            <template v-slot:prepend>
+              <q-icon name="filter_list" />
+            </template>
+          </q-select>
+        </q-card-section>
+
+        <q-card-actions align="right" class="q-px-md q-pb-md">
+          <q-btn flat label="Limpiar" color="grey-7" @click="clearFilters" :disable="!selectedFilter && !filterDate" />
+          <q-btn flat label="Cancelar" color="grey-7" v-close-popup @click="showFilterModal = false" />
+          <q-btn unelevated label="Aplicar" color="primary" @click="applyFilters" :disable="!selectedFilter && !filterDate" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -354,96 +300,86 @@ export default defineComponent({
     const route = useRoute()
     const $q = useQuasar()
     const infiniteScroll = ref(null)
+
     const showFilterModal = ref(false)
-    const showDatePicker = ref(false)
+    const showLoginModal = ref(false)
 
-    const selectedTags = ref([])
-    const selectedDate = ref(null)
-
+    // Opciones de filtro
     const filterOptions = [
-      { label: 'Ver todos', field: null, value: null },
-      { label: 'Sin trapo binocular', field: 'trapo_binoculares', value: 'No' },
-      { label: 'Con trapo binocular', field: 'trapo_binoculares', value: 'Si' },
-      { label: 'Sin sombrero', field: 'sombrero', value: 'No' },
-      { label: 'Con sombrero', field: 'sombrero', value: 'Si' },
-      { label: 'Sin bulto', field: 'bulto', value: 'No' },
-      { label: 'Con bulto', field: 'bulto', value: 'Si' },
-      { label: 'Sin cola de caballo', field: 'cola_caballo', value: 'No' },
-      { label: 'Con cola de caballo', field: 'cola_caballo', value: 'Si' },
-      { label: 'No hay yute', field: 'bolso_yute', value: '0' },
-      { label: 'Hay un yute', field: 'bolso_yute', value: '1', valueAlt: '01' },
-      { label: 'Hay 2 bolsos Yute', field: 'bolso_yute', value: '2', valueAlt: '02' }
+      { label: 'Por fecha', value: JSON.stringify({ isDate: true, label: 'Por fecha' }) },
+      { label: 'Sin trapo binocular', value: JSON.stringify({ field: 'trapo_binoculares', value: 'No', label: 'Sin trapo binocular' }) },
+      { label: 'Con trapo binocular', value: JSON.stringify({ field: 'trapo_binoculares', value: 'Si', label: 'Con trapo binocular' }) },
+      { label: 'Sin sombrero', value: JSON.stringify({ field: 'sombrero', value: 'No', label: 'Sin sombrero' }) },
+      { label: 'Con sombrero', value: JSON.stringify({ field: 'sombrero', value: 'Si', label: 'Con sombrero' }) },
+      { label: 'Sin bulto', value: JSON.stringify({ field: 'bulto', value: 'No', label: 'Sin bulto' }) },
+      { label: 'Con bulto', value: JSON.stringify({ field: 'bulto', value: 'Si', label: 'Con bulto' }) },
+      { label: 'Sin cola de caballo', value: JSON.stringify({ field: 'cola_caballo', value: 'No', label: 'Sin cola de caballo' }) },
+      { label: 'Con cola de caballo', value: JSON.stringify({ field: 'cola_caballo', value: 'Si', label: 'Con cola de caballo' }) },
+      { label: 'Sin Yute', value: JSON.stringify({ field: 'bolso_yute', value: '0', label: 'No hay Yute', isArray: false }) },
+      { label: 'Hay un Yute', value: JSON.stringify({ field: 'bolso_yute', value: '1,01', label: 'Hay un Yute', isArray: true }) },
+      { label: 'Hay 2 Yutes', value: JSON.stringify({ field: 'bolso_yute', value: '2,02', label: 'Hay 2 Yutes', isArray: true }) }
     ]
 
-    const filterBy = ref(filterOptions[0].label)
-
-    const toggleTag = (tag) => {
-      const index = selectedTags.value.indexOf(tag)
-      if (index > -1) {
-        selectedTags.value.splice(index, 1)
-      } else {
-        selectedTags.value.push(tag)
-      }
-    }
+    const selectedFilter = ref(null)
+    const filterDate = ref(null)
 
     const applyFilters = async () => {
-      // Si hay fecha seleccionada, filtrar por fecha
-      if (selectedDate.value) {
-        // El formato de q-date devuelve "YYYY/MM/DD" por defecto
-        // Convertirlo directamente a "YYYY-MM-DD" para Supabase
-        const dbDate = selectedDate.value.replace(/\//g, '-')
+      // Si hay fecha seleccionada, aplicar filtro de fecha
+      if (filterDate.value) {
         await store.applyAdvancedFilter({
-          date: dbDate,
-          label: `Fecha: ${selectedDate.value}`
+          date: filterDate.value,
+          label: 'Fecha: ' + filterDate.value
         })
         showFilterModal.value = false
+        filterDate.value = null
+        selectedFilter.value = null
+        $q.notify({
+          type: 'positive',
+          message: `Filtro aplicado: ${store.activeFilter?.label}`,
+          position: 'top'
+        })
         return
       }
-
-      const selected = filterOptions.find(f => f.label === filterBy.value)
-      if (!selected || !selected.field) {
-        // "Ver todos" - limpiar filtro
-        store.clearAdvancedFilter()
-        showFilterModal.value = false
-        return
-      }
+      
+      if (!selectedFilter.value) return
+      
+      const filterData = JSON.parse(selectedFilter.value)
+      
       await store.applyAdvancedFilter({
-        field: selected.field,
-        value: selected.value,
-        valueAlt: selected.valueAlt || null,
-        label: selected.label
+        field: filterData.field,
+        value: filterData.value,
+        label: filterData.label,
+        isArray: filterData.isArray || false
       })
+      
       showFilterModal.value = false
+      $q.notify({
+        type: 'positive',
+        message: `Filtro aplicado: ${filterData.label}`,
+        position: 'top'
+      })
     }
 
-    const clearFilters = () => {
-      filterBy.value = filterOptions[0].label
-      selectedTags.value = []
-      selectedDate.value = null
-      store.clearAdvancedFilter()
-      showFilterModal.value = false
+    const clearFilters = async () => {
+      selectedFilter.value = null
+      filterDate.value = null
+      await store.clearAdvancedFilter()
+      $q.notify({
+        type: 'info',
+        message: 'Filtros limpiados',
+        position: 'top'
+      })
     }
 
-    const rapidFilterLoading = ref(null)
-
-    const applyRapidFilter = async (type) => {
-      rapidFilterLoading.value = type
-      if (type === 'notes') {
-        await store.applyAdvancedFilter({
-          hasNotes: true,
-          label: 'Con notas'
-        })
-      } else if (type === 'today') {
-        await store.applyAdvancedFilter({
-          isToday: true,
-          label: 'Última revisión por casita'
-        })
-      }
-      rapidFilterLoading.value = null
-      showFilterModal.value = false
+    const clearFiltersFromBadge = async () => {
+      selectedFilter.value = null
+      await store.clearAdvancedFilter()
+      $q.notify({
+        type: 'info',
+        message: 'Filtro limpiado',
+        position: 'top'
+      })
     }
-
-    const showLoginModal = ref(false)
     const loginLoading = computed(() => authStore.loading)
     const loginError = computed(() => authStore.error)
     const isLoggedIn = computed(() => authStore.isLoggedIn)
@@ -628,6 +564,13 @@ export default defineComponent({
       getActionIcon,
       getCardNoteText,
       goToDetails,
+      showFilterModal,
+      applyFilters,
+      filterOptions,
+      selectedFilter,
+      filterDate,
+      clearFilters,
+      clearFiltersFromBadge,
       showLoginModal,
       loginData,
       loginLoading,
@@ -636,18 +579,7 @@ export default defineComponent({
       currentUser,
       daysRemaining,
       handleLogin,
-      handleLogout,
-      showFilterModal,
-      showDatePicker,
-      selectedTags,
-      filterBy,
-      filterOptions,
-      selectedDate,
-      toggleTag,
-      applyFilters,
-      clearFilters,
-      rapidFilterLoading,
-      applyRapidFilter
+      handleLogout
     }
   }
 })
@@ -834,6 +766,18 @@ export default defineComponent({
   height: 40px;
 }
 
+.active-filter-badge {
+  display: inline-flex;
+  align-items: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 4px 10px rgba(102, 126, 234, 0.4);
+}
+
 .logout-btn {
   background: #ffebee;
   color: #c62828;
@@ -860,63 +804,5 @@ export default defineComponent({
 
 .rounded-btn {
   border-radius: 12px;
-}
-
-/* Filter Modal Styles */
-.tag-button {
-  padding: 4px 16px;
-  font-size: 13px;
-  font-weight: 500;
-  border: 1px solid #e0e0e0;
-  transition: all 0.3s;
-}
-
-.tag-inactive {
-  background: white !important;
-  color: #616161;
-}
-
-.tag-active {
-  background: #2196F3 !important;
-  color: white;
-  border-color: #2196F3;
-}
-
-.custom-select :deep(.q-field__control) {
-  height: 54px;
-  background: #f5f5f5 !important;
-}
-
-.date-selector {
-  border: 1px solid #e0e0e0;
-  border-radius: 16px;
-  background: #ffffff;
-  cursor: pointer;
-}
-
-.action-btn-cancel {
-  height: 54px;
-  border-radius: 16px !important;
-  font-weight: bold;
-}
-
-.action-btn-apply {
-  height: 54px;
-  border-radius: 16px !important;
-  font-weight: bold;
-  font-size: 16px;
-}
-
-.scroll::-webkit-scrollbar {
-  display: none;
-}
-.scroll {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-.rapid-filter-btn {
-  font-weight: 600;
-  padding: 8px 16px;
 }
 </style>

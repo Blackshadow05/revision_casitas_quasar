@@ -58,15 +58,14 @@
             </div>
             <div class="col-12 col-sm-6">
               <div class="section-label q-mb-xs">Quién Revisa <span class="required-asterisk">*</span></div>
-              <q-select
+              <q-input
                 v-model="editForm.quien_revisa"
-                :options="users"
                 outlined
                 dense
-                bg-color="white"
+                bg-color="grey-2"
                 class="input-styled"
-                behavior="menu"
-                :rules="[val => !!val || 'Campo requerido']"
+                readonly
+                disable
               />
             </div>
           </div>
@@ -1450,7 +1449,6 @@ export default defineComponent({
       try {
         const updateData = {
           casita: editForm.value.casita,
-          quien_revisa: editForm.value.quien_revisa,
           caja_fuerte: editForm.value.caja_fuerte,
           room_move: editForm.value.room_move,
           puertas_ventanas: editForm.value.puertas_ventanas,

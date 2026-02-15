@@ -7,7 +7,9 @@ const routes = [
       { path: 'details', component: () => import('pages/DetailsPage.vue') },
       { path: 'new-revision', component: () => import('pages/NewRevisionPage.vue') },
       { path: 'menus', component: () => import('pages/MenusPage.vue') },
-      { path: 'menus/scan', component: () => import('pages/ScanMenuPage.vue') }
+      { path: 'menus/scan', component: () => import('pages/ScanMenuPage.vue') },
+      { path: 'config', component: () => import('pages/ConfigPage.vue') },
+      { path: 'admin-users', component: () => import('pages/AdminUsersPage.vue') }
     ]
   },
 

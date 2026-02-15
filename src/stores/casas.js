@@ -16,8 +16,16 @@ export const useCasasStore = defineStore('casas', {
   }),
   getters: {
     filteredCasas: (state) => {
+      console.log('=== filteredCasas getter ===')
+      console.log('activeFilter:', state.activeFilter)
+      console.log('filteredByLatest length:', state.filteredByLatest.length)
+      console.log('casas length:', state.casas.length)
+      console.log('search:', state.search)
+      
       // Si hay un filtro activo, usar los resultados filtrados
       const source = state.activeFilter ? state.filteredByLatest : state.casas
+      console.log('source length:', source.length)
+      
       if (!state.search) {
         state.searchFromDB = false
         return source
@@ -26,12 +34,18 @@ export const useCasasStore = defineStore('casas', {
       if (state.searchFromDB) {
         return source
       }
-      // Filtrado local solo cuando no se ha hecho búsqueda en DB
+      // Si la búsqueda es un número, buscar exactamente por casita
+      // Si es texto, buscar parcialmente en quien_revisa
       const searchLower = state.search.toLowerCase()
-      return source.filter(c => 
-        (c.casita && c.casita.toLowerCase() === searchLower) || 
-        (c.quien_revisa && c.quien_revisa.toLowerCase().includes(searchLower))
-      )
+      if (/^\d+$/.test(state.search.trim())) {
+        // Búsqueda exacta por número de casita
+        return source.filter(c => c.casita && c.casita.toString() === state.search.trim())
+      } else {
+        // Búsqueda parcial por quien_revisa
+        return source.filter(c => 
+          c.quien_revisa && c.quien_revisa.toLowerCase().includes(searchLower)
+        )
+      }
     }
   },
   actions: {
@@ -132,30 +146,107 @@ export const useCasasStore = defineStore('casas', {
           data = result.data
           error = result.error
         } else if (filter.date) {
-          // Filtro por fecha específica
-          // Usar consulta directa en lugar de RPC para manejar correctamente timestamps
+          // Filtro por fecha específica - obtener solo la última revisión por casita de esa fecha
+          console.log('=== FILTRO FECHA ===')
+          console.log('Fecha recibida:', filter.date)
+          console.log('Tipo de fecha:', typeof filter.date)
+          
+          // Usar rango de fechas para manejar correctamente zonas horarias
+          const startDate = filter.date + 'T00:00:00'
+          const endDate = filter.date + 'T23:59:59'
+          
+          console.log('Rango:', startDate, 'a', endDate)
+          
           const { data: queryData, error: queryError } = await supabase
             .from('revisiones_casitas')
+            .select('*', { count: 'exact' })
+            .gte('created_at', startDate)
+            .lte('created_at', endDate)
+            .order('created_at', { ascending: false })
+            .limit(10000)
+          
+          console.log('Datos recibidos:', queryData?.length || 0)
+          console.log('Error:', queryError)
+          
+          if (queryError) throw queryError
+          
+          // Agrupar por casita y obtener solo la última revisión de cada una
+          const latestByCasa = {}
+          for (const casa of queryData) {
+            if (!latestByCasa[casa.casita]) {
+              latestByCasa[casa.casita] = casa
+            }
+          }
+          
+          data = Object.values(latestByCasa)
+          console.log('Resultados finales:', data.length)
+        } else {
+          // Obtener TODAS las revisiones y filtrar localmente para obtener solo la última por casita
+          // luego mostrar solo las que tienen el campo = value en su última revisión
+          const { data: allData, error: allError } = await supabase
+            .from('revisiones_casitas')
             .select('*')
-            .eq('created_at::date', filter.date)
             .order('created_at', { ascending: false })
           
-          data = queryData
-          error = queryError
-        } else {
-          // Usar la función RPC para filtrar última revisión por casita
-          const result = await supabase.rpc('filter_latest_revision', {
-            p_field: filter.field || null,
-            p_value: filter.value || null,
-            p_value_alt: filter.valueAlt || null,
-            p_has_notes: false
+          if (allError) throw allError
+          
+          // Agrupar por casita y obtener solo la última revisión de cada una
+          const latestByCasa = {}
+          for (const casa of allData) {
+            if (!latestByCasa[casa.casita]) {
+              latestByCasa[casa.casita] = casa
+            }
+          }
+          
+          console.log('=== FILTRO DEBUG ===')
+          console.log('Filter:', filter)
+          console.log('Total de casas agrupadas:', Object.keys(latestByCasa).length)
+          console.log('Casitas únicas:', Object.keys(latestByCasa))
+          
+          // Mostrar valores de bolso_yute para cada casa
+          console.log('Valores de bolso_yute en últimas revisiones:')
+          Object.values(latestByCasa).forEach(casa => {
+            console.log(`  Casita ${casa.casita}: bolso_yute = "${casa.bolso_yute}" (tipo: ${typeof casa.bolso_yute})`)
           })
-          data = result.data
-          error = result.error
+          
+          // Filtrar: mostrar solo las casas donde la última revisión tiene el campo igual al valor especificado
+          // O si es un array de valores (como para Yute)
+          const field = filter.field
+          const value = filter.value
+          const isArrayFilter = filter.isArray
+          
+          console.log('Field:', field)
+          console.log('Value:', value)
+          console.log('IsArray:', isArrayFilter)
+          
+          if (isArrayFilter) {
+            const allowedValues = value.split(',')
+            console.log('Allowed values:', allowedValues)
+            
+            // Comparar valores permitiendo variaciones con ceros a la izquierda
+            data = Object.values(latestByCasa).filter(casa => {
+              const fieldValue = String(casa[field]).trim()
+              // Verificar si el valor está en la lista (incluye variaciones con ceros a la izquierda)
+              const matches = allowedValues.some(av => 
+                av === fieldValue || 
+                av.replace(/^0+/, '') === fieldValue.replace(/^0+/, '')
+              )
+              if (matches) {
+                console.log(`  MATCH: Casita ${casa.casita} - fieldValue: "${fieldValue}"`)
+              }
+              return matches
+            })
+            console.log('Resultados encontrados:', data.length)
+            console.log('=== FIN FILTRO ===')
+          } else {
+            data = Object.values(latestByCasa).filter(casa => casa[field] === value)
+          }
         }
 
         if (error) throw error
         this.filteredByLatest = data || []
+        console.log('filteredByLatest guardado:', this.filteredByLatest.length, 'registros')
+        console.log('activeFilter:', this.activeFilter)
       } catch (error) {
         console.error('Error applying advanced filter:', error.message)
         this.filteredByLatest = []
@@ -195,13 +286,22 @@ export const useCasasStore = defineStore('casas', {
       this.loading = true
       this.searchFromDB = true
       try {
-        const searchLower = searchTerm.toLowerCase()
-        const { data, error } = await supabase
+        let query = supabase
           .from('revisiones_casitas')
           .select('*')
-          .or(`casita.eq.${searchLower},quien_revisa.ilike.%${searchLower}%`)
           .order('created_at', { ascending: false })
-          .limit(200)
+        
+        // Si la búsqueda es un número, buscar exactamente por casita
+        // Si es texto, buscar parcialmente en quien_revisa
+        if (/^\d+$/.test(searchTerm.trim())) {
+          // Búsqueda exacta por número de casita
+          query = query.eq('casita', searchTerm.trim())
+        } else {
+          // Búsqueda parcial por quien_revisa
+          query = query.ilike('quien_revisa', `%${searchTerm.trim()}%`)
+        }
+        
+        const { data, error } = await query.limit(200)
 
         if (error) throw error
         this.casas = data

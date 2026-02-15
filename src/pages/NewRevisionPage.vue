@@ -593,6 +593,54 @@
       </q-card-section>
     </q-card>
   </q-dialog>
+
+  <!-- Share Modal -->
+  <q-dialog v-model="showShareModal" persistent>
+    <q-card class="share-modal-card">
+      <q-card-section class="share-modal-header">
+        <div class="text-h6">Compartir Evidencias</div>
+        <q-btn icon="close" flat round dense @click="closeShareModal" />
+      </q-card-section>
+
+      <q-card-section class="q-pt-none">
+        <div class="text-body1 q-mb-md">
+          La revisión ha sido guardada. ¿Deseas compartir las imágenes de evidencia?
+        </div>
+
+        <!-- Evidence Preview Grid -->
+        <div class="share-evidence-grid">
+          <div v-if="shareEvidenciaUrls.evidencia_01" class="share-evidence-item">
+            <div class="share-evidence-label">Evidencia 1</div>
+            <img :src="shareEvidenciaUrls.evidencia_01" class="share-evidence-image" />
+          </div>
+          <div v-if="shareEvidenciaUrls.evidencia_02" class="share-evidence-item">
+            <div class="share-evidence-label">Evidencia 2</div>
+            <img :src="shareEvidenciaUrls.evidencia_02" class="share-evidence-image" />
+          </div>
+          <div v-if="shareEvidenciaUrls.evidencia_03" class="share-evidence-item">
+            <div class="share-evidence-label">Evidencia 3</div>
+            <img :src="shareEvidenciaUrls.evidencia_03" class="share-evidence-image" />
+          </div>
+        </div>
+      </q-card-section>
+
+      <q-card-actions class="share-modal-actions" vertical>
+        <q-btn
+          class="share-btn share-btn-native"
+          unelevated
+          label="Compartir imágenes"
+          icon="share"
+          @click="shareViaWebShare"
+        />
+        <q-btn
+          class="share-btn share-btn-cancel"
+          flat
+          label="Cerrar"
+          @click="closeShareModal"
+        />
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
 </template>
 
 <script>
@@ -619,6 +667,9 @@ export default defineComponent({
     const fileEvidencia03 = ref(null)
     const imageModalOpen = ref(false)
     const modalImageUrl = ref('')
+    const showShareModal = ref(false)
+    const shareEvidenciaUrls = ref({})
+    const shareFiles = ref([])
 
     // Generate casita options 1-50
     const casitaOptions = Array.from({ length: 50 }, (_, i) => (i + 1).toString())
@@ -1123,6 +1174,79 @@ export default defineComponent({
       }
     }
 
+    const shareViaWebShare = async () => {
+      // Use the compressed files from memory
+      if (shareFiles.value.length > 0) {
+        const filesToShare = shareFiles.value.map(f => f.file)
+        
+        try {
+          // Try to share with files
+          await navigator.share({
+            files: filesToShare
+          })
+          return
+        } catch (e) {
+          console.log('Share with files failed:', e)
+          // If sharing files fails, try without files
+        }
+      }
+      
+      // Fallback: try sharing without files (text only)
+      try {
+        await navigator.share({
+          title: 'Evidencias de Revisión',
+          text: 'Aquí están las imágenes de evidencia'
+        })
+      } catch (e) {
+        console.log('Share cancelled or failed:', e)
+        // User cancelled or not supported - do nothing
+      }
+    }
+    
+    const closeShareModal = () => {
+      showShareModal.value = false
+      resetFormAndGoBack()
+    }
+    
+    const resetFormAndGoBack = () => {
+      form.value = {
+        casita: '',
+        quien_revisa: users.value.length === 1 ? users.value[0] : '',
+        caja_fuerte: '',
+        room_move: '',
+        puertas_ventanas: '',
+        chromecast: '',
+        binoculares: '',
+        trapo_binoculares: '',
+        speaker: '',
+        usb_speaker: '',
+        controles_tv: '',
+        secadora: '',
+        accesorios_secadora: '',
+        steamer: '',
+        bolsa_vapor: '',
+        plancha_cabello: '',
+        cola_caballo: '',
+        bulto: '',
+        sombrero: '',
+        bolso_yute: '',
+        camas_ordenadas: '',
+        evidencia_01: null,
+        evidencia_02: null,
+        evidencia_03: null,
+        notas: ''
+      }
+      
+      compressionInfo.value = {
+        evidencia_01: null,
+        evidencia_02: null,
+        evidencia_03: null
+      }
+      
+      formSubmitted.value = false
+      router.back()
+    }
+
     const onSubmit = async () => {
       // Mark form as submitted to show validation errors
       formSubmitted.value = true
@@ -1189,42 +1313,35 @@ export default defineComponent({
         
         if (result.success) {
           console.log('[NewRevisionPage] Revisión guardada exitosamente')
-          // Reset form
-          form.value = {
-            casita: '',
-            quien_revisa: users.value.length === 1 ? users.value[0] : '',
-            caja_fuerte: '',
-            room_move: '',
-            puertas_ventanas: '',
-            chromecast: '',
-            binoculares: '',
-            trapo_binoculares: '',
-            speaker: '',
-            usb_speaker: '',
-            controles_tv: '',
-            secadora: '',
-            accesorios_secadora: '',
-            steamer: '',
-            bolsa_vapor: '',
-            plancha_cabello: '',
-            cola_caballo: '',
-            bulto: '',
-            sombrero: '',
-            bolso_yute: '',
-            camas_ordenadas: '',
-            evidencia_01: null,
-            evidencia_02: null,
-            evidencia_03: null,
-            notas: ''
-          }
           
-          compressionInfo.value = {
-            evidencia_01: null,
-            evidencia_02: null,
-            evidencia_03: null
-          }
+          // Check if there are evidence images to share
+          const hasEvidencia = evidencia01Url || evidencia02Url || evidencia03Url
           
-          router.back()
+          if (hasEvidencia) {
+            // Store compressed files for sharing (before upload to Cloudinary)
+            const files = []
+            if (form.value.evidencia_01) files.push({ field: 'evidencia_01', file: form.value.evidencia_01 })
+            if (form.value.evidencia_02) files.push({ field: 'evidencia_02', file: form.value.evidencia_02 })
+            if (form.value.evidencia_03) files.push({ field: 'evidencia_03', file: form.value.evidencia_03 })
+            
+            shareFiles.value = files
+            
+            // Also prepare Cloudinary URLs for WhatsApp/copy link
+            const cloudName = CLOUDINARY_CONFIG.cloudName
+            const baseUrl = `https://res.cloudinary.com/${cloudName}/image/upload`
+            
+            shareEvidenciaUrls.value = {
+              evidencia_01: evidencia01Url ? `${baseUrl}/f_auto,q_auto/${evidencia01Url}` : null,
+              evidencia_02: evidencia02Url ? `${baseUrl}/f_auto,q_auto/${evidencia02Url}` : null,
+              evidencia_03: evidencia03Url ? `${baseUrl}/f_auto,q_auto/${evidencia03Url}` : null
+            }
+            
+            // Show share modal
+            showShareModal.value = true
+          } else {
+            // No evidence images, go back directly
+            resetFormAndGoBack()
+          }
         } else {
           console.error('[NewRevisionPage] Error al guardar:', result.error)
         }
@@ -1324,7 +1441,13 @@ export default defineComponent({
       getPreviewUrl,
       openImageModal,
       removePhoto,
-      onSubmit
+      onSubmit,
+      showShareModal,
+      shareEvidenciaUrls,
+      shareFiles,
+      shareViaWebShare,
+      closeShareModal,
+      navigator: window.navigator
     }
   }
 })
@@ -1623,6 +1746,123 @@ export default defineComponent({
   
   .compression-row {
     gap: 2px;
+  }
+}
+
+/* Share Modal Styles */
+.share-modal-card {
+  width: 100%;
+  max-width: 450px;
+  border-radius: 16px;
+}
+
+.share-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.share-modal-header .text-h6 {
+  font-weight: 600;
+  color: #424242;
+}
+
+.share-evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.share-evidence-item {
+  position: relative;
+}
+
+.share-evidence-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #616161;
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.share-evidence-image {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.share-evidence-image:hover {
+  transform: scale(1.02);
+}
+
+.share-modal-actions {
+  padding: 8px 20px 20px;
+}
+
+.share-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  font-weight: 600;
+  text-transform: none;
+  margin-bottom: 8px;
+}
+
+.share-btn:last-child {
+  margin-bottom: 0;
+}
+
+.share-btn-primary {
+  background: #25D366 !important;
+  color: white !important;
+}
+
+.share-btn-primary:hover {
+  background: #128C7E !important;
+}
+
+.share-btn-secondary {
+  background: #1976d2 !important;
+  color: white !important;
+}
+
+.share-btn-secondary:hover {
+  background: #1565C0 !important;
+}
+
+.share-btn-native {
+  background: #7B1FA2 !important;
+  color: white !important;
+}
+
+.share-btn-native:hover {
+  background: #6A1B9A !important;
+}
+
+.share-btn-cancel {
+  color: #757575 !important;
+  margin-top: 8px;
+}
+
+.share-btn-cancel:hover {
+  background: #f5f5f5 !important;
+}
+
+@media (max-width: 600px) {
+  .share-evidence-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  
+  .share-modal-card {
+    margin: 16px;
   }
 }
 </style>

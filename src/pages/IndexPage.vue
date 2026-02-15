@@ -280,6 +280,15 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
+    <!-- Floating Action Button -->
+    <q-page-sticky position="bottom-right" :offset="[18, 18]" v-if="isLoggedIn">
+      <q-fab
+        icon="add"
+        color="primary"
+        class="fab-btn"
+        @click="addNew"
+      />
+    </q-page-sticky>
   </q-page>
 </template>
 

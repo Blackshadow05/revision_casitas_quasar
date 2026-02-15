@@ -2,7 +2,7 @@
   <q-page class="bg-gray-1">
     <div class="top-nav-bar q-pa-md row items-center">
       <q-btn flat round dense color="white" icon="arrow_back" @click="$router.back()" />
-      <div class="text-h6 text-white q-ml-md">Escanear Menú con IA</div>
+      <div class="text-h6 text-white q-ml-md">Escanear Menú</div>
     </div>
 
     <div class="q-pa-md">

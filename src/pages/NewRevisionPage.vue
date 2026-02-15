@@ -187,7 +187,7 @@
         </div>
       </div>
 
-      <div class="row q-col-gutter-md" :class="{ 'error-row': validationErrors.trapo_binoculares || validationErrors.bolsa_vapor }">
+      <div class="row q-col-gutter-md" :class="{ 'error-row': validationErrors.trapo_binoculares }">
         <div class="col-12 col-sm-6">
           <div class="section-label q-mb-md" :class="{ 'error-label': validationErrors.trapo_binoculares }">Trapo para binoculares <span class="required-asterisk">*</span></div>
           <div class="button-grid">
@@ -199,6 +199,57 @@
               class="custom-select-btn option-btn"
               :class="{ 'selected': form.trapo_binoculares === option }"
               @click="form.trapo_binoculares = option"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Secadora & Accesorios Secadora -->
+      <div class="row q-col-gutter-md" :class="{ 'error-row': validationErrors.secadora || validationErrors.accesorios_secadora }">
+        <div class="col-12 col-sm-6">
+          <div class="section-label q-mb-md" :class="{ 'error-label': validationErrors.secadora }">Secadora <span class="required-asterisk">*</span></div>
+          <div class="button-grid">
+            <q-btn
+              v-for="option in ['0', '01', '02', '03']"
+              :key="option"
+              :label="option"
+              unelevated
+              class="custom-select-btn option-btn"
+              :class="{ 'selected': form.secadora === option }"
+              @click="form.secadora = option"
+            />
+          </div>
+        </div>
+        <div class="col-12 col-sm-6">
+          <div class="section-label q-mb-md" :class="{ 'error-label': validationErrors.accesorios_secadora }">Accesorios Secadora <span class="required-asterisk">*</span></div>
+          <div class="button-grid">
+            <q-btn
+              v-for="option in ['0', '01', '02', '03', '04', '05', '06', '07', '08']"
+              :key="option"
+              :label="option"
+              unelevated
+              class="custom-select-btn option-btn"
+              style="min-width: 45px;"
+              :class="{ 'selected': form.accesorios_secadora === option }"
+              @click="form.accesorios_secadora = option"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Steamer & Bolsa Vapor -->
+      <div class="row q-col-gutter-md" :class="{ 'error-row': validationErrors.steamer || validationErrors.bolsa_vapor }">
+        <div class="col-12 col-sm-6">
+          <div class="section-label q-mb-md" :class="{ 'error-label': validationErrors.steamer }">Steamer <span class="required-asterisk">*</span></div>
+          <div class="button-grid">
+            <q-btn
+              v-for="option in ['0', '01', '02', '03']"
+              :key="option"
+              :label="option"
+              unelevated
+              class="custom-select-btn option-btn"
+              :class="{ 'selected': form.steamer === option }"
+              @click="form.steamer = option"
             />
           </div>
         </div>
@@ -215,55 +266,6 @@
               @click="form.bolsa_vapor = option"
             />
           </div>
-        </div>
-      </div>
-
-      <!-- Secadora & Steamer -->
-      <div class="row q-col-gutter-md" :class="{ 'error-row': validationErrors.secadora || validationErrors.steamer }">
-        <div class="col-12 col-sm-6">
-          <div class="section-label q-mb-md" :class="{ 'error-label': validationErrors.secadora }">Secadora <span class="required-asterisk">*</span></div>
-          <div class="button-grid">
-            <q-btn
-              v-for="option in ['0', '01', '02', '03']"
-              :key="option"
-              :label="option"
-              unelevated
-              class="custom-select-btn option-btn"
-              :class="{ 'selected': form.secadora === option }"
-              @click="form.secadora = option"
-            />
-          </div>
-        </div>
-        <div class="col-12 col-sm-6">
-          <div class="section-label q-mb-md" :class="{ 'error-label': validationErrors.steamer }">Steamer <span class="required-asterisk">*</span></div>
-          <div class="button-grid">
-            <q-btn
-              v-for="option in ['0', '01', '02', '03']"
-              :key="option"
-              :label="option"
-              unelevated
-              class="custom-select-btn option-btn"
-              :class="{ 'selected': form.steamer === option }"
-              @click="form.steamer = option"
-            />
-          </div>
-        </div>
-      </div>
-
-      <!-- Accesorios Secadora -->
-      <div class="section-container" :class="{ 'error-section': validationErrors.accesorios_secadora }">
-        <div class="section-label q-mb-md" :class="{ 'error-label': validationErrors.accesorios_secadora }">Accesorios Secadora <span class="required-asterisk">*</span></div>
-        <div class="button-grid">
-          <q-btn
-            v-for="option in ['0', '01', '02', '03', '04', '05', '06', '07', '08']"
-            :key="option"
-            :label="option"
-            unelevated
-            class="custom-select-btn option-btn"
-            style="min-width: 45px;"
-            :class="{ 'selected': form.accesorios_secadora === option }"
-            @click="form.accesorios_secadora = option"
-          />
         </div>
       </div>
 

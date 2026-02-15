@@ -52,7 +52,7 @@
           <div class="q-mt-lg">
             <q-btn
               color="primary"
-              label="Escanear con IA"
+              label="Escanear"
               icon="auto_awesome"
               class="full-width py-md rounded-lg text-bold"
               size="lg"

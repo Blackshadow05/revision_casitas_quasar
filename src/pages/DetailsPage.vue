@@ -803,6 +803,8 @@
     <q-dialog v-model="dialog" maximized transition-show="fade" transition-hide="fade">
       <q-card class="bg-black text-white">
         <q-card-actions align="right" class="absolute-top-right z-max">
+          <q-btn flat round icon="share" color="white" @click="shareImage" :disable="!canShare" />
+          <q-btn flat round icon="download" color="white" @click="downloadImage" />
           <q-btn flat round icon="close" color="white" @click="dialog = false" />
         </q-card-actions>
          <q-carousel
@@ -817,7 +819,7 @@
            control-color="white"
            control-type="flat"
            control-text-color="white"
-           :swipeable="zoomLevel === 1"
+           :swipeable="(imageZoomLevels[dialogSlide] || 1) === 1"
            navigation-position="bottom"
          >
            <q-carousel-slide 
@@ -829,7 +831,7 @@
              <q-img 
                :src="img" 
                fit="contain" 
-               :style="{ height: '100vh', width: '100vw', transform: index === dialogSlide ? `scale(${zoomLevel})` : 'scale(1)', transition: isZooming ? 'none' : 'transform 0.3s ease', touchAction: 'manipulation' }"
+               :style="{ height: '100vh', width: '100vw', transform: `scale(${imageZoomLevels[index] || 1})`, transition: isZooming ? 'none' : 'transform 0.2s ease', touchAction: 'manipulation' }"
                class="zoomable-image"
                @touchstart="onTouchStart"
                @touchmove="onTouchMove"
@@ -900,6 +902,7 @@ export default defineComponent({
     const isZooming = ref(false)
     const lastTouchDistance = ref(0)
     const lastScale = ref(1)
+    const imageZoomLevels = ref({}) // Store zoom per image index
     
     const casa = computed(() => store.selectedCasa)
     const authStore = useAuthStore()
@@ -1001,6 +1004,92 @@ export default defineComponent({
     const imageModalOpen = ref(false)
     const modalImageUrl = ref('')
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
+
+    // Check if Web Share API is available
+    const canShare = computed(() => {
+      return typeof navigator !== 'undefined' && !!navigator.share
+    })
+
+    const shareImage = async () => {
+      const currentImageUrl = images.value[dialogSlide.value]
+      if (!currentImageUrl) return
+
+      try {
+        if (navigator.share) {
+          // Fetch the image as a blob for sharing
+          const response = await fetch(currentImageUrl)
+          const blob = await response.blob()
+          const file = new File([blob], 'evidencia.jpg', { type: 'image/jpeg' })
+
+          await navigator.share({
+            title: 'Evidencia de Revisión - Casita ' + (casa.value?.casita || ''),
+            text: 'Revisión de casita ' + (casa.value?.casita || ''),
+            files: [file]
+          })
+        } else {
+          // Fallback: copy URL to clipboard
+          await navigator.clipboard.writeText(currentImageUrl)
+          $q.notify({
+            message: 'Enlace copiado al portapapeles',
+            color: 'positive',
+            position: 'top',
+            timeout: 2000
+          })
+        }
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          console.error('Error sharing:', error)
+          // Fallback to clipboard
+          try {
+            await navigator.clipboard.writeText(currentImageUrl)
+            $q.notify({
+              message: 'Enlace copiado al portapapeles',
+              color: 'positive',
+              position: 'top',
+              timeout: 2000
+            })
+          } catch (clipError) {
+            console.error('Error copying to clipboard:', clipError)
+          }
+        }
+      }
+    }
+
+    const downloadImage = async () => {
+      const currentImageUrl = images.value[dialogSlide.value]
+      if (!currentImageUrl) return
+
+      try {
+        // Fetch the image
+        const response = await fetch(currentImageUrl)
+        const blob = await response.blob()
+        
+        // Create a download link
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `evidencia_${casa.value?.casita || 'image'}_${Date.now()}.jpg`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+
+        $q.notify({
+          message: 'Imagen descargada correctamente',
+          color: 'positive',
+          position: 'top',
+          timeout: 2000
+        })
+      } catch (error) {
+        console.error('Error downloading:', error)
+        $q.notify({
+          message: 'Error al descargar la imagen',
+          color: 'negative',
+          position: 'top',
+          timeout: 2000
+        })
+      }
+    }
 
     const getLocalTime = () => {
       const now = new Date()
@@ -1383,10 +1472,13 @@ export default defineComponent({
     const onOpenImage = (index) => {
       dialogSlide.value = index
       dialog.value = true
-      zoomLevel.value = 1
+      // Only reset zoom if not already zoomed for this image
+      if (!imageZoomLevels.value[index] || imageZoomLevels.value[index] === 1) {
+        imageZoomLevels.value[index] = 1
+      }
       isZooming.value = false
       lastTouchDistance.value = 0
-      lastScale.value = 1
+      lastScale.value = imageZoomLevels.value[index] || 1
     }
 
     const openNoteImage = () => {
@@ -1540,7 +1632,7 @@ export default defineComponent({
           event.touches[0].pageX - event.touches[1].pageX,
           event.touches[0].pageY - event.touches[1].pageY
         )
-        lastScale.value = zoomLevel.value
+        lastScale.value = imageZoomLevels.value[dialogSlide.value] || 1
       }
     }
 
@@ -1555,25 +1647,27 @@ export default defineComponent({
         if (lastTouchDistance.value > 0) {
           const scale = currentDistance / lastTouchDistance.value
           const newZoom = Math.min(Math.max(lastScale.value * scale, 1), 4)
-          zoomLevel.value = newZoom
+          imageZoomLevels.value[dialogSlide.value] = newZoom
         }
       }
     }
 
     const onTouchEnd = () => {
       isZooming.value = false
-      if (zoomLevel.value < 1) {
-        zoomLevel.value = 1
-      } else if (zoomLevel.value > 4) {
-        zoomLevel.value = 4
+      const currentZoom = imageZoomLevels.value[dialogSlide.value] || 1
+      if (currentZoom < 1) {
+        imageZoomLevels.value[dialogSlide.value] = 1
+      } else if (currentZoom > 4) {
+        imageZoomLevels.value[dialogSlide.value] = 4
       }
     }
 
     const onWheel = (event) => {
       event.preventDefault()
       const delta = event.deltaY > 0 ? 0.9 : 1.1
-      const newZoom = Math.min(Math.max(zoomLevel.value * delta, 1), 4)
-      zoomLevel.value = newZoom
+      const currentZoom = imageZoomLevels.value[dialogSlide.value] || 1
+      const newZoom = Math.min(Math.max(currentZoom * delta, 1), 4)
+      imageZoomLevels.value[dialogSlide.value] = newZoom
     }
 
     const images = computed(() => {
@@ -1664,6 +1758,7 @@ export default defineComponent({
       dialog,
       dialogSlide,
       zoomLevel,
+      imageZoomLevels,
       isZooming,
       onOpenImage,
       openNoteImage,
@@ -1671,6 +1766,10 @@ export default defineComponent({
       onTouchMove,
       onTouchEnd,
       onWheel,
+      // Share
+      canShare,
+      shareImage,
+      downloadImage,
       // Nota extra
       showNotaExtra,
       notaExtraForm,

@@ -179,9 +179,9 @@
           </div>
         </div>
 
-        <!-- Cards List with Infinite Scroll (disabled when filter is active) -->
+        <!-- Cards List with Infinite Scroll (disabled when filter is active) - MOBILE/TABLET ONLY -->
         <q-infinite-scroll
-          v-if="isLoggedIn"
+          v-if="isLoggedIn && !$q.screen.gt.md"
           @load="onLoad"
           :offset="250"
           ref="infiniteScroll"
@@ -227,6 +227,127 @@
             </div>
           </template>
         </q-infinite-scroll>
+
+        <!-- Table View - DESKTOP ONLY -->
+        <div v-if="isLoggedIn && $q.screen.gt.md" class="table-container">
+          <q-table
+            :rows="casas"
+            :columns="tableColumns"
+            row-key="id"
+            flat
+            bordered
+            :pagination="{ rowsPerPage: 13 }"
+            class="modern-table"
+            @row-click="(evt, row) => goToDetails(row)"
+          >
+            <!-- Custom header for theme-based coloring -->
+            <template v-slot:header="props">
+              <q-tr :props="props">
+                <q-th
+                  v-for="col in props.cols"
+                  :key="col.name"
+                  :props="props"
+                  class="table-header-cell"
+                >
+                  {{ col.label }}
+                </q-th>
+              </q-tr>
+            </template>
+
+            <!-- Custom body for status coloring -->
+            <template v-slot:body="props">
+              <q-tr :props="props" class="table-row" @click="goToDetails(props.row)">
+                <q-td key="casita" :props="props">
+                  <div class="casita-cell" :class="{ 'has-nota': props.row.nota_extra }">
+                    {{ props.row.casita || '--' }}
+                  </div>
+                </q-td>
+                <q-td key="caja_fuerte" :props="props">
+                  <q-chip
+                    :color="getStatusColor(props.row.caja_fuerte)"
+                    text-color="white"
+                    size="sm"
+                    dense
+                  >
+                    {{ props.row.caja_fuerte || 'Check in' }}
+                  </q-chip>
+                </q-td>
+                <q-td key="quien_revisa" :props="props">
+                  {{ props.row.quien_revisa || 'Anónimo' }}
+                </q-td>
+                <q-td key="created_at" :props="props">
+                  {{ formatFullDate(props.row.created_at) }}
+                </q-td>
+                <q-td key="chromecast" :props="props">
+                  <q-badge :color="props.row.chromecast === '0' ? 'negative' : 'positive'">{{ props.row.chromecast || '0' }}</q-badge>
+                </q-td>
+                <q-td key="speaker" :props="props">
+                  <q-badge :color="props.row.speaker === '0' ? 'negative' : 'positive'">{{ props.row.speaker || '0' }}</q-badge>
+                </q-td>
+                <q-td key="usb_speaker" :props="props">
+                  <q-badge :color="props.row.usb_speaker === '0' ? 'negative' : 'positive'">{{ props.row.usb_speaker || '0' }}</q-badge>
+                </q-td>
+                <q-td key="controles_tv" :props="props">
+                  <q-badge :color="props.row.controles_tv === '0' ? 'negative' : 'positive'">{{ props.row.controles_tv || '0' }}</q-badge>
+                </q-td>
+                <q-td key="secadora" :props="props">
+                  <q-badge :color="props.row.secadora === '0' ? 'negative' : 'positive'">{{ props.row.secadora || '0' }}</q-badge>
+                </q-td>
+                <q-td key="accesorios_secadora" :props="props">
+                  <q-badge :color="props.row.accesorios_secadora === '0' ? 'negative' : 'positive'">{{ props.row.accesorios_secadora || '0' }}</q-badge>
+                </q-td>
+                <q-td key="steamer" :props="props">
+                  <q-badge :color="props.row.steamer === '0' ? 'negative' : 'positive'">{{ props.row.steamer || '0' }}</q-badge>
+                </q-td>
+                <q-td key="bolsa_vapor" :props="props">
+                  <q-badge :color="props.row.bolsa_vapor === 'No' ? 'negative' : 'positive'">{{ props.row.bolsa_vapor || 'No' }}</q-badge>
+                </q-td>
+                <q-td key="binoculares" :props="props">
+                  <q-badge :color="props.row.binoculares === '0' ? 'negative' : 'positive'">{{ props.row.binoculares || '0' }}</q-badge>
+                </q-td>
+                <q-td key="trapo_binoculares" :props="props">
+                  <q-badge :color="props.row.trapo_binoculares === 'No' ? 'negative' : 'positive'">{{ props.row.trapo_binoculares || 'No' }}</q-badge>
+                </q-td>
+                <q-td key="plancha_cabello" :props="props">
+                  <q-badge :color="props.row.plancha_cabello === '0' ? 'negative' : 'positive'">{{ props.row.plancha_cabello || '0' }}</q-badge>
+                </q-td>
+                <q-td key="cola_caballo" :props="props">
+                  <q-badge :color="props.row.cola_caballo === 'No' ? 'negative' : 'positive'">{{ props.row.cola_caballo || 'No' }}</q-badge>
+                </q-td>
+                <q-td key="bolso_yute" :props="props">
+                  <q-badge :color="props.row.bolso_yute === '0' ? 'negative' : 'positive'">{{ props.row.bolso_yute || '0' }}</q-badge>
+                </q-td>
+                <q-td key="bulto" :props="props">
+                  <q-badge :color="props.row.bulto === 'No' ? 'negative' : 'positive'">{{ props.row.bulto || 'No' }}</q-badge>
+                </q-td>
+                <q-td key="sombrero" :props="props">
+                  <q-badge :color="props.row.sombrero === 'No' ? 'negative' : 'positive'">{{ props.row.sombrero || 'No' }}</q-badge>
+                </q-td>
+                <q-td key="camas_ordenadas" :props="props">
+                  <q-badge :color="props.row.camas_ordenadas === 'No' ? 'negative' : 'positive'">{{ props.row.camas_ordenadas || 'No' }}</q-badge>
+                </q-td>
+                <q-td key="notas" :props="props">
+                  <span v-if="props.row.notas" class="notes-cell">{{ props.row.notas }}</span>
+                  <span v-else class="text-grey-5">--</span>
+                </q-td>
+                <q-td key="nota_extra" :props="props">
+                  <q-icon v-if="props.row.nota_extra" name="sticky_note_2" color="orange" size="20px">
+                    <q-tooltip>Tiene nota extra</q-tooltip>
+                  </q-icon>
+                  <span v-else class="text-grey-4">--</span>
+                </q-td>
+              </q-tr>
+            </template>
+
+            <!-- No data slot -->
+            <template v-slot:no-data>
+              <div class="full-width column items-center q-pa-lg">
+                <q-icon name="search_off" size="64px" color="grey-4" />
+                <div class="text-h6 text-grey-5 q-mt-md">No se encontraron resultados</div>
+              </div>
+            </template>
+          </q-table>
+        </div>
       </q-pull-to-refresh>
     </div>
 
@@ -310,6 +431,32 @@ export default defineComponent({
     const $q = useQuasar()
     const infiniteScroll = ref(null)
 
+    // Desktop table columns
+    const tableColumns = [
+      { name: 'casita', label: 'Casita', field: 'casita', align: 'left', sortable: true, style: 'font-weight: bold; width: 80px', sticky: true },
+      { name: 'caja_fuerte', label: 'Caja Fuerte', field: 'caja_fuerte', align: 'left', sortable: true, style: 'font-weight: 600', sticky: true },
+      { name: 'quien_revisa', label: 'Revisado por', field: 'quien_revisa', align: 'left', sortable: true, sticky: true },
+      { name: 'created_at', label: 'Fecha', field: 'created_at', align: 'left', sortable: true, format: val => formatFullDate(val), sticky: true },
+      { name: 'chromecast', label: 'Chromecast', field: 'chromecast', align: 'center', sortable: true },
+      { name: 'speaker', label: 'Speaker', field: 'speaker', align: 'center', sortable: true },
+      { name: 'usb_speaker', label: 'USB Spk', field: 'usb_speaker', align: 'center', sortable: true },
+      { name: 'controles_tv', label: 'Control TV', field: 'controles_tv', align: 'center', sortable: true },
+      { name: 'secadora', label: 'Secadora', field: 'secadora', align: 'center', sortable: true },
+      { name: 'accesorios_secadora', label: 'Acc Sec', field: 'accesorios_secadora', align: 'center', sortable: true },
+      { name: 'steamer', label: 'Steamer', field: 'steamer', align: 'center', sortable: true },
+      { name: 'bolsa_vapor', label: 'Bolsa Vapor', field: 'bolsa_vapor', align: 'center', sortable: true },
+      { name: 'binoculares', label: 'Binoculares', field: 'binoculares', align: 'center', sortable: true },
+      { name: 'trapo_binoculares', label: 'Trapo Bin', field: 'trapo_binoculares', align: 'center', sortable: true },
+      { name: 'plancha_cabello', label: 'Plancha', field: 'plancha_cabello', align: 'center', sortable: true },
+      { name: 'cola_caballo', label: 'Cola', field: 'cola_caballo', align: 'center', sortable: true },
+      { name: 'bolso_yute', label: 'Yute', field: 'bolso_yute', align: 'center', sortable: true },
+      { name: 'bulto', label: 'Bulto', field: 'bulto', align: 'center', sortable: true },
+      { name: 'sombrero', label: 'Sombrero', field: 'sombrero', align: 'center', sortable: true },
+      { name: 'camas_ordenadas', label: 'Camas', field: 'camas_ordenadas', align: 'center', sortable: true },
+      { name: 'notas', label: 'Notas', field: 'notas', align: 'left', style: 'max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis' },
+      { name: 'nota_extra', label: 'Nota Extra', field: 'nota_extra', align: 'center', sortable: false }
+    ]
+
     const showFilterModal = ref(false)
     const showLoginModal = ref(false)
 
@@ -326,7 +473,9 @@ export default defineComponent({
       { label: 'Con cola de caballo', value: JSON.stringify({ field: 'cola_caballo', value: 'Si', label: 'Con cola de caballo' }) },
       { label: 'Sin Yute', value: JSON.stringify({ field: 'bolso_yute', value: '0', label: 'No hay Yute', isArray: false }) },
       { label: 'Hay un Yute', value: JSON.stringify({ field: 'bolso_yute', value: '1,01', label: 'Hay un Yute', isArray: true }) },
-      { label: 'Hay 2 Yutes', value: JSON.stringify({ field: 'bolso_yute', value: '2,02', label: 'Hay 2 Yutes', isArray: true }) }
+      { label: 'Hay 2 Yutes', value: JSON.stringify({ field: 'bolso_yute', value: '2,02', label: 'Hay 2 Yutes', isArray: true }) },
+      { label: 'No hay steamer', value: JSON.stringify({ field: 'steamer', value: '0', label: 'No hay steamer' }) },
+      { label: 'No hay secadora', value: JSON.stringify({ field: 'secadora', value: '0', label: 'No hay secadora' }) }
     ]
 
     const selectedFilter = ref(null)
@@ -428,6 +577,13 @@ export default defineComponent({
     const casas = computed(() => store.filteredCasas)
     const loading = computed(() => store.loading)
 
+    // Load data on mount (works for both mobile and desktop)
+    const initData = async () => {
+      if (store.casas.length === 0 && !store.loading) {
+        await store.fetchCasas()
+      }
+    }
+
     const loadData = async () => {
       await store.fetchCasas()
     }
@@ -490,6 +646,10 @@ export default defineComponent({
     onMounted(() => {
       if (isLoggedIn.value) {
         store.loadSavedSearch()
+      }
+      // Load data for table view on desktop
+      if ($q.screen.gt.md) {
+        initData()
       }
     })
 
@@ -557,6 +717,18 @@ export default defineComponent({
       return ''
     }
 
+    const getStatusColor = (status) => {
+      if (!status) return 'green'
+      const s = status.toLowerCase()
+      if (s.includes('check out')) return 'red'
+      if (s.includes('guardar upsell')) return 'purple'
+      if (s.includes('upsell')) return 'blue'
+      if (s.includes('move')) return 'orange'
+      if (s === 'si' || s === 'no') return 'amber'
+      if (s === 'back to back' || s === 'backtoback') return 'brown'
+      return 'green'
+    }
+
     return {
       store,
       search,
@@ -588,7 +760,10 @@ export default defineComponent({
       currentUser,
       daysRemaining,
       handleLogin,
-      handleLogout
+      handleLogout,
+      // Table
+      tableColumns,
+      getStatusColor
     }
   }
 })
@@ -813,5 +988,103 @@ export default defineComponent({
 
 .rounded-btn {
   border-radius: 12px;
+}
+
+/* Desktop Table Styles */
+.table-container {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  max-height: calc(100vh - 350px);
+  overflow: auto;
+}
+
+.modern-table {
+  font-size: 12px;
+  min-width: 1100px;
+}
+
+.modern-table .q-table__top {
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.table-header-cell {
+  font-weight: 700 !important;
+  color: #424242 !important;
+  background: #f5f5f5 !important;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.table-row {
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.table-row:hover {
+  background: #f0f7ff !important;
+}
+
+.casita-cell {
+  font-weight: 800;
+  font-size: 14px;
+  color: #1a1a1a;
+}
+
+.casita-cell.has-nota {
+  color: #FF9800;
+}
+
+.notes-cell {
+  color: #0505F5;
+  font-weight: 500;
+}
+
+/* Sticky first 4 columns */
+.table-container :deep(td:nth-child(1)),
+.table-container :deep(td:nth-child(2)),
+.table-container :deep(td:nth-child(3)),
+.table-container :deep(td:nth-child(4)),
+.table-container :deep(th:nth-child(1)),
+.table-container :deep(th:nth-child(2)),
+.table-container :deep(th:nth-child(3)),
+.table-container :deep(th:nth-child(4)) {
+  position: sticky;
+  left: 0;
+  z-index: 10;
+  background: white;
+}
+
+.table-container :deep(th:nth-child(1)),
+.table-container :deep(th:nth-child(2)),
+.table-container :deep(th:nth-child(3)),
+.table-container :deep(th:nth-child(4)) {
+  background: #f5f5f5;
+  z-index: 20;
+}
+
+.table-container :deep(tr:hover td:nth-child(1)),
+.table-container :deep(tr:hover td:nth-child(2)),
+.table-container :deep(tr:hover td:nth-child(3)),
+.table-container :deep(tr:hover td:nth-child(4)) {
+  background: #e3f2fd;
+}
+
+/* Horizontal scroll for table on smaller desktops */
+@media (max-width: 1400px) {
+  .table-container {
+    overflow-x: auto;
+  }
+  
+  .modern-table {
+    min-width: 1200px;
+  }
 }
 </style>

@@ -58,11 +58,11 @@ export const useCasasStore = defineStore('casas', {
           .from('revisiones_casitas')
           .select('*')
           .order('created_at', { ascending: false })
-          .limit(50)
+          .limit(500)
 
         if (error) throw error
         this.casas = data
-        this.hasMore = data.length === 50
+        this.hasMore = data.length === 500
         this.page = 1
       } catch (error) {
         console.error('Error fetching casas:', error.message)
@@ -78,14 +78,14 @@ export const useCasasStore = defineStore('casas', {
           .from('revisiones_casitas')
           .select('*')
           .order('created_at', { ascending: false })
-          .range(this.page * 50, (this.page + 1) * 50 - 1)
+          .range(this.page * 500, (this.page + 1) * 500 - 1)
 
         if (error) throw error
         if (data.length > 0) {
           this.casas = [...this.casas, ...data]
           this.page += 1
         }
-        this.hasMore = data.length === 50
+        this.hasMore = data.length === 500
       } catch (error) {
         console.error('Error fetching more casas:', error.message)
       } finally {
@@ -164,11 +164,6 @@ export const useCasasStore = defineStore('casas', {
             .lte('created_at', endDate)
             .order('created_at', { ascending: false })
             .limit(10000)
-          
-          console.log('Datos recibidos:', queryData?.length || 0)
-          console.log('Error:', queryError)
-          
-          if (queryError) throw queryError
           
           // Agrupar por casita y obtener solo la última revisión de cada una
           const latestByCasa = {}

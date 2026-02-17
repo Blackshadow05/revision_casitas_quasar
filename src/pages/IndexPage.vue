@@ -235,8 +235,9 @@
             :columns="tableColumns"
             row-key="id"
             flat
+            dense
             bordered
-            :pagination="{ rowsPerPage: 13 }"
+            :pagination="{ rowsPerPage: 0 }"
             class="modern-table"
             @row-click="(evt, row) => goToDetails(row)"
           >
@@ -347,6 +348,21 @@
               </div>
             </template>
           </q-table>
+
+          <!-- Load More Button for Desktop -->
+          <div v-if="store.hasMore" class="flex flex-center q-pa-md">
+            <q-btn
+              color="primary"
+              label="Cargar más registros"
+              icon="expand_more"
+              :loading="loading"
+              @click="loadMore"
+              class="load-more-btn"
+            />
+          </div>
+          <div v-else-if="casas.length > 0" class="text-center q-pa-md text-grey-6">
+            {{ casas.length }} registros cargados
+          </div>
         </div>
       </q-pull-to-refresh>
     </div>
@@ -643,6 +659,10 @@ export default defineComponent({
       done()
     }
 
+    const loadMore = async () => {
+      await store.fetchMoreCasas()
+    }
+
     onMounted(() => {
       if (isLoggedIn.value) {
         store.loadSavedSearch()
@@ -738,6 +758,7 @@ export default defineComponent({
       formatFullDate,
       refresh,
       loadData,
+      loadMore,
       onLoad,
       infiniteScroll,
       getThemeClass,
@@ -995,12 +1016,12 @@ export default defineComponent({
   background: white;
   border-radius: 16px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  max-height: calc(100vh - 350px);
   overflow: auto;
+  margin-top: 16px;
 }
 
 .modern-table {
-  font-size: 12px;
+  font-size: 11px;
   min-width: 1100px;
 }
 
@@ -1011,16 +1032,38 @@ export default defineComponent({
   z-index: 50;
 }
 
+.modern-table .q-table__bottom {
+  font-size: 11px;
+}
+
+.modern-table :deep(.q-table__middle) {
+  max-height: calc(100vh - 400px);
+}
+
+.modern-table :deep(thead) {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.modern-table :deep(thead th) {
+  position: sticky;
+  top: 0;
+  z-index: 101;
+  background: #f5f5f5 !important;
+}
+
 .table-header-cell {
   font-weight: 700 !important;
   color: #424242 !important;
   background: #f5f5f5 !important;
   text-transform: uppercase;
-  font-size: 11px;
+  font-size: 10px;
   letter-spacing: 0.5px;
   position: sticky;
   top: 0;
   z-index: 100;
+  padding: 8px 4px;
 }
 
 .table-row {
@@ -1032,9 +1075,13 @@ export default defineComponent({
   background: #f0f7ff !important;
 }
 
+.modern-table :deep(.q-td) {
+  padding: 4px 8px;
+}
+
 .casita-cell {
   font-weight: 800;
-  font-size: 14px;
+  font-size: 13px;
   color: #1a1a1a;
 }
 
@@ -1086,5 +1133,10 @@ export default defineComponent({
   .modern-table {
     min-width: 1200px;
   }
+}
+
+.load-more-btn {
+  border-radius: 20px;
+  padding: 8px 24px;
 }
 </style>

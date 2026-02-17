@@ -3,6 +3,30 @@
     <div class="text-h5 q-mb-md">Configuración</div>
 
     <q-list bordered separator class="rounded-borders">
+      <q-item clickable v-ripple @click="goToReportes">
+        <q-item-section avatar>
+          <q-icon name="assessment" color="primary" />
+        </q-item-section>
+        <q-item-section>
+          <q-item-label>Reportes</q-item-label>
+          <q-item-label caption>Generar reportes CSV</q-item-label>
+        </q-item-section>
+        <q-item-section side>
+          <q-icon name="chevron_right" color="grey" />
+        </q-item-section>
+      </q-item>
+      <q-item clickable v-ripple @click="goToCajaFuerte">
+        <q-item-section avatar>
+          <q-icon name="lock" color="primary" />
+        </q-item-section>
+        <q-item-section>
+          <q-item-label>Caja Fuerte</q-item-label>
+          <q-item-label caption>Gestionar cajas fuertes</q-item-label>
+        </q-item-section>
+        <q-item-section side>
+          <q-icon name="chevron_right" color="grey" />
+        </q-item-section>
+      </q-item>
       <q-item clickable v-ripple @click="goToAdminUsers">
         <q-item-section avatar>
           <q-icon name="people" color="primary" />
@@ -32,8 +56,18 @@ export default defineComponent({
       router.push("/admin-users");
     };
 
+    const goToReportes = () => {
+      router.push("/reportes");
+    };
+
+    const goToCajaFuerte = () => {
+      router.push("/caja-fuerte");
+    };
+
     return {
       goToAdminUsers,
+      goToReportes,
+      goToCajaFuerte,
     };
   },
 });

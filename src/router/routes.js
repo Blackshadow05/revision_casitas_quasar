@@ -9,7 +9,11 @@ const routes = [
       { path: 'menus', component: () => import('pages/MenusPage.vue') },
       { path: 'menus/scan', component: () => import('pages/ScanMenuPage.vue') },
       { path: 'config', component: () => import('pages/ConfigPage.vue') },
-      { path: 'admin-users', component: () => import('pages/AdminUsersPage.vue') }
+      { path: 'caja-fuerte', component: () => import('pages/CajaFuerteListPage.vue') },
+      { path: 'caja-fuerte/todos', component: () => import('pages/CajaFuerteDetailPage.vue') },
+      { path: 'caja-fuerte/:numero', component: () => import('pages/CajaFuerteDetailPage.vue') },
+      { path: 'admin-users', component: () => import('pages/AdminUsersPage.vue') },
+      { path: 'reportes', component: () => import('pages/ReportesPage.vue') }
     ]
   },
 

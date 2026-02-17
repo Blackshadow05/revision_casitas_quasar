@@ -6,7 +6,56 @@
       </router-view>
     </q-page-container>
 
-    <q-footer class="custom-footer">
+    <!-- Desktop: Dropdown menu button -->
+    <q-header class="desktop-nav bg-primary text-white" v-if="$q.screen.gt.md">
+      <q-toolbar>
+        <q-toolbar-title class="text-weight-bold">
+          Revisiones Casitas
+        </q-toolbar-title>
+        
+        <q-btn-dropdown
+          flat
+          dense
+          icon="menu"
+          label="Menú"
+          class="menu-dropdown text-white"
+        >
+          <q-list>
+            <q-item clickable v-close-popup @click="goToHome">
+              <q-item-section avatar>
+                <q-icon name="home" color="primary" />
+              </q-item-section>
+              <q-item-section>
+                <q-item-label>Inicio</q-item-label>
+              </q-item-section>
+            </q-item>
+            
+            <q-item clickable v-close-popup @click="goToMenus">
+              <q-item-section avatar>
+                <q-icon name="restaurant" color="primary" />
+              </q-item-section>
+              <q-item-section>
+                <q-item-label>Menús</q-item-label>
+              </q-item-section>
+            </q-item>
+            
+            <q-separator />
+            
+            <q-item clickable v-close-popup @click="goToConfig">
+              <q-item-section avatar>
+                <q-icon name="settings" color="grey" />
+              </q-item-section>
+              <q-item-section>
+                <q-item-label>Configuración</q-item-label>
+              </q-item-section>
+            </q-item>
+          </q-list>
+        </q-btn-dropdown>
+      </q-toolbar>
+    </q-header>
+
+    <!-- Mobile/Tablet: Bottom tabs -->
+    <q-footer class="custom-footer" v-if="!$q.screen.gt.md">
       <q-tabs
         v-model="tab"
         dense
@@ -30,6 +79,7 @@
 <script>
 import { ref, defineComponent, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
+import { useQuasar } from "quasar";
 import InstallPrompt from "../components/InstallPrompt.vue";
 
 export default defineComponent({
@@ -38,6 +88,7 @@ export default defineComponent({
     InstallPrompt
   },
   setup() {
+    const $q = useQuasar();
     const tab = ref("home");
     const router = useRouter();
     const route = useRoute();
@@ -63,6 +114,7 @@ export default defineComponent({
     };
 
     return {
+      $q,
       tab,
       goToHome,
       goToMenus,
@@ -90,5 +142,18 @@ export default defineComponent({
   background: #e1f5fe;
   padding: 8px 16px;
   border-radius: 15px;
+}
+
+.desktop-nav {
+  border-bottom: none;
+}
+
+.menu-dropdown {
+  border-radius: 8px;
+  color: white;
+}
+
+.menu-dropdown :deep(.q-btn__content) {
+  font-weight: 500;
 }
 </style>

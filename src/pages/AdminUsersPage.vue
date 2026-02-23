@@ -145,7 +145,7 @@
       </q-card>
     </q-dialog>
 
-    <!-- Diálogo para editar contraseña -->
+    <!-- Diálogo para editar contraseña y rol -->
     <q-dialog v-model="showEditDialog">
       <q-card style="min-width: 350px">
         <q-card-section>
@@ -161,6 +161,7 @@
             label="Nueva contraseña"
             :type="showPassword ? 'text' : 'password'"
             filled
+            class="q-mb-md"
           >
             <template v-slot:append>
               <q-icon
@@ -170,6 +171,15 @@
               />
             </template>
           </q-input>
+          <!-- Selector de rol (solo SuperAdmin) -->
+          <q-select
+            v-if="isSuperAdmin"
+            v-model="editingUser.Rol"
+            :options="rolOptions"
+            label="Rol"
+            filled
+            class="q-mb-md"
+          />
         </q-card-section>
 
         <q-card-actions align="right">
@@ -177,7 +187,7 @@
           <q-btn
             color="primary"
             label="Guardar"
-            @click="updatePassword"
+            @click="updateUser"
             :loading="loading"
           />
         </q-card-actions>
@@ -237,7 +247,7 @@ export default defineComponent({
     const editingUser = ref(null);
     const userToDelete = ref(null);
 
-    const rolOptions = ["Admin", "Usuario", "Revisor", "SuperAdmin"];
+    const rolOptions = ["SuperAdmin", "admin", "user", "inactivo"];
 
     // Obtener el usuario actual del store
     const currentUser = computed(() => authStore.user);
@@ -329,8 +339,8 @@ export default defineComponent({
       }
     };
 
-    const updatePassword = async () => {
-      if (!editingUser.value.password_hash) {
+    const updateUser = async () => {
+      if (!editingUser.value.password_hash && !isSuperAdmin.value) {
         $q.notify({
           color: "warning",
           message: "La contraseña no puede estar vacía",
@@ -340,26 +350,39 @@ export default defineComponent({
 
       loading.value = true;
       try {
+        const updateData = {};
+
+        // SuperAdmin puede cambiar la contraseña (si no está vacía) y el rol
+        if (isSuperAdmin.value) {
+          if (editingUser.value.password_hash) {
+            updateData.password_hash = editingUser.value.password_hash;
+          }
+          updateData.Rol = editingUser.value.Rol;
+        } else {
+          // Usuario normal solo puede cambiar su propia contraseña
+          updateData.password_hash = editingUser.value.password_hash;
+        }
+
         const { error } = await supabase
           .from("Usuarios")
-          .update({ password_hash: editingUser.value.password_hash })
+          .update(updateData)
           .eq("id", editingUser.value.id);
 
         if (error) throw error;
 
         $q.notify({
           color: "positive",
-          message: "Contraseña actualizada correctamente",
+          message: isSuperAdmin.value ? "Usuario actualizado correctamente" : "Contraseña actualizada correctamente",
         });
 
         showEditDialog.value = false;
         editingUser.value = null;
         loadUsers();
       } catch (error) {
-        console.error("Error updating password:", error);
+        console.error("Error updating user:", error);
         $q.notify({
           color: "negative",
-          message: "Error al actualizar contraseña",
+          message: "Error al actualizar usuario: " + error.message,
         });
       } finally {
         loading.value = false;
@@ -426,7 +449,7 @@ export default defineComponent({
       addUser,
       openEditDialog,
       openMyPasswordDialog,
-      updatePassword,
+      updateUser,
       confirmDelete,
       deleteUser,
       goBack,
@@ -434,3 +457,33 @@ export default defineComponent({
   },
 });
 </script>
+
+<style scoped>
+/* Desktop: proper desktop layout for Admin Users */
+@media (min-width: 1024px) {
+  .q-page {
+    max-width: 900px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 32px 40px !important;
+  }
+
+  .q-card {
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  }
+
+  .q-list.bordered {
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  }
+
+  .q-item {
+    padding: 16px 20px;
+  }
+
+  .text-h5 {
+    font-size: 1.75rem;
+  }
+}
+</style>

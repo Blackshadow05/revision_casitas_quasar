@@ -95,7 +95,7 @@
           </div>
           <q-btn flat dense no-caps class="logout-btn" @click="handleLogout">
             <q-icon name="logout" size="14px" class="q-mr-xs" />
-            <span class="gt-xs">Cerrar</span>
+            <span>Cerrar sesión</span>
           </q-btn>
         </div>
         <!-- Fila de puntos de sesión (debajo en móvil, al lado en desktop) -->
@@ -187,7 +187,7 @@
           ref="infiniteScroll"
           :disable="!!store.activeFilter"
         >
-          <div class="row q-col-gutter-md">
+          <div class="row q-col-gutter-md mobile-cards-grid">
             <div v-for="casa in casas" :key="casa.id" class="col-6 col-md-4">
               <q-card 
                 class="modern-card" 
@@ -417,9 +417,10 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
-    <!-- Floating Action Button -->
+    <!-- Floating Action Button (visible sólo en pantallas < md) -->
     <q-page-sticky position="bottom-right" :offset="[18, 18]" v-if="isLoggedIn">
       <q-fab
+        v-if="canAdd && $q.screen.lt.md"
         icon="add"
         color="primary"
         class="fab-btn"
@@ -559,6 +560,7 @@ export default defineComponent({
     const isLoggedIn = computed(() => authStore.isLoggedIn)
     const currentUser = computed(() => authStore.user)
     const daysRemaining = computed(() => authStore.daysRemaining)
+    const canAdd = computed(() => authStore.canAdd)
 
     const loginData = reactive({
       username: '',
@@ -753,6 +755,7 @@ export default defineComponent({
       store,
       search,
       casas,
+      canAdd,
       loading,
       addNew,
       formatFullDate,
@@ -806,60 +809,78 @@ export default defineComponent({
 }
 
 .modern-card {
+  position: relative;
+  overflow: hidden;
   border-radius: 20px;
   padding: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
-  transition: transform 0.2s, box-shadow 0.2s;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.08),
+    0 2px 8px rgba(255, 255, 255, 0.35) inset;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
   height: 100%;
   display: flex;
   flex-direction: column;
 }
 
+.modern-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 38%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.38) 0%, rgba(255, 255, 255, 0) 100%);
+  pointer-events: none;
+}
+
 .modern-card:active {
   transform: scale(0.97);
+  box-shadow:
+    0 7px 18px rgba(0, 0, 0, 0.09),
+    0 1px 5px rgba(255, 255, 255, 0.28) inset;
 }
 
 /* Themes */
 .theme-green {
-  background: linear-gradient(135deg, #a8e6cf 0%, rgba(255, 255, 255, 0.85) 100%);
-  box-shadow: 0 10px 20px rgba(0, 210, 106, 0.2);
+  background: linear-gradient(145deg, #b8f0d9 0%, #e6fff3 58%, #ffffff 100%);
+  box-shadow: 0 12px 20px rgba(0, 210, 106, 0.18);
 }
 .theme-red {
-  background: linear-gradient(135deg, #ffcdd2 0%, rgba(255, 255, 255, 0.85) 100%);
-  box-shadow: 0 10px 20px rgba(255, 77, 77, 0.2);
+  background: linear-gradient(145deg, #ffd7dc 0%, #fff0f2 58%, #ffffff 100%);
+  box-shadow: 0 12px 20px rgba(255, 77, 77, 0.18);
 }
 .theme-purple {
-  background: linear-gradient(135deg, #e1bee7 0%, rgba(255, 255, 255, 0.85) 100%);
-  box-shadow: 0 10px 20px rgba(147, 51, 234, 0.2);
+  background: linear-gradient(145deg, #e9cbef 0%, #f8efff 58%, #ffffff 100%);
+  box-shadow: 0 12px 20px rgba(147, 51, 234, 0.18);
 }
 .theme-orange {
-  background: linear-gradient(135deg, #ffcc80 0%, rgba(255, 255, 255, 0.85) 100%);
-  box-shadow: 0 10px 20px rgba(255, 152, 0, 0.25);
+  background: linear-gradient(145deg, #ffd39a 0%, #fff3e1 58%, #ffffff 100%);
+  box-shadow: 0 12px 20px rgba(255, 152, 0, 0.2);
 }
 .theme-yellow {
-  background: linear-gradient(135deg, #fff9c4 0%, rgba(255, 255, 255, 0.85) 100%);
-  box-shadow: 0 10px 20px rgba(250, 204, 21, 0.2);
+  background: linear-gradient(145deg, #fffad2 0%, #fffdf0 58%, #ffffff 100%);
+  box-shadow: 0 12px 20px rgba(250, 204, 21, 0.2);
 }
 .theme-gold {
-  background: linear-gradient(135deg, #ffe082 0%, rgba(255, 255, 255, 0.85) 100%);
-  box-shadow: 0 10px 20px rgba(255, 215, 0, 0.25);
+  background: linear-gradient(145deg, #ffe7a3 0%, #fff8df 58%, #ffffff 100%);
+  box-shadow: 0 12px 20px rgba(255, 215, 0, 0.2);
 }
 .theme-blue {
-  background: linear-gradient(135deg, #b3e5fc 0%, rgba(255, 255, 255, 0.85) 100%);
-  box-shadow: 0 10px 20px rgba(33, 150, 243, 0.2);
+  background: linear-gradient(145deg, #c4ecff 0%, #e8f7ff 58%, #ffffff 100%);
+  box-shadow: 0 12px 20px rgba(33, 150, 243, 0.18);
 }
 .theme-brown {
-  background: linear-gradient(135deg, #d7ccc8 0%, rgba(255, 255, 255, 0.85) 100%);
-  box-shadow: 0 10px 20px rgba(121, 85, 72, 0.2);
+  background: linear-gradient(145deg, #e1d5d1 0%, #f4ece9 58%, #ffffff 100%);
+  box-shadow: 0 12px 20px rgba(121, 85, 72, 0.18);
 }
 
 .card-header {
-  min-height: 28px;
-  max-height: 28px;
+  min-height: 30px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
 }
 
 .casita-number {
@@ -875,17 +896,19 @@ export default defineComponent({
 }
 
 .status-chip {
-  padding: 4px 10px;
-  border-radius: 16px;
+  padding: 5px 10px;
+  border-radius: 999px;
   color: white;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  box-shadow:
+    0 5px 10px rgba(0, 0, 0, 0.14),
+    0 1px 2px rgba(255, 255, 255, 0.25) inset;
   letter-spacing: 0.3px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 120px;
+  max-width: 130px;
   line-height: 1;
   -webkit-text-size-adjust: none;
   text-size-adjust: none;
@@ -917,8 +940,11 @@ export default defineComponent({
 .bg-brown-action { background-color: #3e2723; }
 
 .card-content {
-  margin: 16px 0;
+  margin: 14px 0 12px;
   flex-grow: 1;
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 12px;
+  padding: 8px;
 }
 
 .info-row {
@@ -949,9 +975,15 @@ export default defineComponent({
 .note-text {
   font-size: 11px;
   color: #0505F5;
-  font-weight: 500;
-  line-height: 1.3;
-  padding-top: 4px;
+  font-weight: 600;
+  line-height: 1.35;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 10px;
+}
+
+.mobile-cards-grid {
+  margin-bottom: 6px;
 }
 
 .fab-btn {
@@ -1004,6 +1036,44 @@ export default defineComponent({
 @media (min-width: 600px) {
   .session-dots {
     max-width: none;
+  }
+}
+
+@media (max-width: 599px) {
+  .modern-card {
+    border-radius: 16px;
+    padding: 12px;
+  }
+
+  .casita-number {
+    font-size: 20px;
+  }
+
+  .status-chip {
+    max-width: 110px;
+    padding: 5px 8px;
+  }
+
+  .card-content {
+    margin: 10px 0 8px;
+    padding: 7px;
+  }
+
+  .info-row :deep(.q-icon) {
+    font-size: 16px !important;
+  }
+
+  .info-row .text-body1 {
+    font-size: 13px;
+  }
+
+  .info-row .text-subtitle2 {
+    font-size: 11px;
+  }
+
+  .note-text {
+    font-size: 11px;
+    padding: 5px 6px;
   }
 }
 

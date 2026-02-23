@@ -24,6 +24,22 @@ export const useAuthStore = defineStore('auth', {
       const diffTime = expiry - now
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
       return Math.max(0, diffDays)
+    },
+    canAdd: (state) => {
+      if (!state.user) return false
+      // inactivo users cannot add data
+      if (state.user.Rol === 'inactivo') return false
+      return true
+    },
+    canEdit: (state) => {
+      if (!state.user) return false
+      // inactivo users cannot edit data
+      if (state.user.Rol === 'inactivo') return false
+      return true
+    },
+    canView: (state) => {
+      if (!state.user) return false
+      return true
     }
   },
   
@@ -52,6 +68,11 @@ export const useAuthStore = defineStore('auth', {
         }
 
         if (data) {
+          // Check if user is inactive
+          if (data.Rol === 'inactivo') {
+            this.error = 'Usuario inactivo. Contacte al administrador.'
+            return { success: false, message: this.error }
+          }
           this.user = data
           const expiryDate = new Date()
           expiryDate.setDate(expiryDate.getDate() + 6)

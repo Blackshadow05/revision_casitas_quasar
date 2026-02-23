@@ -13,6 +13,7 @@ const routes = [
       { path: 'caja-fuerte/todos', component: () => import('pages/CajaFuerteDetailPage.vue') },
       { path: 'caja-fuerte/:numero', component: () => import('pages/CajaFuerteDetailPage.vue') },
       { path: 'admin-users', component: () => import('pages/AdminUsersPage.vue') },
+      { path: 'forms', component: () => import('pages/FormsPage.vue') },
       { path: 'reportes', component: () => import('pages/ReportesPage.vue') }
     ]
   },

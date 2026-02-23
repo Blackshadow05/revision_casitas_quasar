@@ -49,6 +49,15 @@
                 <q-item-label>Configuración</q-item-label>
               </q-item-section>
             </q-item>
+            
+            <q-item clickable v-close-popup @click="goToForms">
+              <q-item-section avatar>
+                <q-icon name="assignment" color="primary" />
+              </q-item-section>
+              <q-item-section>
+                <q-item-label>Forms</q-item-label>
+              </q-item-section>
+            </q-item>
           </q-list>
         </q-btn-dropdown>
       </q-toolbar>
@@ -68,6 +77,7 @@
       >
         <q-tab name="home" icon="home" label="Inicio" @click="goToHome" />
         <q-tab name="menus" icon="restaurant" label="Menús" @click="goToMenus" />
+        <q-tab name="forms" icon="assignment" label="Forms" @click="goToForms" />
         <q-tab name="settings" icon="settings" label="Configuración" class="tab-settings" @click="goToConfig" />
       </q-tabs>
     </q-footer>
@@ -88,7 +98,7 @@ export default defineComponent({
     InstallPrompt
   },
   setup() {
-    const $q = useQuasar();
+    const q = useQuasar();
     const tab = ref("home");
     const router = useRouter();
     const route = useRoute();
@@ -98,6 +108,7 @@ export default defineComponent({
       if (path === '/') tab.value = 'home';
       else if (path === '/menus') tab.value = 'menus';
       else if (path === '/config') tab.value = 'settings';
+      else if (path === '/forms') tab.value = 'forms';
       // Agregue más si es necesario
     }, { immediate: true });
 
@@ -109,15 +120,20 @@ export default defineComponent({
       router.push("/menus");
     };
 
+    const goToForms = () => {
+      router.push('/forms');
+    };
+
     const goToConfig = () => {
       router.push("/config");
     };
 
     return {
-      $q,
+      q,
       tab,
       goToHome,
       goToMenus,
+      goToForms,
       goToConfig,
     };
   },

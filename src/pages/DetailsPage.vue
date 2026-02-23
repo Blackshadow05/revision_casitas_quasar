@@ -440,6 +440,7 @@
           <div class="row items-center justify-between">
             <div class="text-h4 text-weight-bolder text-dark">Casita {{ casa.casita || '--' }}</div>
             <q-btn
+              v-if="canEdit"
               icon="edit"
               label="Editar"
               color="primary"
@@ -584,7 +585,7 @@
         </div>
 
         <!-- Nota Extra Button -->
-        <div v-if="!showNotaExtra && (!casa.nota_extra)" class="q-mt-lg q-mb-xl">
+        <div v-if="canAdd && !showNotaExtra && (!casa.nota_extra)" class="q-mt-lg q-mb-xl">
           <q-btn
             label="Agregar nota extra"
             icon="note_add"
@@ -906,6 +907,8 @@ export default defineComponent({
     
     const casa = computed(() => store.selectedCasa)
     const authStore = useAuthStore()
+    const canAdd = computed(() => authStore.canAdd)
+    const canEdit = computed(() => authStore.canEdit)
     
     // Nota extra fields
     const showNotaExtra = ref(false)
@@ -1800,7 +1803,9 @@ export default defineComponent({
       saveEditing,
       logs,
       fetchLogs,
-      formatLogData
+      formatLogData,
+      canAdd,
+      canEdit
     }
   }
 })
@@ -2383,5 +2388,93 @@ export default defineComponent({
   border-bottom: 1px dashed #e0e0e0;
   margin-bottom: 6px;
   padding-bottom: 6px;
+}
+
+/* Desktop: proper desktop layout */
+@media (min-width: 1024px) {
+  .content-container {
+    max-width: 1100px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0 24px;
+  }
+
+  .image-header {
+    max-width: 1100px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .header-gradient {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+    max-width: 100%;
+  }
+
+  .header-gradient .row.items-center.justify-between {
+    grid-column: 1 / -1;
+  }
+
+  .header-gradient .text-subtitle1.text-grey-7 {
+    grid-column: 1 / -1;
+  }
+
+  .header-gradient .nota-extra-badge {
+    grid-column: 1 / -1;
+  }
+
+  .info-card {
+    margin-bottom: 0 !important;
+  }
+
+  .q-pa-md.q-gutter-y-lg {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+
+  .q-pa-md.q-gutter-y-lg > .section-card {
+    max-width: 100%;
+    margin: 0;
+  }
+
+  /* Make the Seguridad section span full width */
+  .q-pa-md.q-gutter-y-lg > .section-card:first-child {
+    grid-column: 1 / -1;
+  }
+
+  /* Notes and Nota Extra sections span full width */
+  .q-pa-md.q-gutter-y-lg > .section-card:has(.text-body2) {
+    grid-column: 1 / -1;
+  }
+
+  /* Historial spans full width */
+  .q-pa-md.q-gutter-y-lg > .section-card:last-child {
+    grid-column: 1 / -1;
+  }
+
+  /* Full width buttons */
+  .q-pa-md.q-gutter-y-lg > .q-mt-lg {
+    grid-column: 1 / -1;
+  }
+
+  .section-card {
+    border-radius: 16px;
+    padding: 24px;
+  }
+
+  /* Wider count badges and item rows on desktop */
+  .section-card .row.items-center.justify-between {
+    padding: 8px 0;
+  }
+
+  .count-badge {
+    min-width: 36px;
+    height: 32px;
+    border-radius: 16px;
+    font-size: 15px;
+  }
 }
 </style>

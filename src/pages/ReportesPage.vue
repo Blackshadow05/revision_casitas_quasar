@@ -70,7 +70,7 @@
             label="Generar CSV"
             @click="generateCSV"
             :loading="loading"
-            :disable="(reportType === 'all' && (!dateFrom || !dateTo)) || selectedFields.length === 0"
+            :disable="!isLoggedIn || (reportType === 'all' && (!dateFrom || !dateTo)) || selectedFields.length === 0"
           />
           <q-btn
             color="grey"
@@ -134,8 +134,11 @@
 import { ref, computed } from "vue";
 import { supabase } from "../supabase";
 import { useQuasar } from "quasar";
+import { useAuthStore } from '../stores/auth'
 
 const $q = useQuasar();
+const authStore = useAuthStore();
+const isLoggedIn = computed(() => authStore.isLoggedIn);
 
 const dateFrom = ref("");
 const dateTo = ref("");

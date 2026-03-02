@@ -5,6 +5,7 @@
       <div style="width: 40px"></div>
       <div class="text-h6 text-white text-weight-medium">Menús</div>
       <q-btn
+        v-if="isLoggedIn"
         flat
         dense
         color="white"
@@ -114,6 +115,7 @@
 import { computed, defineComponent, onMounted, ref } from 'vue'
 import { supabase } from '../supabase'
 import { date, useQuasar } from 'quasar'
+import { useAuthStore } from '../stores/auth'
 
 export default defineComponent({
   name: 'MenusPage',
@@ -121,6 +123,8 @@ export default defineComponent({
     const $q = useQuasar()
     const loading = ref(false)
     const menus = ref([])
+    const authStore = useAuthStore()
+    const isLoggedIn = computed(() => authStore.isLoggedIn)
 
     // Función para obtener la fecha local en formato YYYY-MM-DD
     const getLocalDateString = (date) => {
@@ -238,7 +242,8 @@ export default defineComponent({
       formatDayName,
       formatDayNumber,
       getRelativeLabel,
-      parseMenuItems
+      parseMenuItems,
+      isLoggedIn
     }
   }
 })

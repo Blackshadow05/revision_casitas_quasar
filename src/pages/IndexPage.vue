@@ -418,9 +418,9 @@
       </q-card>
     </q-dialog>
     <!-- Floating Action Button (visible sólo en pantallas < md) -->
-    <q-page-sticky position="bottom-right" :offset="[18, 18]" v-if="isLoggedIn">
+    <q-page-sticky position="bottom-right" :offset="[18, 18]">
       <q-fab
-        v-if="canAdd && $q.screen.lt.md"
+        v-if="$q.screen.lt.md"
         icon="add"
         color="primary"
         class="fab-btn"

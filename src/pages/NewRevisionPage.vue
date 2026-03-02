@@ -25,16 +25,28 @@
         </div>
         <div class="col-12 col-sm-6">
           <div class="section-label q-mb-xs" :class="{ 'error-label': validationErrors.quien_revisa }">Quién Revisa <span class="required-asterisk">*</span></div>
+          <q-input
+            v-if="authStore.isLoggedIn && authStore.user && authStore.user.Usuario"
+            v-model="form.quien_revisa"
+            readonly
+            outlined
+            dense
+            bg-color="grey-3"
+            class="input-styled"
+          />
           <q-select
+            v-else
             v-model="form.quien_revisa"
             :options="users"
+            emit-value
+            map-options
+            placeholder="Seleccionar revisor"
             outlined
             dense
             bg-color="white"
             class="input-styled"
             :class="{ 'error-field': validationErrors.quien_revisa }"
             behavior="menu"
-            :disable="!!authStore.user"
             :rules="[val => !!val || 'Campo requerido']"
           />
         </div>
@@ -847,10 +859,10 @@ export default defineComponent({
           return
         }
         
-        users.value = data.map(user => user.Usuario) || []
+        users.value = (data || []).map(user => ({ label: user.Usuario, value: user.Usuario }))
         
-        // Set current logged in user automatically
-        if (authStore.user && authStore.user.Usuario) {
+        // Set current logged in user automatically only if session is active
+        if (authStore.isLoggedIn && authStore.user && authStore.user.Usuario) {
           form.value.quien_revisa = authStore.user.Usuario
         }
       } catch (error) {
@@ -1215,7 +1227,7 @@ export default defineComponent({
     const resetFormAndGoBack = () => {
       form.value = {
         casita: '',
-        quien_revisa: users.value.length === 1 ? users.value[0] : '',
+        quien_revisa: users.value.length === 1 ? users.value[0].value : '',
         caja_fuerte: '',
         room_move: '',
         puertas_ventanas: '',

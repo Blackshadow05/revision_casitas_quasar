@@ -1,90 +1,118 @@
 <template>
-  <q-page padding>
+  <q-page class="forms-page q-pa-md">
+    <!-- index view -->
     <div v-if="!currentUrl">
-      <div class="row items-center q-gutter-md">
-        <div class="col-12">
-          <h6>Forms</h6>
-          <p>Lista de formularios disponibles.</p>
-        </div>
+      <div class="forms-header q-mb-lg">
+        <div class="text-h4 text-weight-bold">Formularios</div>
+        <div class="text-caption text-grey-6 q-mt-xs">Accede a los formularios disponibles</div>
+      </div>
 
-        <div class="col-12">
-          <q-list bordered separator>
-            <q-item clickable @click="openForm('https://docs.google.com/forms/d/e/1FAIpQLSctsgdYAKlqLbAcbb_jkJpL8FHgMOUYnvo2YVbu7LZG_cNgAQ/viewform','Ingreso a casitas')">
-              <q-item-section avatar>
-                <q-icon name="assignment" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>Ingreso a casitas</q-item-label>
-                <q-item-label caption>Formulario de ingreso</q-item-label>
-              </q-item-section>
-              <q-item-section side>
-                <q-icon name="open_in_new" />
-              </q-item-section>
-            </q-item>
-            <q-item clickable @click="openForm('https://docs.google.com/forms/d/e/1FAIpQLSdGtxFReFg-fgkZ0ixlSsmUVBciwkCfgb0tqNNTNE-EBniX8A/viewform','Bitacora Puesto 09')">
-              <q-item-section avatar>
-                <q-icon name="book" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>Bitacora Puesto 09</q-item-label>
-                <q-item-label caption>Registro diario - Puesto 09</q-item-label>
-              </q-item-section>
-              <q-item-section side>
-                <q-icon name="open_in_new" />
-              </q-item-section>
-            </q-item>
-
-            <q-item clickable @click="openForm('https://docs.google.com/forms/d/e/1FAIpQLScB6x6ckXbPeqtFOm8VUpllzcuIL7OFstdI3rCChJ7wX1wVNA/viewform','Reporte turno puesto 09')">
-              <q-item-section avatar>
-                <q-icon name="report" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>Reporte turno puesto 09</q-item-label>
-                <q-item-label caption>Reporte de turno</q-item-label>
-              </q-item-section>
-              <q-item-section side>
-                <q-icon name="open_in_new" />
-              </q-item-section>
-            </q-item>
-
-            <q-item clickable @click="openForm('https://docs.google.com/forms/d/e/1FAIpQLSeEEBGyEX24c8uDPUj3MQniH87oMEtY54iSU322tbIyWH6p6A/viewform','Solicitud de días')">
-              <q-item-section avatar>
-                <q-icon name="event" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>Solicitud de días</q-item-label>
-                <q-item-label caption>Gestión de días/permisos</q-item-label>
-              </q-item-section>
-              <q-item-section side>
-                <q-icon name="open_in_new" />
-              </q-item-section>
-            </q-item>
-          </q-list>
-        </div>
+      <div class="settings-card">
+        <q-item
+          clickable
+          v-ripple
+          class="settings-item"
+          @click="openForm('https://docs.google.com/forms/d/e/1FAIpQLSctsgdYAKlqLbAcbb_jkJpL8FHgMOUYnvo2YVbu7LZG_cNgAQ/viewform','Ingreso a casitas')"
+        >
+          <q-item-section avatar>
+            <div class="settings-icon-wrap bg-blue">
+              <q-icon name="assignment" color="white" size="20px" />
+            </div>
+          </q-item-section>
+          <q-item-section>
+            <q-item-label class="text-weight-medium">Ingreso a casitas</q-item-label>
+            <q-item-label caption>Formulario de ingreso</q-item-label>
+          </q-item-section>
+          <q-item-section side>
+            <q-icon name="open_in_new" color="grey-4" size="18px" />
+          </q-item-section>
+        </q-item>
+        <q-separator inset="72px" />
+        <q-item
+          clickable
+          v-ripple
+          class="settings-item"
+          @click="openForm('https://docs.google.com/forms/d/e/1FAIpQLSdGtxFReFg-fgkZ0ixlSsmUVBciwkCfgb0tqNNTNE-EBniX8A/viewform','Bitacora Puesto 09')"
+        >
+          <q-item-section avatar>
+            <div class="settings-icon-wrap bg-purple">
+              <q-icon name="book" color="white" size="20px" />
+            </div>
+          </q-item-section>
+          <q-item-section>
+            <q-item-label class="text-weight-medium">Bitácora Puesto 09</q-item-label>
+            <q-item-label caption>Registro diario - Puesto 09</q-item-label>
+          </q-item-section>
+          <q-item-section side>
+            <q-icon name="open_in_new" color="grey-4" size="18px" />
+          </q-item-section>
+        </q-item>
+        <q-separator inset="72px" />
+        <q-item
+          clickable
+          v-ripple
+          class="settings-item"
+          @click="openForm('https://docs.google.com/forms/d/e/1FAIpQLScB6x6ckXbPeqtFOm8VUpllzcuIL7OFstdI3rCChJ7wX1wVNA/viewform','Reporte turno puesto 09')"
+        >
+          <q-item-section avatar>
+            <div class="settings-icon-wrap bg-teal">
+              <q-icon name="report" color="white" size="20px" />
+            </div>
+          </q-item-section>
+          <q-item-section>
+            <q-item-label class="text-weight-medium">Reporte turno Puesto 09</q-item-label>
+            <q-item-label caption>Reporte de turno</q-item-label>
+          </q-item-section>
+          <q-item-section side>
+            <q-icon name="open_in_new" color="grey-4" size="18px" />
+          </q-item-section>
+        </q-item>
+        <q-separator inset="72px" />
+        <q-item
+          clickable
+          v-ripple
+          class="settings-item"
+          @click="openForm('https://docs.google.com/forms/d/e/1FAIpQLSeEEBGyEX24c8uDPUj3MQniH87oMEtY54iSU322tbIyWH6p6A/viewform','Solicitud de días')"
+        >
+          <q-item-section avatar>
+            <div class="settings-icon-wrap bg-orange">
+              <q-icon name="event" color="white" size="20px" />
+            </div>
+          </q-item-section>
+          <q-item-section>
+            <q-item-label class="text-weight-medium">Solicitud de días</q-item-label>
+            <q-item-label caption>Gestión de días/permisos</q-item-label>
+          </q-item-section>
+          <q-item-section side>
+            <q-icon name="open_in_new" color="grey-4" size="18px" />
+          </q-item-section>
+        </q-item>
       </div>
     </div>
 
+    <!-- form view -->
     <div v-else>
       <q-toolbar class="bg-primary text-white">
         <q-btn flat dense round icon="arrow_back" @click="closeForm" />
         <q-toolbar-title class="text-weight-bold">{{ currentTitle }}</q-toolbar-title>
       </q-toolbar>
-        <div class="q-mt-md">
-          <div v-if="iframeBlocked" class="row items-center q-pa-md">
-            <div class="col-12">
-              <q-banner dense class="bg-yellow-3 text-black">
-                No fue posible cargar este recurso dentro de la aplicación por la política de seguridad del sitio.
-              </q-banner>
-              <div class="q-mt-md">
-                <q-btn color="primary" label="Abrir en nueva pestaña" unelevated @click="openExternal(currentUrl)" />
-                <q-btn flat label="Volver" class="q-ml-sm" @click="closeForm" />
-              </div>
+
+      <div class="q-mt-md">
+        <div v-if="iframeBlocked" class="row items-center q-pa-md">
+          <div class="col-12">
+            <q-banner dense class="bg-yellow-3 text-black">
+              No fue posible cargar este recurso dentro de la aplicación por la política de seguridad del sitio.
+            </q-banner>
+            <div class="q-mt-md">
+              <q-btn color="primary" label="Abrir en nueva pestaña" unelevated @click="openExternal(currentUrl)" />
+              <q-btn flat label="Volver" class="q-ml-sm" @click="closeForm" />
             </div>
           </div>
-          <div v-else>
-            <iframe ref="formFrame" :src="currentUrl" @load="onIFrameLoad" style="width:100%;height:80vh;border:0"></iframe>
-          </div>
         </div>
+        <div v-else>
+          <iframe ref="formFrame" :src="currentUrl" @load="onIFrameLoad" class="form-iframe"></iframe>
+        </div>
+      </div>
     </div>
   </q-page>
 </template>
@@ -190,7 +218,47 @@ export default defineComponent({
 </script>
 
 <style scoped>
-h6 {
-  margin: 0 0 8px 0;
+.forms-page {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.forms-header {
+  padding-top: 8px;
+}
+
+.settings-card {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.settings-item {
+  padding: 12px 16px;
+  min-height: 64px;
+}
+
+.settings-icon-wrap {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.form-iframe {
+  width: 100%;
+  height: 80vh;
+  border: 0;
+}
+
+/* Dark mode tweaks */
+.body--dark .settings-card {
+  background: #1e1e1e;
+  border-color: rgba(255, 255, 255, 0.06);
 }
 </style>

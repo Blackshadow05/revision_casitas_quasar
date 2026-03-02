@@ -881,7 +881,7 @@ export default defineComponent({
     const getCompressionConfig = () => {
       return isIOS ? {
         targetSizeKB: 600,
-        maxResolution: 1000,
+        maxResolution: 1200,
         maxQuality: 0.85,
         minQuality: 0.50,
         maxAttempts: 10,
@@ -909,9 +909,7 @@ export default defineComponent({
     const compressImage = async (file, field) => {
       const config = getCompressionConfig()
       const originalSize = file.size
-      const isApple = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-                     (/^((?!chrome|android).)*safari/i.test(navigator.userAgent))
-      
+
       return new Promise(async (resolve, reject) => {
         try {
           console.log(`[Compression] Starting normalization for ${field} (iOS optimization)...`)
@@ -921,27 +919,28 @@ export default defineComponent({
           const url = URL.createObjectURL(file)
           await new Promise((res, rej) => {
             img.onload = res
-            img.onerror = rej
+            img.onerror = (err) => {
+              URL.revokeObjectURL(url)
+              rej(err)
+            }
             img.src = url
           })
 
           if ('decode' in img) await img.decode()
 
-          // 2. NORMALIZATION STAGE (FORCED DECODE FIX)
-          // Reemplazo de nCtx.drawImage(img, 0, 0) para forzar a WebKit a decodificar HEIC
-          const decodeSafely = async (file, img) => {
+          // 2. NORMALIZATION STAGE
+          const decodeSafely = async (fileObject, imageElement) => {
             if ('createImageBitmap' in window) {
               try {
-                // Truco: convertir a blob intermedio obliga a WebKit a terminar el decode
-                const tempUrl = URL.createObjectURL(file)
-                const tempBlob = await fetch(tempUrl).then(r => r.blob())
-                URL.revokeObjectURL(tempUrl)
-                return await createImageBitmap(tempBlob)
+                // Ensure the file is a Blob/File
+                const sourceBlob = fileObject instanceof Blob ? fileObject : 
+                                  await fetch(URL.createObjectURL(fileObject)).then(r => r.blob())
+                return await createImageBitmap(sourceBlob)
               } catch (e) {
                 console.warn('[Compression] createImageBitmap failed, fallback to img', e)
               }
             }
-            return img
+            return imageElement
           }
 
           const normalizeCanvas = document.createElement('canvas')
@@ -955,23 +954,19 @@ export default defineComponent({
           
           if (!nCtx) throw new Error('Could not get normalization context')
 
-          // Normalize background
           nCtx.fillStyle = '#FFFFFF'
           nCtx.fillRect(0, 0, normalizeCanvas.width, normalizeCanvas.height)
           
-          // FORCED DECODE DRAWING
           const source = await decodeSafely(file, img)
           nCtx.drawImage(source, 0, 0)
           
-          // Liberar bitmap si se usó uno
           if (source instanceof ImageBitmap) {
             source.close()
           }
 
-          // 3. RESIZING STAGES (Conservative Step-Down)
+          // 3. RESIZING STAGES
           let width = img.width
           let height = img.height
-          
           let currentCanvas = normalizeCanvas
 
           while (width > config.maxResolution * 1.5) {
@@ -979,7 +974,7 @@ export default defineComponent({
             const nextHeight = Math.floor(height / 2)
             
             const nextCanvas = document.createElement('canvas')
-            const nextCtx = nextCanvas.getContext('2d', { alpha: false, style: 'image-rendering: crisp-edges;' })
+            const nextCtx = nextCanvas.getContext('2d', { alpha: false })
             nextCanvas.width = nextWidth
             nextCanvas.height = nextHeight
             
@@ -995,7 +990,6 @@ export default defineComponent({
             currentCanvas = nextCanvas
             width = nextWidth
             height = nextHeight
-            console.log(`[Compression] Resizing step: ${width}x${height}`)
           }
 
           // 4. PRECISE FINAL SCALE
@@ -1024,6 +1018,7 @@ export default defineComponent({
           // 5. ITERATIVE BLOB GENERATION
           let quality = config.maxQuality
           let attempts = 0
+          const finalMime = `image/${config.format}`
 
           const generateBlob = () => {
             finalCanvas.toBlob((blob) => {
@@ -1034,13 +1029,13 @@ export default defineComponent({
 
               const sizeKB = blob.size / 1024
               if (sizeKB <= config.targetSizeKB || attempts >= config.maxAttempts || quality <= config.minQuality) {
-                const finalFile = new File([blob], `normalized.jpg`, { type: 'image/jpeg' })
+                const finalFile = new File([blob], `normalized.${config.format}`, { type: finalMime })
                 
                 compressionInfo.value[field] = {
                   originalSize: formatBytes(originalSize),
                   compressedSize: formatBytes(finalFile.size),
                   reduction: Math.round(((originalSize - finalFile.size) / originalSize) * 100),
-                  format: 'JPEG',
+                  format: config.format.toUpperCase(),
                   originalDimensions: `${img.width}x${img.height}`,
                   compressedDimensions: `${targetW}x${targetH}`
                 }
@@ -1053,12 +1048,12 @@ export default defineComponent({
                 attempts++
                 generateBlob()
               }
-            }, 'image/jpeg', quality)
+            }, finalMime, quality)
           }
 
           generateBlob()
         } catch (error) {
-          console.error(`[Compression] iOS Normalization Failed:`, error)
+          console.error(`[Compression] Failed:`, error)
           reject(error)
         }
       })

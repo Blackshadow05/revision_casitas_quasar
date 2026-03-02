@@ -832,12 +832,13 @@
              <q-img 
                :src="img" 
                fit="contain" 
-               :style="{ height: '100vh', width: '100vw', transform: `scale(${imageZoomLevels[index] || 1})`, transition: isZooming ? 'none' : 'transform 0.2s ease', touchAction: 'manipulation' }"
+               :style="getImageStyle(index)"
                class="zoomable-image"
-               @touchstart="onTouchStart"
-               @touchmove="onTouchMove"
-               @touchend="onTouchEnd"
-               @wheel="onWheel"
+               draggable="false"
+               @touchstart.stop="onTouchStart"
+               @touchmove.stop.prevent="onTouchMove"
+               @touchend.stop="onTouchEnd"
+               @wheel.prevent="onWheel"
              />
            </q-carousel-slide>
          </q-carousel>
@@ -899,11 +900,66 @@ export default defineComponent({
     const slide = ref(0)
     const dialog = ref(false)
     const dialogSlide = ref(0)
-    const zoomLevel = ref(1)
     const isZooming = ref(false)
-    const lastTouchDistance = ref(0)
-    const lastScale = ref(1)
-    const imageZoomLevels = ref({}) // Store zoom per image index
+    const isInteracting = ref(false)
+    const imageZoomLevels = ref({}) // Store zoom per image index (compat with swipeable check)
+    const imageTransforms = ref({}) // Store scale and pan per image
+    const gestureState = ref({
+      mode: 'none',
+      startDistance: 0,
+      startScale: 1,
+      startCenter: { x: 0, y: 0 },
+      startX: 0,
+      startY: 0,
+      lastPoint: { x: 0, y: 0 }
+    })
+
+    const clamp = (val, min, max) => Math.min(Math.max(val, min), max)
+
+    const ensureTransform = (index) => {
+      if (!imageTransforms.value[index]) {
+        imageTransforms.value[index] = { scale: 1, x: 0, y: 0 }
+      }
+      if (!imageZoomLevels.value[index]) {
+        imageZoomLevels.value[index] = 1
+      }
+    }
+
+    const getMaxOffset = (scale) => {
+      const vw = typeof window !== 'undefined' ? (window.innerWidth || 0) : 0
+      const vh = typeof window !== 'undefined' ? (window.innerHeight || 0) : 0
+      return {
+        x: Math.max(0, ((scale - 1) * vw) / 2),
+        y: Math.max(0, ((scale - 1) * vh) / 2)
+      }
+    }
+
+    const applyTransform = (index, transform) => {
+      ensureTransform(index)
+      const next = { ...imageTransforms.value[index], ...transform }
+      const maxOffset = getMaxOffset(next.scale)
+      next.x = clamp(next.x, -maxOffset.x, maxOffset.x)
+      next.y = clamp(next.y, -maxOffset.y, maxOffset.y)
+      imageTransforms.value[index] = next
+      imageZoomLevels.value[index] = next.scale
+    }
+
+    const resetTransform = (index) => {
+      applyTransform(index, { scale: 1, x: 0, y: 0 })
+    }
+
+    const getImageStyle = (index) => {
+      const t = imageTransforms.value[index] || { scale: 1, x: 0, y: 0 }
+      return {
+        height: '100vh',
+        width: '100vw',
+        transform: `translate3d(${t.x}px, ${t.y}px, 0) scale(${t.scale})`,
+        transition: isInteracting.value ? 'none' : 'transform 120ms ease-out',
+        touchAction: 'none',
+        willChange: 'transform',
+        userSelect: 'none'
+      }
+    }
     
     const casa = computed(() => store.selectedCasa)
     const authStore = useAuthStore()
@@ -1116,7 +1172,7 @@ export default defineComponent({
     const getCompressionConfig = () => {
       return isIOS ? {
         targetSizeKB: 600,
-        maxResolution: 1000,
+        maxResolution: 1200,
         maxQuality: 0.85,
         minQuality: 0.50,
         maxAttempts: 10,
@@ -1475,13 +1531,18 @@ export default defineComponent({
     const onOpenImage = (index) => {
       dialogSlide.value = index
       dialog.value = true
-      // Only reset zoom if not already zoomed for this image
-      if (!imageZoomLevels.value[index] || imageZoomLevels.value[index] === 1) {
-        imageZoomLevels.value[index] = 1
-      }
+      resetTransform(index)
       isZooming.value = false
-      lastTouchDistance.value = 0
-      lastScale.value = imageZoomLevels.value[index] || 1
+      isInteracting.value = false
+      gestureState.value = {
+        mode: 'none',
+        startDistance: 0,
+        startScale: 1,
+        startCenter: { x: 0, y: 0 },
+        startX: 0,
+        startY: 0,
+        lastPoint: { x: 0, y: 0 }
+      }
     }
 
     const openNoteImage = () => {
@@ -1628,49 +1689,105 @@ export default defineComponent({
       }
     }
 
+    const getTouchCenter = (touches) => ({
+      x: (touches[0].pageX + touches[1].pageX) / 2,
+      y: (touches[0].pageY + touches[1].pageY) / 2
+    })
+
     const onTouchStart = (event) => {
+      const idx = dialogSlide.value
+      ensureTransform(idx)
+
       if (event.touches.length === 2) {
         isZooming.value = true
-        lastTouchDistance.value = Math.hypot(
+        isInteracting.value = true
+        const distance = Math.hypot(
           event.touches[0].pageX - event.touches[1].pageX,
           event.touches[0].pageY - event.touches[1].pageY
         )
-        lastScale.value = imageZoomLevels.value[dialogSlide.value] || 1
+
+        gestureState.value = {
+          mode: 'pinch',
+          startDistance: distance,
+          startScale: imageTransforms.value[idx].scale,
+          startCenter: getTouchCenter(event.touches),
+          startX: imageTransforms.value[idx].x,
+          startY: imageTransforms.value[idx].y,
+          lastPoint: gestureState.value.lastPoint
+        }
+      } else if (event.touches.length === 1 && (imageTransforms.value[idx]?.scale || 1) > 1.01) {
+        isInteracting.value = true
+        gestureState.value = {
+          ...gestureState.value,
+          mode: 'pan',
+          startScale: imageTransforms.value[idx].scale,
+          startX: imageTransforms.value[idx].x,
+          startY: imageTransforms.value[idx].y,
+          lastPoint: { x: event.touches[0].pageX, y: event.touches[0].pageY }
+        }
+      } else {
+        gestureState.value = { ...gestureState.value, mode: 'none' }
       }
     }
 
     const onTouchMove = (event) => {
-      if (event.touches.length === 2 && isZooming.value) {
+      const idx = dialogSlide.value
+
+      if (event.touches.length === 2 && gestureState.value.mode === 'pinch') {
         event.preventDefault()
-        const currentDistance = Math.hypot(
+        const distance = Math.hypot(
           event.touches[0].pageX - event.touches[1].pageX,
           event.touches[0].pageY - event.touches[1].pageY
         )
-        
-        if (lastTouchDistance.value > 0) {
-          const scale = currentDistance / lastTouchDistance.value
-          const newZoom = Math.min(Math.max(lastScale.value * scale, 1), 4)
-          imageZoomLevels.value[dialogSlide.value] = newZoom
-        }
+        const base = gestureState.value
+        if (base.startDistance === 0) return
+
+        const nextScale = clamp(base.startScale * (distance / base.startDistance), 1, 4)
+        const center = getTouchCenter(event.touches)
+        const dx = center.x - base.startCenter.x
+        const dy = center.y - base.startCenter.y
+        applyTransform(idx, {
+          scale: nextScale,
+          x: base.startX + dx,
+          y: base.startY + dy
+        })
+      } else if (event.touches.length === 1 && gestureState.value.mode === 'pan') {
+        event.preventDefault()
+        const point = event.touches[0]
+        const deltaX = point.pageX - gestureState.value.lastPoint.x
+        const deltaY = point.pageY - gestureState.value.lastPoint.y
+        gestureState.value.lastPoint = { x: point.pageX, y: point.pageY }
+        const transform = imageTransforms.value[idx] || { scale: 1, x: 0, y: 0 }
+        applyTransform(idx, {
+          scale: transform.scale,
+          x: transform.x + deltaX,
+          y: transform.y + deltaY
+        })
       }
     }
 
     const onTouchEnd = () => {
+      const idx = dialogSlide.value
+      ensureTransform(idx)
+      const current = imageTransforms.value[idx]
+      const clampedScale = clamp(current.scale, 1, 4)
+      const nextX = clampedScale === 1 ? 0 : current.x
+      const nextY = clampedScale === 1 ? 0 : current.y
+      applyTransform(idx, { scale: clampedScale, x: nextX, y: nextY })
       isZooming.value = false
-      const currentZoom = imageZoomLevels.value[dialogSlide.value] || 1
-      if (currentZoom < 1) {
-        imageZoomLevels.value[dialogSlide.value] = 1
-      } else if (currentZoom > 4) {
-        imageZoomLevels.value[dialogSlide.value] = 4
-      }
+      isInteracting.value = false
+      gestureState.value = { ...gestureState.value, mode: 'none' }
     }
 
     const onWheel = (event) => {
       event.preventDefault()
+      const idx = dialogSlide.value
+      ensureTransform(idx)
       const delta = event.deltaY > 0 ? 0.9 : 1.1
-      const currentZoom = imageZoomLevels.value[dialogSlide.value] || 1
-      const newZoom = Math.min(Math.max(currentZoom * delta, 1), 4)
-      imageZoomLevels.value[dialogSlide.value] = newZoom
+      const transform = imageTransforms.value[idx]
+      const nextScale = clamp(transform.scale * delta, 1, 4)
+      applyTransform(idx, { scale: nextScale })
+      isInteracting.value = false
     }
 
     const images = computed(() => {
@@ -1760,11 +1877,13 @@ export default defineComponent({
       themeClass,
       dialog,
       dialogSlide,
-      zoomLevel,
       imageZoomLevels,
+      imageTransforms,
       isZooming,
+      isInteracting,
       onOpenImage,
       openNoteImage,
+      getImageStyle,
       onTouchStart,
       onTouchMove,
       onTouchEnd,
@@ -1834,6 +1953,11 @@ export default defineComponent({
   background-color: transparent;
   z-index: 2;
   margin: 16px 16px 0 16px;
+}
+
+.zoomable-image {
+  backface-visibility: hidden;
+  will-change: transform;
 }
 
 @media (min-width: 768px) {

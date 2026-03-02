@@ -14,7 +14,9 @@ const routes = [
       { path: 'caja-fuerte/:numero', component: () => import('pages/CajaFuerteDetailPage.vue') },
       { path: 'admin-users', component: () => import('pages/AdminUsersPage.vue') },
       { path: 'forms', component: () => import('pages/FormsPage.vue') },
-      { path: 'reportes', component: () => import('pages/ReportesPage.vue') }
+      { path: 'reportes', component: () => import('pages/ReportesPage.vue') },
+      { path: 'danos-casitas', component: () => import('pages/DanosCasitasListPage.vue') },
+      { path: 'danos-casitas/:numero', component: () => import('pages/DanosCasitasDetailPage.vue') }
     ]
   },
 

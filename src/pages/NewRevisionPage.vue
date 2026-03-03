@@ -846,6 +846,20 @@ export default defineComponent({
       return count
     })
 
+    const helperBase64ToFile = async (base64String, filename) => {
+      if (!base64String || typeof base64String !== 'string') return null
+      try {
+        const res = await fetch(base64String)
+        const blob = await res.blob()
+        const file = new File([blob], filename, { type: blob.type })
+        file._isCompressed = true // Mark as compressed so watchers don't re-compress
+        return file
+      } catch (e) {
+        console.error('Error converting base64 to file:', e)
+        return null
+      }
+    }
+
     // Load users from Supabase
     const loadUsers = async () => {
       try {
@@ -861,6 +875,40 @@ export default defineComponent({
         
         users.value = (data || []).map(user => ({ label: user.Usuario, value: user.Usuario }))
         
+        // Load saved form data from localStorage if exists
+        const savedForm = localStorage.getItem('new_revision_form')
+        if (savedForm) {
+          try {
+            const parsedForm = JSON.parse(savedForm)
+            
+            // Restore primitive form fields first
+            Object.keys(form.value).forEach(key => {
+              if (key !== 'evidencia_01' && key !== 'evidencia_02' && key !== 'evidencia_03' && parsedForm[key] !== undefined) {
+                form.value[key] = parsedForm[key]
+              }
+            })
+
+            // Restore evidence files from Base64
+            if (parsedForm.evidencia_01 && typeof parsedForm.evidencia_01 === 'string' && parsedForm.evidencia_01.startsWith('data:')) {
+              form.value.evidencia_01 = await helperBase64ToFile(parsedForm.evidencia_01, 'evidencia_01.jpg')
+            }
+            if (parsedForm.evidencia_02 && typeof parsedForm.evidencia_02 === 'string' && parsedForm.evidencia_02.startsWith('data:')) {
+              form.value.evidencia_02 = await helperBase64ToFile(parsedForm.evidencia_02, 'evidencia_02.jpg')
+            }
+            if (parsedForm.evidencia_03 && typeof parsedForm.evidencia_03 === 'string' && parsedForm.evidencia_03.startsWith('data:')) {
+              form.value.evidencia_03 = await helperBase64ToFile(parsedForm.evidencia_03, 'evidencia_03.jpg')
+            }
+
+            // Restore compression info if exists
+            const savedInfo = localStorage.getItem('new_revision_compression_info')
+            if (savedInfo) {
+              compressionInfo.value = JSON.parse(savedInfo)
+            }
+          } catch (e) {
+            console.error('Error parsing saved form:', e)
+          }
+        }
+
         // Set current logged in user automatically only if session is active
         if (authStore.isLoggedIn && authStore.user && authStore.user.Usuario) {
           form.value.quien_revisa = authStore.user.Usuario
@@ -869,6 +917,38 @@ export default defineComponent({
         console.error('Error loading users:', error)
       }
     }
+
+    const helperFileToBase64 = (file) => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.readAsDataURL(file)
+        reader.onload = () => resolve(reader.result)
+        reader.onerror = error => reject(error)
+      })
+    }
+
+    const saveFormToStorage = async () => {
+      const dataToSave = { ...form.value }
+      
+      // Convert File objects to Base64 for storage
+      if (dataToSave.evidencia_01 instanceof File) {
+        dataToSave.evidencia_01 = await helperFileToBase64(dataToSave.evidencia_01)
+      }
+      if (dataToSave.evidencia_02 instanceof File) {
+        dataToSave.evidencia_02 = await helperFileToBase64(dataToSave.evidencia_02)
+      }
+      if (dataToSave.evidencia_03 instanceof File) {
+        dataToSave.evidencia_03 = await helperFileToBase64(dataToSave.evidencia_03)
+      }
+      
+      localStorage.setItem('new_revision_form', JSON.stringify(dataToSave))
+      localStorage.setItem('new_revision_compression_info', JSON.stringify(compressionInfo.value))
+    }
+
+    // Watch form changes to save to localStorage
+    watch(form, async () => {
+      await saveFormToStorage()
+    }, { deep: true })
 
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
 
@@ -1220,9 +1300,11 @@ export default defineComponent({
     }
     
     const resetFormAndGoBack = () => {
+      localStorage.removeItem('new_revision_form')
+      localStorage.removeItem('new_revision_compression_info')
       form.value = {
         casita: '',
-        quien_revisa: users.value.length === 1 ? users.value[0].value : '',
+        quien_revisa: authStore.isLoggedIn && authStore.user && authStore.user.Usuario ? authStore.user.Usuario : (users.value.length === 1 ? users.value[0].value : ''),
         caja_fuerte: '',
         room_move: '',
         puertas_ventanas: '',

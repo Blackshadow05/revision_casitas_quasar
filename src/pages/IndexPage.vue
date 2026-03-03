@@ -686,6 +686,8 @@ export default defineComponent({
     }
 
     const addNew = () => {
+      localStorage.removeItem('new_revision_form')
+      localStorage.removeItem('new_revision_compression_info')
       router.push('/new-revision')
     }
 

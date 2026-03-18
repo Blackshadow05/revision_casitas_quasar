@@ -57,16 +57,17 @@ export default {
     const showPrompt = ref(false)
     const deferredPrompt = ref(null)
     const isIOS = ref(false)
+    const isMobile = ref(false)
 
     const checkPlatform = () => {
       const userAgent = window.navigator.userAgent.toLowerCase()
       isIOS.value = /iphone|ipad|ipod/.test(userAgent)
+      isMobile.value = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/.test(userAgent)
       
-      const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/.test(userAgent)
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone
 
       // Solo mostramos en móviles y si NO está instalada
-      if (isMobile && !isStandalone) {
+      if (isMobile.value && !isStandalone) {
         // En iOS mostramos después de 3 segundos
         if (isIOS.value) {
           setTimeout(() => {
@@ -103,6 +104,9 @@ export default {
         // Prevenir que Chrome muestre su banner automático
         e.preventDefault()
         deferredPrompt.value = e
+        
+        // Solo mostrar el prompt en dispositivos móviles
+        if (!isMobile.value) return
         
         const dismissed = localStorage.getItem('pwa-prompt-dismissed')
         const now = new Date().getTime()

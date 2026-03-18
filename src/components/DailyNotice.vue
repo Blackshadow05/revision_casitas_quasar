@@ -26,6 +26,7 @@
 
 <script>
 import { defineComponent, ref, onMounted } from 'vue'
+import { Platform } from 'quasar'
 
 export default defineComponent({
   name: 'DailyNotice',
@@ -38,6 +39,10 @@ export default defineComponent({
     }
 
     onMounted(() => {
+      if (Platform.is.desktop) {
+        return
+      }
+
       try {
         const seen = localStorage.getItem('dailyNoticeSeen')
         const today = todayKey()

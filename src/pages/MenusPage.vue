@@ -16,16 +16,16 @@
       />
     </div>
 
-    <div class="q-pa-md">
+    <div class="q-pa-md q-pa-lg-xl">
       <!-- Loading State -->
       <div v-if="loading && menus.length === 0" class="flex flex-center q-my-xl">
         <q-spinner-dots color="primary" size="40px" />
       </div>
 
       <!-- Content -->
-      <div v-else>
+      <div v-else class="content-wrapper">
         <!-- SECCIÓN: MENÚ DE HOY -->
-        <div v-if="todayMenu" class="q-mb-xl">
+        <div v-if="todayMenu" class="q-mb-xl today-menu-section">
           <div class="modern-menu-card orange-theme">
             <!-- Header de la tarjeta -->
             <div class="card-top-section row items-center no-wrap">
@@ -58,7 +58,7 @@
         </div>
 
         <!-- SECCIÓN: PRÓXIMOS MENÚS -->
-        <div v-if="upcomingMenus.length > 0">
+        <div v-if="upcomingMenus.length > 0" class="upcoming-menus-section">
           <div class="row items-center q-mb-md q-px-sm">
             <div class="section-icon-box q-mr-sm">
               <q-icon name="auto_awesome" color="primary" size="20px" />
@@ -70,30 +70,32 @@
             </q-badge>
           </div>
 
-          <div v-for="menu in upcomingMenus" :key="menu.id" class="modern-menu-card blue-theme q-mb-lg">
-            <!-- Header de la tarjeta -->
-            <div class="card-top-section row items-center no-wrap">
-              <div class="icon-container blue-gradient shadow-blue">
-                <q-icon name="local_cafe" color="white" size="24px" />
+          <div class="menus-grid">
+            <div v-for="menu in upcomingMenus" :key="menu.id" class="modern-menu-card blue-theme">
+              <!-- Header de la tarjeta -->
+              <div class="card-top-section row items-center no-wrap">
+                <div class="icon-container blue-gradient shadow-blue">
+                  <q-icon name="local_cafe" color="white" size="24px" />
+                </div>
+                <div class="column q-ml-md flex-grow">
+                  <div class="text-overline text-primary text-weight-bolder" style="line-height: 1">PRÓXIMO MENÚ</div>
+                  <div class="text-h5 text-weight-bold text-grey-9">{{ formatDayName(menu.fecha_menu) }}</div>
+                  <div class="text-body2 text-grey-6">{{ getRelativeLabel(menu.fecha_menu) }}</div>
+                </div>
+                <div class="day-badge-circle blue-gradient shadow-blue">
+                  {{ formatDayNumber(menu.fecha_menu) }}
+                </div>
               </div>
-              <div class="column q-ml-md flex-grow">
-                <div class="text-overline text-primary text-weight-bolder" style="line-height: 1">PRÓXIMO MENÚ</div>
-                <div class="text-h5 text-weight-bold text-grey-9">{{ formatDayName(menu.fecha_menu) }}</div>
-                <div class="text-body2 text-grey-6">{{ getRelativeLabel(menu.fecha_menu) }}</div>
-              </div>
-              <div class="day-badge-circle blue-gradient shadow-blue">
-                {{ formatDayNumber(menu.fecha_menu) }}
-              </div>
-            </div>
 
-            <!-- Caja de Platillos -->
-            <div class="content-container">
-              <div class="platillo-box">
-                <div class="text-overline text-primary text-weight-bold q-mb-xs">PLATILLO</div>
-                <div class="q-gutter-y-xs">
-                  <div v-for="(item, idx) in parseMenuItems(menu.contenido_menu)" :key="idx" class="row items-start no-wrap q-py-xs">
-                    <q-icon name="play_arrow" color="primary" size="14px" class="q-mt-xs q-mr-sm" />
-                    <div class="text-body1 text-weight-medium text-grey-9">{{ item }}</div>
+              <!-- Caja de Platillos -->
+              <div class="content-container">
+                <div class="platillo-box">
+                  <div class="text-overline text-primary text-weight-bold q-mb-xs">PLATILLO</div>
+                  <div class="q-gutter-y-xs">
+                    <div v-for="(item, idx) in parseMenuItems(menu.contenido_menu)" :key="idx" class="row items-start no-wrap q-py-xs">
+                      <q-icon name="play_arrow" color="primary" size="14px" class="q-mt-xs q-mr-sm" />
+                      <div class="text-body1 text-weight-medium text-grey-9">{{ item }}</div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -365,6 +367,76 @@ export default defineComponent({
 
 .line-height-1 {
   line-height: 1;
+}
+
+/* Desktop Layout */
+@media (min-width: 1024px) {
+  .content-wrapper {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  
+  .today-menu-section {
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  
+  .upcoming-menus-section {
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  
+  .menus-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 24px;
+  }
+  
+  .menus-grid .modern-menu-card {
+    margin-bottom: 0;
+  }
+  
+  .modern-menu-card {
+    border-radius: 20px;
+  }
+  
+  .card-top-section {
+    padding: 30px 30px 20px;
+  }
+  
+  .icon-container {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .day-badge-circle {
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+  }
+  
+  .content-container {
+    padding: 0 25px 25px;
+  }
+  
+  .platillo-box {
+    padding: 25px;
+  }
+}
+
+/* Tablet Layout */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .menus-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+  
+  .menus-grid .modern-menu-card {
+    margin-bottom: 0;
+  }
 }
 
 @media (max-width: 400px) {

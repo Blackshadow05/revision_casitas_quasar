@@ -94,39 +94,6 @@
         </q-item-section>
       </q-item>
     </div>
-
-    <!-- Danger zone divider -->
-    <div class="danger-divider q-mb-md">
-      <q-separator />
-      <span class="danger-label">
-        <q-icon name="warning_amber" color="warning" size="14px" class="q-mr-xs" />
-        Zona avanzada
-      </span>
-      <q-separator />
-    </div>
-
-    <!-- Advanced / danger settings group -->
-    <div class="settings-card">
-      <q-item
-        clickable
-        v-ripple
-        class="settings-item"
-        @click="goToForms"
-      >
-        <q-item-section avatar>
-          <div class="settings-icon-wrap bg-orange">
-            <q-icon name="assignment" color="white" size="20px" />
-          </div>
-        </q-item-section>
-        <q-item-section>
-          <q-item-label class="text-weight-medium">Formularios</q-item-label>
-          <q-item-label caption>Configurar formularios del sistema</q-item-label>
-        </q-item-section>
-        <q-item-section side>
-          <q-icon name="chevron_right" color="grey-4" size="18px" />
-        </q-item-section>
-      </q-item>
-    </div>
   </q-page>
 </template>
 
@@ -155,16 +122,11 @@ export default defineComponent({
       router.push("/danos-casitas");
     };
 
-    const goToForms = () => {
-      router.push("/forms");
-    };
-
     return {
       goToAdminUsers,
       goToReportes,
       goToCajaFuerte,
       goToDanosCasitas,
-      goToForms,
     };
   },
 });
@@ -201,21 +163,6 @@ export default defineComponent({
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-}
-
-.danger-divider {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 4px 0;
-}
-
-.danger-label {
-  font-size: 0.72rem;
-  color: #888;
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
 }
 
 .body--dark .settings-card {

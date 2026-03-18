@@ -473,4 +473,17 @@ export default defineComponent({
 .rounded-lg { border-radius: 12px; }
 .rounded-xl { border-radius: 20px; }
 .py-md { padding-top: 16px; padding-bottom: 16px; }
+
+/* Limitar tamaño de la imagen de vista previa */
+.preview-section .q-img {
+  max-width: 100%;
+  max-height: 400px;
+  object-fit: contain;
+}
+
+@media (max-width: 600px) {
+  .preview-section .q-img {
+    max-height: 300px;
+  }
+}
 </style>

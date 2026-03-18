@@ -35,12 +35,12 @@
       color="primary"
       icon="add"
       label="Nuevo Usuario"
-      class="full-width q-mb-md"
+      class="full-width q-mb-md desktop-btn"
       @click="showAddDialog = true"
     />
 
-    <!-- Lista de usuarios -->
-    <q-list bordered separator class="rounded-borders">
+    <!-- Vista Móvil: Lista de usuarios -->
+    <q-list bordered separator class="rounded-borders mobile-only">
       <q-item v-for="user in users" :key="user.id">
         <q-item-section avatar>
           <q-avatar color="primary" text-color="white">
@@ -95,6 +95,84 @@
         </q-item-section>
       </q-item>
     </q-list>
+
+    <!-- Vista Desktop: Tabla de usuarios -->
+    <q-card class="desktop-only">
+      <q-table
+        :rows="users"
+        :columns="columns"
+        row-key="id"
+        flat
+        bordered
+        :pagination="{ rowsPerPage: 15 }"
+        class="users-table"
+      >
+        <template v-slot:body-cell-avatar="props">
+          <q-td :props="props">
+            <q-avatar color="primary" text-color="white" size="md">
+              {{ props.row.Usuario.charAt(0).toUpperCase() }}
+            </q-avatar>
+          </q-td>
+        </template>
+
+        <template v-slot:body-cell-rol="props">
+          <q-td :props="props">
+            <q-chip
+              :color="getRolColor(props.row.Rol)"
+              text-color="white"
+              size="sm"
+            >
+              {{ props.row.Rol || 'Sin rol' }}
+            </q-chip>
+          </q-td>
+        </template>
+
+        <template v-slot:body-cell-actions="props">
+          <q-td :props="props">
+            <div class="row q-gutter-xs justify-center">
+              <!-- Si es SuperAdmin puede editar cualquier usuario -->
+              <template v-if="isSuperAdmin">
+                <q-btn
+                  flat
+                  round
+                  dense
+                  icon="edit"
+                  color="primary"
+                  @click="openEditDialog(props.row)"
+                >
+                  <q-tooltip>Cambiar contraseña</q-tooltip>
+                </q-btn>
+                <!-- Solo Esteban B puede eliminar -->
+                <q-btn
+                  v-if="canDeleteUsers"
+                  flat
+                  round
+                  dense
+                  icon="delete"
+                  color="negative"
+                  @click="confirmDelete(props.row)"
+                >
+                  <q-tooltip>Eliminar usuario</q-tooltip>
+                </q-btn>
+              </template>
+              <!-- Si no es SuperAdmin, solo puede ver el botón de editar su propia contraseña -->
+              <template v-else-if="props.row.id === currentUser?.id">
+                <q-btn
+                  flat
+                  round
+                  dense
+                  icon="edit"
+                  color="primary"
+                  @click="openEditDialog(props.row)"
+                >
+                  <q-tooltip>Cambiar mi contraseña</q-tooltip>
+                </q-btn>
+              </template>
+            </div>
+          </q-td>
+        </template>
+      </q-table>
+    </q-card>
 
     <!-- Diálogo para agregar nuevo usuario -->
     <q-dialog v-model="showAddDialog">
@@ -248,6 +326,38 @@ export default defineComponent({
     const userToDelete = ref(null);
 
     const rolOptions = ["SuperAdmin", "admin", "user", "inactivo"];
+
+    // Columnas para la tabla de usuarios (vista desktop)
+    const columns = [
+      {
+        name: "avatar",
+        label: "",
+        field: "Usuario",
+        align: "center",
+        style: "width: 60px",
+      },
+      {
+        name: "usuario",
+        label: "Usuario",
+        field: "Usuario",
+        align: "left",
+        sortable: true,
+      },
+      {
+        name: "rol",
+        label: "Rol",
+        field: "Rol",
+        align: "center",
+        sortable: true,
+      },
+      {
+        name: "actions",
+        label: "Acciones",
+        field: "actions",
+        align: "center",
+        style: "width: 120px",
+      },
+    ];
 
     // Obtener el usuario actual del store
     const currentUser = computed(() => authStore.user);
@@ -427,6 +537,17 @@ export default defineComponent({
       router.back();
     };
 
+    // Función para obtener el color del rol
+    const getRolColor = (rol) => {
+      const colors = {
+        SuperAdmin: "red",
+        admin: "orange",
+        user: "blue",
+        inactivo: "grey",
+      };
+      return colors[rol] || "grey";
+    };
+
     onMounted(() => {
       loadUsers();
     });
@@ -442,6 +563,7 @@ export default defineComponent({
       editingUser,
       userToDelete,
       rolOptions,
+      columns,
       currentUser,
       isSuperAdmin,
       canDeleteUsers,
@@ -453,16 +575,34 @@ export default defineComponent({
       confirmDelete,
       deleteUser,
       goBack,
+      getRolColor,
     };
   },
 });
 </script>
 
 <style scoped>
+/* Responsive visibility classes */
+.mobile-only {
+  display: block;
+}
+
+.desktop-only {
+  display: none;
+}
+
 /* Desktop: proper desktop layout for Admin Users */
 @media (min-width: 1024px) {
+  .mobile-only {
+    display: none !important;
+  }
+
+  .desktop-only {
+    display: block !important;
+  }
+
   .q-page {
-    max-width: 900px;
+    max-width: 1000px;
     margin-left: auto;
     margin-right: auto;
     padding: 32px 40px !important;
@@ -484,6 +624,24 @@ export default defineComponent({
 
   .text-h5 {
     font-size: 1.75rem;
+  }
+
+  .desktop-btn {
+    width: auto !important;
+    max-width: 200px;
+  }
+
+  .users-table {
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .users-table .q-table__top {
+    padding: 16px 20px;
+  }
+
+  .users-table .q-table__bottom {
+    padding: 16px 20px;
   }
 }
 </style>

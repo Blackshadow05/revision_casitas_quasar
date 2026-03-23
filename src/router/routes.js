@@ -16,7 +16,8 @@ const routes = [
       { path: 'forms', component: () => import('pages/FormsPage.vue') },
       { path: 'reportes', component: () => import('pages/ReportesPage.vue') },
       { path: 'danos-casitas', component: () => import('pages/DanosCasitasListPage.vue') },
-      { path: 'danos-casitas/:numero', component: () => import('pages/DanosCasitasDetailPage.vue') }
+      { path: 'danos-casitas/:numero', component: () => import('pages/DanosCasitasDetailPage.vue') },
+      { path: 'dashboard-horario', component: () => import('pages/DashboardHorarioPage.vue') }
     ]
   },
 

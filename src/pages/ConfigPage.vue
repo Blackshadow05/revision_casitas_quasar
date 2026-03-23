@@ -93,6 +93,28 @@
           <q-icon name="chevron_right" color="grey-4" size="18px" />
         </q-item-section>
       </q-item>
+
+      <q-separator inset="72px" class="lt-md" />
+
+      <q-item
+        clickable
+        v-ripple
+        class="settings-item lt-md"
+        @click="goToDashboardHorario"
+      >
+        <q-item-section avatar>
+          <div class="settings-icon-wrap bg-orange">
+            <q-icon name="schedule" color="white" size="20px" />
+          </div>
+        </q-item-section>
+        <q-item-section>
+          <q-item-label class="text-weight-medium">Dashboard Horario</q-item-label>
+          <q-item-label caption>Ver turnos del personal</q-item-label>
+        </q-item-section>
+        <q-item-section side>
+          <q-icon name="chevron_right" color="grey-4" size="18px" />
+        </q-item-section>
+      </q-item>
     </div>
   </q-page>
 </template>
@@ -122,11 +144,16 @@ export default defineComponent({
       router.push("/danos-casitas");
     };
 
+    const goToDashboardHorario = () => {
+      router.push("/dashboard-horario");
+    };
+
     return {
       goToAdminUsers,
       goToReportes,
       goToCajaFuerte,
       goToDanosCasitas,
+      goToDashboardHorario,
     };
   },
 });

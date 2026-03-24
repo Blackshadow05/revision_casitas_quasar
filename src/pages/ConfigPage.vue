@@ -94,6 +94,28 @@
         </q-item-section>
       </q-item>
 
+      <q-separator inset="72px" />
+
+      <q-item
+        clickable
+        v-ripple
+        class="settings-item"
+        @click="goToSnippets"
+      >
+        <q-item-section avatar>
+          <div class="settings-icon-wrap bg-deep-orange">
+            <q-icon name="code" color="white" size="20px" />
+          </div>
+        </q-item-section>
+        <q-item-section>
+          <q-item-label class="text-weight-medium">Codigo</q-item-label>
+          <q-item-label caption>Biblioteca personal de snippets</q-item-label>
+        </q-item-section>
+        <q-item-section side>
+          <q-icon name="chevron_right" color="grey-4" size="18px" />
+        </q-item-section>
+      </q-item>
+
       <q-separator inset="72px" class="lt-md" />
 
       <q-item
@@ -148,12 +170,17 @@ export default defineComponent({
       router.push("/dashboard-horario");
     };
 
+    const goToSnippets = () => {
+      router.push("/snippets");
+    };
+
     return {
       goToAdminUsers,
       goToReportes,
       goToCajaFuerte,
       goToDanosCasitas,
       goToDashboardHorario,
+      goToSnippets,
     };
   },
 });

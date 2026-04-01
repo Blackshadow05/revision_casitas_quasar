@@ -40,6 +40,9 @@ export const useAuthStore = defineStore('auth', {
     canView: (state) => {
       if (!state.user) return false
       return true
+    },
+    isSuperAdmin: (state) => {
+      return state.user?.Rol === 'SuperAdmin'
     }
   },
   

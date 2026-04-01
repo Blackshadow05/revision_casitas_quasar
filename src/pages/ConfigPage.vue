@@ -141,49 +141,19 @@
   </q-page>
 </template>
 
-<script>
-import { defineComponent } from "vue";
-import { useRouter } from "vue-router";
+<script setup>
+import { useRouter } from 'vue-router'
 
-export default defineComponent({
-  name: "ConfigPage",
-  setup() {
-    const router = useRouter();
+defineOptions({ name: 'ConfigPage' })
 
-    const goToAdminUsers = () => {
-      router.push("/admin-users");
-    };
+const router = useRouter()
 
-    const goToReportes = () => {
-      router.push("/reportes");
-    };
-
-    const goToCajaFuerte = () => {
-      router.push("/caja-fuerte");
-    };
-
-    const goToDanosCasitas = () => {
-      router.push("/danos-casitas");
-    };
-
-    const goToDashboardHorario = () => {
-      router.push("/dashboard-horario");
-    };
-
-    const goToSnippets = () => {
-      router.push("/snippets");
-    };
-
-    return {
-      goToAdminUsers,
-      goToReportes,
-      goToCajaFuerte,
-      goToDanosCasitas,
-      goToDashboardHorario,
-      goToSnippets,
-    };
-  },
-});
+const goToAdminUsers = () => router.push('/admin-users')
+const goToReportes = () => router.push('/reportes')
+const goToCajaFuerte = () => router.push('/caja-fuerte')
+const goToDanosCasitas = () => router.push('/danos-casitas')
+const goToDashboardHorario = () => router.push('/dashboard-horario')
+const goToSnippets = () => router.push('/snippets')
 </script>
 
 <style scoped>

@@ -129,7 +129,7 @@
       <div class="row items-center q-gutter-x-md q-mb-lg">
         <q-input
           v-model="search"
-          placeholder="Buscar por casita o revisor..."
+          placeholder="Buscar por casita, revisor o notas..."
           outlined
           rounded
           dense
@@ -645,17 +645,16 @@ export default defineComponent({
 
     let searchTimeout = null
 
-    watch(() => store.search, async (newVal) => {
+    watch(() => store.search, (newVal) => {
       infiniteScroll.value?.reset()
-      clearTimeout(searchTimeout)
-      
-      searchTimeout = setTimeout(async () => {
-        if (newVal && newVal.trim()) {
-          await store.searchInDatabase(newVal.trim())
-        } else {
+      // Si no hay datos cargados aún, cargarlos
+      if (!store.allLoaded && !store.loading) {
+        clearTimeout(searchTimeout)
+        searchTimeout = setTimeout(async () => {
           await loadData()
-        }
-      }, 500)
+        }, 300)
+      }
+      // El getter filteredCasas se encarga del filtrado local automáticamente
     })
 
     const checkSessionInterval = setInterval(() => {

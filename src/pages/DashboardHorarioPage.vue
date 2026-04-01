@@ -9,6 +9,7 @@
     <q-tabs v-model="activeTab" dense class="text-primary q-mb-md" active-color="primary" indicator-color="primary" align="left" narrow-indicator>
       <q-tab name="horarios" label="Horarios" icon="schedule" />
       <q-tab name="extras" label="Extras" icon="more_time" />
+      <q-tab v-if="isSuperAdmin" name="quincena" label="Quincena" icon="date_range" />
       <q-tab name="vacaciones" label="Vacaciones" icon="beach_access" />
       <q-tab name="feriados" label="Feriados" icon="celebration" />
     </q-tabs>
@@ -191,20 +192,98 @@
 
     <!-- ==================== TAB EXTRAS ==================== -->
     <div v-show="activeTab === 'extras'">
-      <div class="text-caption text-grey-7 q-mb-sm">
-        Quincena: <strong>{{ quincenaLabel }}</strong>
+
+      <!-- Modo: quincena vs rango personalizado -->
+      <div class="row q-mb-md">
+        <q-btn-toggle
+          v-model="extrasMode"
+          toggle-color="primary"
+          :options="[
+            { label: 'Por quincena', value: 'quincena', icon: 'date_range' },
+            { label: 'Rango personalizado', value: 'rango', icon: 'tune' }
+          ]"
+          dense
+          unelevated
+          rounded
+          spread
+        />
       </div>
 
-      <q-inner-loading :showing="loadingExtras">
+      <!-- Modo quincena: selector -->
+      <template v-if="extrasMode === 'quincena'">
+        <q-select
+          v-model="selectedPeriodo"
+          :options="periodosOptions"
+          label="Seleccionar Quincena"
+          dense
+          outlined
+          emit-value
+          map-options
+          class="q-mb-sm"
+          :loading="loadingPeriodos"
+          @update:model-value="fetchExtrasByPeriodo"
+        />
+        <div v-if="selectedPeriodo" class="q-mb-md">
+          <div class="text-caption text-grey-7">
+            {{ selectedPeriodo.fecha_inicio }} al {{ selectedPeriodo.fecha_fin }}
+          </div>
+          <div v-if="selectedPeriodo.created_by" class="text-caption text-grey-6">
+            <q-icon name="person" size="xs" /> Registrada por: <strong>{{ selectedPeriodo.created_by }}</strong>
+          </div>
+        </div>
+      </template>
+
+      <!-- Modo rango personalizado: date pickers -->
+      <template v-else>
+        <div class="row q-col-gutter-sm q-mb-md">
+          <div class="col-6">
+            <q-input v-model="rangoDesde" label="Desde" dense outlined readonly>
+              <template #append>
+                <q-icon name="event" class="cursor-pointer">
+                  <q-popup-proxy transition-show="scale" transition-hide="scale">
+                    <q-date v-model="rangoDesde" mask="YYYY-MM-DD">
+                      <div class="row items-center justify-end">
+                        <q-btn v-close-popup label="Cerrar" color="primary" flat />
+                      </div>
+                    </q-date>
+                  </q-popup-proxy>
+                </q-icon>
+              </template>
+            </q-input>
+          </div>
+          <div class="col-6">
+            <q-input v-model="rangoHasta" label="Hasta" dense outlined readonly>
+              <template #append>
+                <q-icon name="event" class="cursor-pointer">
+                  <q-popup-proxy transition-show="scale" transition-hide="scale">
+                    <q-date v-model="rangoHasta" mask="YYYY-MM-DD">
+                      <div class="row items-center justify-end">
+                        <q-btn v-close-popup label="Cerrar" color="primary" flat />
+                      </div>
+                    </q-date>
+                  </q-popup-proxy>
+                </q-icon>
+              </template>
+            </q-input>
+          </div>
+        </div>
+        <div class="row justify-end q-mb-md">
+          <q-btn color="primary" icon="search" label="Calcular" dense unelevated
+            :disable="!rangoDesde || !rangoHasta"
+            @click="fetchExtrasByRango" />
+        </div>
+      </template>
+
+      <q-inner-loading :showing="loadingExtrasQuincena">
         <q-spinner-gears size="50px" color="primary" />
       </q-inner-loading>
 
-      <q-banner v-if="errorExtras" class="bg-negative text-white q-mb-md" rounded>
+      <q-banner v-if="errorExtrasQuincena" class="bg-negative text-white q-mb-md" rounded>
         <template #avatar><q-icon name="error" /></template>
-        {{ errorExtras }}
+        {{ errorExtrasQuincena }}
       </q-banner>
 
-      <template v-if="!loadingExtras && extrasResumen.length > 0">
+      <template v-if="!loadingExtrasQuincena && extrasResumenQuincena.length > 0">
         <!-- Extras Nocturnas -->
         <q-card class="q-mb-md">
           <q-card-section class="bg-blue-8 text-white">
@@ -212,11 +291,11 @@
               <q-icon name="nights_stay" size="sm" class="q-mr-sm" />
               <div class="text-subtitle1 text-weight-bold">Horas Extra Nocturnas</div>
               <q-space />
-              <q-badge color="white" text-color="blue-8" :label="totalExtrasNocturnas + 'h'" />
+              <q-badge color="white" text-color="blue-8" :label="totalNocturnasQuincena + 'h'" />
             </div>
           </q-card-section>
           <q-list separator>
-            <q-item v-for="emp in extrasNocturnas" :key="emp.empleado" clickable v-ripple @click="openDiasDialog(emp)">
+            <q-item v-for="emp in extrasNocturnasQuincena" :key="emp.empleado" clickable v-ripple @click="openDiasDialog(emp)">
               <q-item-section avatar>
                 <q-avatar color="blue-2" text-color="blue-9">
                   {{ emp.empleado.charAt(0).toUpperCase() }}
@@ -233,7 +312,7 @@
                 </div>
               </q-item-section>
             </q-item>
-            <q-item v-if="extrasNocturnas.length === 0">
+            <q-item v-if="extrasNocturnasQuincena.length === 0">
               <q-item-section class="text-grey text-center">Sin horas extra nocturnas</q-item-section>
             </q-item>
           </q-list>
@@ -246,11 +325,11 @@
               <q-icon name="brightness_6" size="sm" class="q-mr-sm" />
               <div class="text-subtitle1 text-weight-bold">Horas Extra Mixtas</div>
               <q-space />
-              <q-badge color="white" text-color="green-8" :label="totalExtrasMixtas + 'h'" />
+              <q-badge color="white" text-color="green-8" :label="totalMixtasQuincena + 'h'" />
             </div>
           </q-card-section>
           <q-list separator>
-            <q-item v-for="emp in extrasMixtas" :key="emp.empleado" clickable v-ripple @click="openDiasDialog(emp)">
+            <q-item v-for="emp in extrasMixtasQuincena" :key="emp.empleado" clickable v-ripple @click="openDiasDialog(emp)">
               <q-item-section avatar>
                 <q-avatar color="green-2" text-color="green-9">
                   {{ emp.empleado.charAt(0).toUpperCase() }}
@@ -267,16 +346,133 @@
                 </div>
               </q-item-section>
             </q-item>
-            <q-item v-if="extrasMixtas.length === 0">
+            <q-item v-if="extrasMixtasQuincena.length === 0">
               <q-item-section class="text-grey text-center">Sin horas extra mixtas</q-item-section>
             </q-item>
           </q-list>
         </q-card>
       </template>
 
-      <div v-if="!loadingExtras && extrasResumen.length === 0 && !errorExtras" class="text-grey text-center q-pa-lg">
-        No hay horas extra en esta quincena
+      <div v-if="!loadingExtrasQuincena && (extrasMode === 'quincena' ? selectedPeriodo : rangoDesde && rangoHasta) && extrasResumenQuincena.length === 0 && !errorExtrasQuincena" class="text-grey text-center q-pa-lg">
+        No hay horas extra en este periodo
       </div>
+      <div v-if="extrasMode === 'quincena' && !selectedPeriodo && !loadingPeriodos" class="text-grey text-center q-pa-lg">
+        Selecciona una quincena para ver las horas extra
+      </div>
+    </div>
+
+    <!-- ==================== TAB QUINCENA ==================== -->
+    <div v-if="isSuperAdmin" v-show="activeTab === 'quincena'">
+
+      <!-- Lista de quincenas existentes -->
+      <div class="text-subtitle2 text-weight-bold q-mb-sm">Quincenas registradas</div>
+      <q-list bordered separator class="q-mb-lg rounded-borders">
+        <q-item v-for="p in periodos" :key="p.id">
+          <q-item-section>
+            <q-item-label>{{ p.nombre }}</q-item-label>
+            <q-item-label caption>{{ p.fecha_inicio }} → {{ p.fecha_fin }}</q-item-label>
+            <q-item-label v-if="p.created_by" caption class="text-grey-6">
+              <q-icon name="person" size="xs" /> {{ p.created_by }}
+            </q-item-label>
+          </q-item-section>
+          <q-item-section side>
+            <q-btn flat round icon="edit" color="primary" size="sm" @click="openEditDialog(p)" />
+          </q-item-section>
+        </q-item>
+        <q-item v-if="periodos.length === 0 && !loadingPeriodos">
+          <q-item-section class="text-grey text-center">Sin quincenas registradas</q-item-section>
+        </q-item>
+        <q-item v-if="loadingPeriodos">
+          <q-item-section class="text-center"><q-spinner-dots color="primary" /></q-item-section>
+        </q-item>
+      </q-list>
+
+      <div class="text-subtitle2 text-weight-bold q-mb-sm">Crear quincena</div>
+      <q-card flat bordered class="q-pa-md q-mb-md">
+        <q-card-section class="q-pa-none q-mb-md">
+          <div class="text-subtitle1 text-weight-bold">Crear quincena</div>
+          <div class="text-caption text-grey-7">Define el nombre y el rango de fechas del periodo de pago.</div>
+        </q-card-section>
+
+        <div class="row q-col-gutter-md q-mb-md">
+          <div class="col-12 col-sm-6">
+            <q-select
+              v-model="periodoTipo"
+              :options="tipoOptions"
+              label="Tipo"
+              dense
+              outlined
+              emit-value
+              map-options
+            />
+          </div>
+          <div class="col-12 col-sm-6">
+            <q-select
+              v-model="periodoMes"
+              :options="mesOptions"
+              label="Mes"
+              dense
+              outlined
+              emit-value
+              map-options
+            />
+          </div>
+        </div>
+
+        <q-input
+          v-model="nombrePeriodo"
+          label="Nombre"
+          dense
+          outlined
+          readonly
+          class="q-mb-md"
+        />
+
+        <div class="row q-col-gutter-md q-mb-md">
+          <div class="col-12 col-sm-6">
+            <q-input v-model="fechaInicio" label="Fecha inicio" dense outlined readonly>
+              <template #append>
+                <q-icon name="event" class="cursor-pointer">
+                  <q-popup-proxy transition-show="scale" transition-hide="scale">
+                    <q-date v-model="fechaInicio" mask="YYYY-MM-DD">
+                      <div class="row items-center justify-end">
+                        <q-btn v-close-popup label="Cerrar" color="primary" flat />
+                      </div>
+                    </q-date>
+                  </q-popup-proxy>
+                </q-icon>
+              </template>
+            </q-input>
+          </div>
+
+          <div class="col-12 col-sm-6">
+            <q-input v-model="fechaFin" label="Fecha fin" dense outlined readonly>
+              <template #append>
+                <q-icon name="event" class="cursor-pointer">
+                  <q-popup-proxy transition-show="scale" transition-hide="scale">
+                    <q-date v-model="fechaFin" mask="YYYY-MM-DD">
+                      <div class="row items-center justify-end">
+                        <q-btn v-close-popup label="Cerrar" color="primary" flat />
+                      </div>
+                    </q-date>
+                  </q-popup-proxy>
+                </q-icon>
+              </template>
+            </q-input>
+          </div>
+        </div>
+
+        <div class="row justify-end">
+          <q-btn
+            color="primary"
+            icon="save"
+            label="Guardar quincena"
+            :loading="savingPeriodo"
+            :disable="!fechaInicio || !fechaFin"
+            @click="guardarPeriodo"
+          />
+        </div>
+      </q-card>
     </div>
 
     <!-- ==================== TAB VACACIONES ==================== -->
@@ -436,6 +632,48 @@
       </div>
     </div>
 
+    <!-- Diálogo editar quincena -->
+    <q-dialog v-model="showEditDialog" persistent>
+      <q-card style="min-width: 320px; max-width: 95vw">
+        <q-card-section class="bg-primary text-white">
+          <div class="text-subtitle1 text-weight-bold">Editar quincena</div>
+        </q-card-section>
+        <q-card-section v-if="editingPeriodo" class="q-pt-md q-gutter-md">
+          <q-input v-model="editingPeriodo.nombre" label="Nombre" dense outlined />
+          <q-input v-model="editingPeriodo.fecha_inicio" label="Fecha inicio" dense outlined readonly>
+            <template #append>
+              <q-icon name="event" class="cursor-pointer">
+                <q-popup-proxy transition-show="scale" transition-hide="scale">
+                  <q-date v-model="editingPeriodo.fecha_inicio" mask="YYYY-MM-DD">
+                    <div class="row items-center justify-end">
+                      <q-btn v-close-popup label="Cerrar" color="primary" flat />
+                    </div>
+                  </q-date>
+                </q-popup-proxy>
+              </q-icon>
+            </template>
+          </q-input>
+          <q-input v-model="editingPeriodo.fecha_fin" label="Fecha fin" dense outlined readonly>
+            <template #append>
+              <q-icon name="event" class="cursor-pointer">
+                <q-popup-proxy transition-show="scale" transition-hide="scale">
+                  <q-date v-model="editingPeriodo.fecha_fin" mask="YYYY-MM-DD">
+                    <div class="row items-center justify-end">
+                      <q-btn v-close-popup label="Cerrar" color="primary" flat />
+                    </div>
+                  </q-date>
+                </q-popup-proxy>
+              </q-icon>
+            </template>
+          </q-input>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="Cancelar" color="grey" v-close-popup />
+          <q-btn color="primary" icon="save" label="Guardar" :loading="savingEditPeriodo" @click="saveEditPeriodo" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
     <!-- Dialog días de extras -->
     <q-dialog v-model="showDiasDialog" position="bottom">
       <q-card style="width: 100%; max-width: 500px">
@@ -501,20 +739,78 @@
 
 <script>
 import { defineComponent, ref, computed, onMounted, watch } from "vue";
+import { useQuasar } from "quasar";
 import { supabase } from "../supabase";
+import { useAuthStore } from "../stores/auth";
 
 export default defineComponent({
   name: "DashboardHorarioPage",
   setup() {
+    const $q = useQuasar();
+    const authStore = useAuthStore();
+    const isSuperAdmin = computed(() => authStore.user?.Rol === 'SuperAdmin');
+
+    // --- Extras mode: quincena vs rango personalizado ---
+    const extrasMode = ref('quincena');
+    const rangoDesde = ref('');
+    const rangoHasta = ref('');
+
+    // --- Periodos de Pago (Creation Form) ---
+    const currentYearForm = new Date().getFullYear();
+    const tipoOptions = [
+      { label: "Primera quincena de", value: "Primera quincena de" },
+      { label: "Segunda quincena de", value: "Segunda quincena de" }
+    ];
+    const mesOptions = [
+      { label: "Enero", value: "Enero" }, { label: "Febrero", value: "Febrero" },
+      { label: "Marzo", value: "Marzo" }, { label: "Abril", value: "Abril" },
+      { label: "Mayo", value: "Mayo" }, { label: "Junio", value: "Junio" },
+      { label: "Julio", value: "Julio" }, { label: "Agosto", value: "Agosto" },
+      { label: "Septiembre", value: "Septiembre" }, { label: "Octubre", value: "Octubre" },
+      { label: "Noviembre", value: "Noviembre" }, { label: "Diciembre", value: "Diciembre" }
+    ];
+    const periodoTipo = ref("Primera quincena de");
+    const periodoMes = ref(mesOptions[new Date().getMonth()].value);
+    const fechaInicio = ref("");
+    const fechaFin = ref("");
+    const savingPeriodo = ref(false);
+
+    const nombrePeriodo = computed(() => {
+      if (!periodoTipo.value || !periodoMes.value) return "";
+      return `${periodoTipo.value} ${periodoMes.value} ${currentYearForm}`;
+    });
+
+    async function guardarPeriodo() {
+      if (!fechaInicio.value || !fechaFin.value) return;
+      if (fechaInicio.value >= fechaFin.value) {
+        $q.notify({ type: "warning", message: "La fecha de inicio debe ser anterior a la fecha de fin" });
+        return;
+      }
+      savingPeriodo.value = true;
+      const { error } = await supabase.from("periodos_pago").insert({
+        nombre: nombrePeriodo.value,
+        fecha_inicio: fechaInicio.value,
+        fecha_fin: fechaFin.value,
+        abierto: true,
+        created_by: authStore.user?.Usuario || null,
+      });
+      savingPeriodo.value = false;
+      if (error) {
+        $q.notify({ type: "negative", message: `Error: ${error.message}` });
+      } else {
+        $q.notify({ type: "positive", message: "Periodo guardado correctamente", icon: "check" });
+        fechaInicio.value = "";
+        fechaFin.value = "";
+        fetchPeriodos();
+      }
+    }
+
     const activeTab = ref("horarios");
     const loading = ref(false);
     const horarios = ref([]);
     const errorMsg = ref("");
 
-    // --- Extras state ---
-    const loadingExtras = ref(false);
-    const horariosQuincena = ref([]);
-    const errorExtras = ref("");
+
 
     function getLocalDateString() {
       const d = new Date();
@@ -588,39 +884,7 @@ export default defineComponent({
       })
     );
 
-    // --- Extras calculation ---
-    // 10pm/6am = 2 horas extras nocturnas por día
-    // 2pm/10pm = 1 hora extra mixta por día
-    const extrasResumen = computed(() => {
-      const map = {};
-      for (const h of horariosQuincena.value) {
-        const t = normalizar(h.turno);
-        let tipo = null;
-        let horasExtra = 0;
-        if (t === "10pm/6am") {
-          tipo = "nocturna";
-          horasExtra = 2;
-        } else if (t === "2pm/10pm") {
-          tipo = "mixta";
-          horasExtra = 1;
-        }
-        if (!tipo) continue;
 
-        const key = `${h.empleado}__${tipo}`;
-        if (!map[key]) {
-          map[key] = { empleado: h.empleado, tipo, dias: 0, horas: 0, fechas: [] };
-        }
-        map[key].dias++;
-        map[key].horas += horasExtra;
-        map[key].fechas.push(h.fecha);
-      }
-      return Object.values(map).sort((a, b) => a.empleado.localeCompare(b.empleado));
-    });
-
-    const extrasNocturnas = computed(() => extrasResumen.value.filter((e) => e.tipo === "nocturna"));
-    const extrasMixtas = computed(() => extrasResumen.value.filter((e) => e.tipo === "mixta"));
-    const totalExtrasNocturnas = computed(() => extrasNocturnas.value.reduce((s, e) => s + e.horas, 0));
-    const totalExtrasMixtas = computed(() => extrasMixtas.value.reduce((s, e) => s + e.horas, 0));
 
     // --- Dialog de días extras ---
     const showDiasDialog = ref(false);
@@ -768,6 +1032,143 @@ export default defineComponent({
     const feriadoAnio = ref(null);
     const feriadoEmpleado = ref(null);
 
+    // --- Periodos de Pago ---
+    const loadingPeriodos = ref(false);
+    const periodos = ref([]);
+    const selectedPeriodo = ref(null);
+    const loadingExtrasQuincena = ref(false);
+    const horariosQuincenaSelected = ref([]);
+    const errorExtrasQuincena = ref("");
+
+    const periodosOptions = computed(() =>
+      periodos.value.map((p) => ({ label: p.nombre, value: p }))
+    );
+
+    const extrasResumenQuincena = computed(() => {
+      const map = {};
+      for (const h of horariosQuincenaSelected.value) {
+        const t = normalizar(h.turno);
+        let tipo = null;
+        let horasExtra = 0;
+        if (t === "10pm/6am") { tipo = "nocturna"; horasExtra = 2; }
+        else if (t === "2pm/10pm") { tipo = "mixta"; horasExtra = 1; }
+        if (!tipo) continue;
+        const key = `${h.empleado}__${tipo}`;
+        if (!map[key]) map[key] = { empleado: h.empleado, tipo, dias: 0, horas: 0, fechas: [] };
+        map[key].dias++;
+        map[key].horas += horasExtra;
+        map[key].fechas.push(h.fecha);
+      }
+      return Object.values(map).sort((a, b) => a.empleado.localeCompare(b.empleado));
+    });
+
+    const extrasNocturnasQuincena = computed(() => extrasResumenQuincena.value.filter((e) => e.tipo === "nocturna"));
+    const extrasMixtasQuincena = computed(() => extrasResumenQuincena.value.filter((e) => e.tipo === "mixta"));
+    const totalNocturnasQuincena = computed(() => extrasNocturnasQuincena.value.reduce((s, e) => s + e.horas, 0));
+    const totalMixtasQuincena = computed(() => extrasMixtasQuincena.value.reduce((s, e) => s + e.horas, 0));
+
+    async function fetchPeriodos() {
+      loadingPeriodos.value = true;
+      const { data } = await supabase
+        .from("periodos_pago")
+        .select("id, nombre, fecha_inicio, fecha_fin, abierto, created_by")
+        .order("fecha_inicio", { ascending: false })
+        .limit(10);
+      periodos.value = data || [];
+      // Auto-seleccionar el periodo más reciente si no hay uno seleccionado
+      if (periodos.value.length > 0 && !selectedPeriodo.value) {
+        selectedPeriodo.value = periodos.value[0];
+        fetchExtrasByPeriodo(periodos.value[0]);
+      }
+      loadingPeriodos.value = false;
+    }
+
+    // --- Editar quincena ---
+    const showEditDialog = ref(false);
+    const editingPeriodo = ref(null);
+    const savingEditPeriodo = ref(false);
+
+    function openEditDialog(periodo) {
+      editingPeriodo.value = { ...periodo };
+      showEditDialog.value = true;
+    }
+
+    async function saveEditPeriodo() {
+      if (!editingPeriodo.value) return;
+      if (!editingPeriodo.value.nombre || !editingPeriodo.value.fecha_inicio || !editingPeriodo.value.fecha_fin) {
+        $q.notify({ type: 'warning', message: 'Completa todos los campos' });
+        return;
+      }
+      savingEditPeriodo.value = true;
+      const { error } = await supabase
+        .from('periodos_pago')
+        .update({
+          nombre: editingPeriodo.value.nombre,
+          fecha_inicio: editingPeriodo.value.fecha_inicio,
+          fecha_fin: editingPeriodo.value.fecha_fin,
+        })
+        .eq('id', editingPeriodo.value.id);
+      savingEditPeriodo.value = false;
+      if (error) {
+        $q.notify({ type: 'negative', message: `Error: ${error.message}` });
+      } else {
+        $q.notify({ type: 'positive', message: 'Quincena actualizada', icon: 'check' });
+        showEditDialog.value = false;
+        // Refrescar lista
+        const saved = selectedPeriodo.value?.id;
+        await fetchPeriodos();
+        // Si el periodo editado estaba seleccionado, actualizar la selección
+        if (saved === editingPeriodo.value.id) {
+          const updated = periodos.value.find(p => p.id === saved);
+          if (updated) {
+            selectedPeriodo.value = updated;
+            fetchExtrasByPeriodo(updated);
+          }
+        }
+      }
+    }
+
+    // --- Fetch extras por rango personalizado ---
+    async function fetchExtrasByRango() {
+      if (!rangoDesde.value || !rangoHasta.value) return;
+      loadingExtrasQuincena.value = true;
+      errorExtrasQuincena.value = '';
+      const { data, error } = await supabase
+        .from('horarios')
+        .select('id, empleado, turno, fecha')
+        .gte('fecha', rangoDesde.value)
+        .lte('fecha', rangoHasta.value)
+        .in('turno', ['10pm/6am', '2pm/10pm'])
+        .order('empleado');
+      if (error) {
+        errorExtrasQuincena.value = error.message;
+      } else {
+        horariosQuincenaSelected.value = data || [];
+      }
+      loadingExtrasQuincena.value = false;
+    }
+
+    async function fetchExtrasByPeriodo(periodo) {
+      if (!periodo) return;
+      loadingExtrasQuincena.value = true;
+      errorExtrasQuincena.value = "";
+      const { data, error } = await supabase
+        .from("horarios")
+        .select("id, empleado, turno, fecha")
+        .gte("fecha", periodo.fecha_inicio)
+        .lte("fecha", periodo.fecha_fin)
+        .in("turno", ["10pm/6am", "2pm/10pm"])
+        .order("empleado");
+      if (error) {
+        errorExtrasQuincena.value = error.message;
+      } else {
+        horariosQuincenaSelected.value = data || [];
+      }
+      loadingExtrasQuincena.value = false;
+    }
+
+
+
     const currentYear = new Date().getFullYear();
     const feriadoAnioOptions = computed(() => {
       const years = [];
@@ -862,8 +1263,16 @@ export default defineComponent({
     }
 
     watch(activeTab, (tab) => {
-      if (tab === "extras" && horariosQuincena.value.length === 0 && !loadingExtras.value) {
-        fetchExtras();
+      if (tab === "extras") {
+        if (periodos.value.length === 0 && !loadingPeriodos.value) {
+          fetchPeriodos(); // también auto-selecciona el primero
+        } else if (periodos.value.length > 0 && !selectedPeriodo.value) {
+          selectedPeriodo.value = periodos.value[0];
+          fetchExtrasByPeriodo(periodos.value[0]);
+        }
+      }
+      if (tab === "quincena" && periodos.value.length === 0 && !loadingPeriodos.value) {
+        fetchPeriodos();
       }
       if (tab === "vacaciones" && vacacionesRaw.value.length === 0 && !loadingVacaciones.value) {
         fetchVacaciones();
@@ -880,6 +1289,15 @@ export default defineComponent({
 
     return {
       activeTab,
+      tipoOptions,
+      mesOptions,
+      periodoTipo,
+      periodoMes,
+      fechaInicio,
+      fechaFin,
+      savingPeriodo,
+      nombrePeriodo,
+      guardarPeriodo,
       loading,
       selectedDate,
       errorMsg,
@@ -889,14 +1307,6 @@ export default defineComponent({
       turnoNocturno,
       turnoOtros,
       fetchHorarios,
-      loadingExtras,
-      errorExtras,
-      quincenaLabel,
-      extrasResumen,
-      extrasNocturnas,
-      extrasMixtas,
-      totalExtrasNocturnas,
-      totalExtrasMixtas,
       showDiasDialog,
       selectedExtra,
       openDiasDialog,
@@ -916,6 +1326,32 @@ export default defineComponent({
       feriadoAnioOptions,
       feriadoEmpleadoOptions,
       fetchFeriados,
+      // Permisos
+      isSuperAdmin,
+      // Periodos de Pago
+      periodos,
+      loadingPeriodos,
+      periodosOptions,
+      selectedPeriodo,
+      loadingExtrasQuincena,
+      errorExtrasQuincena,
+      extrasResumenQuincena,
+      extrasNocturnasQuincena,
+      extrasMixtasQuincena,
+      totalNocturnasQuincena,
+      totalMixtasQuincena,
+      fetchExtrasByPeriodo,
+      // Extras mode
+      extrasMode,
+      rangoDesde,
+      rangoHasta,
+      fetchExtrasByRango,
+      // Editar quincena
+      showEditDialog,
+      editingPeriodo,
+      savingEditPeriodo,
+      openEditDialog,
+      saveEditPeriodo,
     };
   },
 });

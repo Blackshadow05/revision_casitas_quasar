@@ -87,10 +87,12 @@
 </template>
 
 <script>
-import { ref, defineComponent, watch } from "vue";
+import { ref, defineComponent, watch, onUnmounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useQuasar } from "quasar";
 import InstallPrompt from "../components/InstallPrompt.vue";
+import { useCasasStore } from "../stores/casas";
+import { useAuthStore } from "../stores/auth";
 
 export default defineComponent({
   name: "MainLayout",
@@ -102,6 +104,8 @@ export default defineComponent({
     const tab = ref("home");
     const router = useRouter();
     const route = useRoute();
+    const casasStore = useCasasStore();
+    const authStore = useAuthStore();
 
     // Sincronizar tab con la ruta actual
     watch(() => route.path, (path) => {
@@ -109,8 +113,33 @@ export default defineComponent({
       else if (path === '/menus') tab.value = 'menus';
       else if (path === '/config') tab.value = 'settings';
       else if (path === '/forms') tab.value = 'forms';
-      // Agregue más si es necesario
     }, { immediate: true });
+
+    // Iniciar/detener suscripción realtime según estado de sesión
+    watch(() => authStore.isLoggedIn, (loggedIn) => {
+      if (loggedIn) {
+        casasStore.subscribeToRealtime((newRecord) => {
+          // Solo notificar si el usuario NO está en la pantalla de inicio (ya la ve en tiempo real)
+          if (route.path !== '/') {
+            q.notify({
+              type: 'positive',
+              message: `Nueva revisión: Casita ${newRecord.casita || '--'} por ${newRecord.quien_revisa || 'Anónimo'}`,
+              caption: 'Toca para ir al inicio',
+              position: 'top',
+              timeout: 6000,
+              icon: 'add_circle',
+              actions: [{ label: 'Ver', color: 'white', handler: () => router.push('/') }]
+            })
+          }
+        })
+      } else {
+        casasStore.unsubscribeFromRealtime()
+      }
+    }, { immediate: true });
+
+    onUnmounted(() => {
+      casasStore.unsubscribeFromRealtime()
+    });
 
     const goToHome = () => {
       router.push("/");

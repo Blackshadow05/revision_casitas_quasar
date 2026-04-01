@@ -5,47 +5,42 @@ export const useCasasStore = defineStore('casas', {
   state: () => ({
     casas: [],
     loading: false,
+    realtimeChannel: null,
     search: localStorage.getItem('searchQuery') || '',
     selectedCasa: JSON.parse(localStorage.getItem('selectedCasa')) || null,
     page: 0,
     hasMore: true,
+    allLoaded: false, // Indica si ya se cargaron todos los registros
     // Filtros avanzados
     activeFilter: null, // { field: 'trapo_binoculares', value: 'Si', label: 'Con trapo binocular' }
     filteredByLatest: [], // Resultados filtrados por última revisión
-    searchFromDB: false // Indicador si la búsqueda se realizó desde la base de datos
   }),
   getters: {
     filteredCasas: (state) => {
-      console.log('=== filteredCasas getter ===')
-      console.log('activeFilter:', state.activeFilter)
-      console.log('filteredByLatest length:', state.filteredByLatest.length)
-      console.log('casas length:', state.casas.length)
-      console.log('search:', state.search)
-      
       // Si hay un filtro activo, usar los resultados filtrados
       const source = state.activeFilter ? state.filteredByLatest : state.casas
-      console.log('source length:', source.length)
       
-      if (!state.search) {
-        state.searchFromDB = false
+      if (!state.search || !state.search.trim()) {
         return source
       }
-      // Si la búsqueda proviene de la base de datos, no filtrar localmente
-      if (state.searchFromDB) {
-        return source
-      }
-      // Si la búsqueda es un número, buscar exactamente por casita
-      // Si es texto, buscar parcialmente en quien_revisa
-      const searchLower = state.search.toLowerCase()
-      if (/^\d+$/.test(state.search.trim())) {
-        // Búsqueda exacta por número de casita
-        return source.filter(c => c.casita && c.casita.toString() === state.search.trim())
-      } else {
-        // Búsqueda parcial por quien_revisa
-        return source.filter(c => 
-          c.quien_revisa && c.quien_revisa.toLowerCase().includes(searchLower)
-        )
-      }
+
+      const searchTerm = state.search.trim().toLowerCase()
+
+      return source.filter(c => {
+        // Búsqueda por número de casita (exacta)
+        if (/^\d+$/.test(searchTerm)) {
+          return c.casita && c.casita.toString() === searchTerm
+        }
+
+        // Búsqueda parcial por texto en otros campos
+        // Buscar en quien_revisa
+        if (c.quien_revisa && c.quien_revisa.toLowerCase().includes(searchTerm)) return true
+        // Buscar en notas
+        if (c.notas && c.notas.toLowerCase().includes(searchTerm)) return true
+        // Buscar en nota_extra
+        if (c.nota_extra && c.nota_extra.toLowerCase().includes(searchTerm)) return true
+        return false
+      })
     }
   },
   actions: {
@@ -58,11 +53,11 @@ export const useCasasStore = defineStore('casas', {
           .from('revisiones_casitas')
           .select('*')
           .order('created_at', { ascending: false })
-          .limit(500)
 
         if (error) throw error
         this.casas = data
-        this.hasMore = data.length === 500
+        this.allLoaded = true
+        this.hasMore = false
         this.page = 1
       } catch (error) {
         console.error('Error fetching casas:', error.message)
@@ -277,35 +272,44 @@ export const useCasasStore = defineStore('casas', {
         this.loading = false
       }
     },
-    async searchInDatabase(searchTerm) {
-      this.loading = true
-      this.searchFromDB = true
-      try {
-        let query = supabase
-          .from('revisiones_casitas')
-          .select('*')
-          .order('created_at', { ascending: false })
-        
-        // Si la búsqueda es un número, buscar exactamente por casita
-        // Si es texto, buscar parcialmente en quien_revisa
-        if (/^\d+$/.test(searchTerm.trim())) {
-          // Búsqueda exacta por número de casita
-          query = query.eq('casita', searchTerm.trim())
-        } else {
-          // Búsqueda parcial por quien_revisa
-          query = query.ilike('quien_revisa', `%${searchTerm.trim()}%`)
-        }
-        
-        const { data, error } = await query.limit(200)
+    subscribeToRealtime(onInsert) {
+      if (this.realtimeChannel) return // ya suscrito
 
-        if (error) throw error
-        this.casas = data
-        this.hasMore = false
-        this.page = 0
-      } catch (error) {
-        console.error('Error searching in database:', error.message)
-      } finally {
-        this.loading = false
+      this.realtimeChannel = supabase
+        .channel('revisiones_casitas_realtime')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'revisiones_casitas' },
+          (payload) => {
+            // Evitar duplicado si el INSERT ya fue agregado localmente por addCasa
+            const exists = this.casas.some(c => c.id === payload.new.id)
+            if (!exists) {
+              this.casas.unshift(payload.new)
+            }
+            if (typeof onInsert === 'function') onInsert(payload.new)
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'revisiones_casitas' },
+          (payload) => {
+            const idx = this.casas.findIndex(c => c.id === payload.new.id)
+            if (idx !== -1) this.casas[idx] = { ...payload.new }
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'revisiones_casitas' },
+          (payload) => {
+            this.casas = this.casas.filter(c => c.id !== payload.old.id)
+          }
+        )
+        .subscribe()
+    },
+    unsubscribeFromRealtime() {
+      if (this.realtimeChannel) {
+        supabase.removeChannel(this.realtimeChannel)
+        this.realtimeChannel = null
       }
     },
     setSearch(value) {
@@ -320,7 +324,10 @@ export const useCasasStore = defineStore('casas', {
       const savedSearch = localStorage.getItem('searchQuery')
       if (savedSearch && savedSearch.trim()) {
         this.search = savedSearch
-        await this.searchInDatabase(savedSearch)
+        // Si aún no hay datos cargados, cargarlos
+        if (!this.allLoaded) {
+          await this.fetchCasas()
+        }
       }
     }
   }

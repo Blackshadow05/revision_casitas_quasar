@@ -115,7 +115,6 @@
         <q-card class="data-card">
           <q-card-section class="section-header section-header-info">
             <div class="text-subtitle1 text-weight-bold">Registros de Puesto 01</div>
-            <div class="text-caption">Cada fila representa un solo registro con ingreso y salida</div>
           </q-card-section>
           <q-list separator>
             <q-item v-for="(item, index) in dashboard.registros" :key="`p01-registro-${item.id}-${index}`">

@@ -198,7 +198,7 @@
           @load="onLoad"
           :offset="250"
           ref="infiniteScroll"
-          :disable="!!store.activeFilter"
+          :disable="!!store.activeFilter || loading || casas.length === 0"
         >
           <div class="row q-col-gutter-md mobile-cards-grid">
             <div v-for="casa in casas" :key="casa.id" class="col-6 col-md-4">
@@ -242,141 +242,139 @@
         </q-infinite-scroll>
 
         <!-- Table View - DESKTOP ONLY -->
-        <div v-if="isLoggedIn && $q.screen.gt.md" class="table-container">
-          <q-table
-            :rows="casas"
-            :columns="tableColumns"
-            row-key="id"
-            flat
-            dense
-            bordered
-            :pagination="{ rowsPerPage: 0 }"
-            class="modern-table"
-            @row-click="(evt, row) => goToDetails(row)"
-          >
-            <!-- Custom header for theme-based coloring -->
-            <template v-slot:header="props">
-              <q-tr :props="props">
-                <q-th
-                  v-for="col in props.cols"
-                  :key="col.name"
-                  :props="props"
-                  class="table-header-cell"
-                >
-                  {{ col.label }}
-                </q-th>
-              </q-tr>
-            </template>
-
-            <!-- Custom body for status coloring -->
-            <template v-slot:body="props">
-              <q-tr :props="props" class="table-row" @click="goToDetails(props.row)">
-                <q-td key="casita" :props="props">
-                  <div class="casita-cell" :class="{ 'has-nota': props.row.nota_extra }">
-                    {{ props.row.casita || '--' }}
-                  </div>
-                </q-td>
-                <q-td key="caja_fuerte" :props="props">
-                  <q-chip
-                    :color="getStatusColor(props.row.caja_fuerte)"
-                    text-color="white"
-                    size="sm"
-                    dense
+        <q-infinite-scroll
+          v-if="isLoggedIn && $q.screen.gt.md"
+          @load="onLoad"
+          :offset="250"
+          ref="infiniteScroll"
+          :disable="!!store.activeFilter || loading || casas.length === 0"
+        >
+          <div class="table-container">
+            <q-table
+              :rows="casas"
+              :columns="tableColumns"
+              row-key="id"
+              flat
+              dense
+              bordered
+              :pagination="{ rowsPerPage: 0 }"
+              class="modern-table"
+              @row-click="(evt, row) => goToDetails(row)"
+            >
+              <!-- Custom header for theme-based coloring -->
+              <template v-slot:header="props">
+                <q-tr :props="props">
+                  <q-th
+                    v-for="col in props.cols"
+                    :key="col.name"
+                    :props="props"
+                    class="table-header-cell"
                   >
-                    {{ props.row.caja_fuerte || 'Check in' }}
-                  </q-chip>
-                </q-td>
-                <q-td key="quien_revisa" :props="props">
-                  {{ props.row.quien_revisa || 'Anónimo' }}
-                </q-td>
-                <q-td key="created_at" :props="props">
-                  {{ formatFullDate(props.row.created_at) }}
-                </q-td>
-                <q-td key="chromecast" :props="props">
-                  <q-badge :color="props.row.chromecast === '0' ? 'negative' : 'positive'">{{ props.row.chromecast || '0' }}</q-badge>
-                </q-td>
-                <q-td key="speaker" :props="props">
-                  <q-badge :color="props.row.speaker === '0' ? 'negative' : 'positive'">{{ props.row.speaker || '0' }}</q-badge>
-                </q-td>
-                <q-td key="usb_speaker" :props="props">
-                  <q-badge :color="props.row.usb_speaker === '0' ? 'negative' : 'positive'">{{ props.row.usb_speaker || '0' }}</q-badge>
-                </q-td>
-                <q-td key="controles_tv" :props="props">
-                  <q-badge :color="props.row.controles_tv === '0' ? 'negative' : 'positive'">{{ props.row.controles_tv || '0' }}</q-badge>
-                </q-td>
-                <q-td key="secadora" :props="props">
-                  <q-badge :color="props.row.secadora === '0' ? 'negative' : 'positive'">{{ props.row.secadora || '0' }}</q-badge>
-                </q-td>
-                <q-td key="accesorios_secadora" :props="props">
-                  <q-badge :color="props.row.accesorios_secadora === '0' ? 'negative' : 'positive'">{{ props.row.accesorios_secadora || '0' }}</q-badge>
-                </q-td>
-                <q-td key="steamer" :props="props">
-                  <q-badge :color="props.row.steamer === '0' ? 'negative' : 'positive'">{{ props.row.steamer || '0' }}</q-badge>
-                </q-td>
-                <q-td key="bolsa_vapor" :props="props">
-                  <q-badge :color="props.row.bolsa_vapor === 'No' ? 'negative' : 'positive'">{{ props.row.bolsa_vapor || 'No' }}</q-badge>
-                </q-td>
-                <q-td key="binoculares" :props="props">
-                  <q-badge :color="props.row.binoculares === '0' ? 'negative' : 'positive'">{{ props.row.binoculares || '0' }}</q-badge>
-                </q-td>
-                <q-td key="trapo_binoculares" :props="props">
-                  <q-badge :color="props.row.trapo_binoculares === 'No' ? 'negative' : 'positive'">{{ props.row.trapo_binoculares || 'No' }}</q-badge>
-                </q-td>
-                <q-td key="plancha_cabello" :props="props">
-                  <q-badge :color="props.row.plancha_cabello === '0' ? 'negative' : 'positive'">{{ props.row.plancha_cabello || '0' }}</q-badge>
-                </q-td>
-                <q-td key="cola_caballo" :props="props">
-                  <q-badge :color="props.row.cola_caballo === 'No' ? 'negative' : 'positive'">{{ props.row.cola_caballo || 'No' }}</q-badge>
-                </q-td>
-                <q-td key="bolso_yute" :props="props">
-                  <q-badge :color="props.row.bolso_yute === '0' ? 'negative' : 'positive'">{{ props.row.bolso_yute || '0' }}</q-badge>
-                </q-td>
-                <q-td key="bulto" :props="props">
-                  <q-badge :color="props.row.bulto === 'No' ? 'negative' : 'positive'">{{ props.row.bulto || 'No' }}</q-badge>
-                </q-td>
-                <q-td key="sombrero" :props="props">
-                  <q-badge :color="props.row.sombrero === 'No' ? 'negative' : 'positive'">{{ props.row.sombrero || 'No' }}</q-badge>
-                </q-td>
-                <q-td key="camas_ordenadas" :props="props">
-                  <q-badge :color="props.row.camas_ordenadas === 'No' ? 'negative' : 'positive'">{{ props.row.camas_ordenadas || 'No' }}</q-badge>
-                </q-td>
-                <q-td key="notas" :props="props">
-                  <span v-if="props.row.notas" class="notes-cell">{{ props.row.notas }}</span>
-                  <span v-else class="text-grey-5">--</span>
-                </q-td>
-                <q-td key="nota_extra" :props="props">
-                  <q-icon v-if="props.row.nota_extra" name="sticky_note_2" color="orange" size="20px">
-                    <q-tooltip>Tiene nota extra</q-tooltip>
-                  </q-icon>
-                  <span v-else class="text-grey-4">--</span>
-                </q-td>
-              </q-tr>
-            </template>
+                    {{ col.label }}
+                  </q-th>
+                </q-tr>
+              </template>
 
-            <!-- No data slot -->
-            <template v-slot:no-data>
-              <div class="full-width column items-center q-pa-lg">
-                <q-icon name="search_off" size="64px" color="grey-4" />
-                <div class="text-h6 text-grey-5 q-mt-md">No se encontraron resultados</div>
-              </div>
-            </template>
-          </q-table>
+              <!-- Custom body for status coloring -->
+              <template v-slot:body="props">
+                <q-tr :props="props" class="table-row" @click="goToDetails(props.row)">
+                  <q-td key="casita" :props="props">
+                    <div class="casita-cell" :class="{ 'has-nota': props.row.nota_extra }">
+                      {{ props.row.casita || '--' }}
+                    </div>
+                  </q-td>
+                  <q-td key="caja_fuerte" :props="props">
+                    <q-chip
+                      :color="getStatusColor(props.row.caja_fuerte)"
+                      text-color="white"
+                      size="sm"
+                      dense
+                    >
+                      {{ props.row.caja_fuerte || 'Check in' }}
+                    </q-chip>
+                  </q-td>
+                  <q-td key="quien_revisa" :props="props">
+                    {{ props.row.quien_revisa || 'Anónimo' }}
+                  </q-td>
+                  <q-td key="created_at" :props="props">
+                    {{ formatFullDate(props.row.created_at) }}
+                  </q-td>
+                  <q-td key="chromecast" :props="props">
+                    <q-badge :color="props.row.chromecast === '0' ? 'negative' : 'positive'">{{ props.row.chromecast || '0' }}</q-badge>
+                  </q-td>
+                  <q-td key="speaker" :props="props">
+                    <q-badge :color="props.row.speaker === '0' ? 'negative' : 'positive'">{{ props.row.speaker || '0' }}</q-badge>
+                  </q-td>
+                  <q-td key="usb_speaker" :props="props">
+                    <q-badge :color="props.row.usb_speaker === '0' ? 'negative' : 'positive'">{{ props.row.usb_speaker || '0' }}</q-badge>
+                  </q-td>
+                  <q-td key="controles_tv" :props="props">
+                    <q-badge :color="props.row.controles_tv === '0' ? 'negative' : 'positive'">{{ props.row.controles_tv || '0' }}</q-badge>
+                  </q-td>
+                  <q-td key="secadora" :props="props">
+                    <q-badge :color="props.row.secadora === '0' ? 'negative' : 'positive'">{{ props.row.secadora || '0' }}</q-badge>
+                  </q-td>
+                  <q-td key="accesorios_secadora" :props="props">
+                    <q-badge :color="props.row.accesorios_secadora === '0' ? 'negative' : 'positive'">{{ props.row.accesorios_secadora || '0' }}</q-badge>
+                  </q-td>
+                  <q-td key="steamer" :props="props">
+                    <q-badge :color="props.row.steamer === '0' ? 'negative' : 'positive'">{{ props.row.steamer || '0' }}</q-badge>
+                  </q-td>
+                  <q-td key="bolsa_vapor" :props="props">
+                    <q-badge :color="props.row.bolsa_vapor === 'No' ? 'negative' : 'positive'">{{ props.row.bolsa_vapor || 'No' }}</q-badge>
+                  </q-td>
+                  <q-td key="binoculares" :props="props">
+                    <q-badge :color="props.row.binoculares === '0' ? 'negative' : 'positive'">{{ props.row.binoculares || '0' }}</q-badge>
+                  </q-td>
+                  <q-td key="trapo_binoculares" :props="props">
+                    <q-badge :color="props.row.trapo_binoculares === 'No' ? 'negative' : 'positive'">{{ props.row.trapo_binoculares || 'No' }}</q-badge>
+                  </q-td>
+                  <q-td key="plancha_cabello" :props="props">
+                    <q-badge :color="props.row.plancha_cabello === '0' ? 'negative' : 'positive'">{{ props.row.plancha_cabello || '0' }}</q-badge>
+                  </q-td>
+                  <q-td key="cola_caballo" :props="props">
+                    <q-badge :color="props.row.cola_caballo === 'No' ? 'negative' : 'positive'">{{ props.row.cola_caballo || 'No' }}</q-badge>
+                  </q-td>
+                  <q-td key="bolso_yute" :props="props">
+                    <q-badge :color="props.row.bolso_yute === '0' ? 'negative' : 'positive'">{{ props.row.bolso_yute || '0' }}</q-badge>
+                  </q-td>
+                  <q-td key="bulto" :props="props">
+                    <q-badge :color="props.row.bulto === 'No' ? 'negative' : 'positive'">{{ props.row.bulto || 'No' }}</q-badge>
+                  </q-td>
+                  <q-td key="sombrero" :props="props">
+                    <q-badge :color="props.row.sombrero === 'No' ? 'negative' : 'positive'">{{ props.row.sombrero || 'No' }}</q-badge>
+                  </q-td>
+                  <q-td key="camas_ordenadas" :props="props">
+                    <q-badge :color="props.row.camas_ordenadas === 'No' ? 'negative' : 'positive'">{{ props.row.camas_ordenadas || 'No' }}</q-badge>
+                  </q-td>
+                  <q-td key="notas" :props="props">
+                    <span v-if="props.row.notas" class="notes-cell">{{ props.row.notas }}</span>
+                    <span v-else class="text-grey-5">--</span>
+                  </q-td>
+                  <q-td key="nota_extra" :props="props">
+                    <q-icon v-if="props.row.nota_extra" name="sticky_note_2" color="orange" size="20px">
+                      <q-tooltip>Tiene nota extra</q-tooltip>
+                    </q-icon>
+                    <span v-else class="text-grey-4">--</span>
+                  </q-td>
+                </q-tr>
+              </template>
 
-          <!-- Load More Button for Desktop -->
-          <div v-if="store.hasMore" class="flex flex-center q-pa-md">
-            <q-btn
-              color="primary"
-              label="Cargar más registros"
-              icon="expand_more"
-              :loading="loading"
-              @click="loadMore"
-              class="load-more-btn"
-            />
+              <!-- No data slot -->
+              <template v-slot:no-data>
+                <div class="full-width column items-center q-pa-lg">
+                  <q-icon name="search_off" size="64px" color="grey-4" />
+                  <div class="text-h6 text-grey-5 q-mt-md">No se encontraron resultados</div>
+                </div>
+              </template>
+            </q-table>
           </div>
-          <div v-else-if="casas.length > 0" class="text-center q-pa-md text-grey-6">
-            {{ casas.length }} registros cargados
-          </div>
-        </div>
+          <template v-slot:loading>
+            <div v-if="casas.length > 0" class="row justify-center q-my-md">
+              <q-spinner-dots color="primary" size="40px" />
+            </div>
+          </template>
+        </q-infinite-scroll>
       </q-pull-to-refresh>
     </div>
 
@@ -619,28 +617,19 @@ export default defineComponent({
       await store.fetchCasas()
     }
 
-    const onLoad = async (index, done) => {
-      // Si ya hay un proceso de carga en curso (desde onMounted), esperamos o ignoramos
-      if (store.loading && index === 1) {
-        // Podríamos esperar un poco o simplemente dejar que onMounted termine
-        // pero lo mejor es coordinar con el store
+    const onLoad = async (_, done) => {
+      if (store.loading || casas.value.length === 0) {
         done()
         return
       }
 
-      if (index === 1 && store.casas.length === 0) {
-        await loadData()
-        done()
-      } else if (index > 1) {
-        await store.fetchMoreCasas()
-        if (!store.hasMore) {
-          done(true)
-        } else {
-          done()
-        }
-      } else {
-        done()
+      if (!store.hasMore || store.activeFilter) {
+        done(true)
+        return
       }
+
+      await store.fetchMoreCasas()
+      done(!store.hasMore)
     }
 
     let searchTimeout = null
@@ -673,17 +662,13 @@ export default defineComponent({
       done()
     }
 
-    const loadMore = async () => {
-      await store.fetchMoreCasas()
-    }
-
     onMounted(() => {
       if (isLoggedIn.value) {
-        store.loadSavedSearch()
-      }
-      // Load data for table view on desktop
-      if ($q.screen.gt.md) {
-        initData()
+        store.loadSavedSearch().finally(async () => {
+          if (store.casas.length === 0 && !store.loading) {
+            await initData()
+          }
+        })
       }
     })
 
@@ -779,7 +764,6 @@ export default defineComponent({
       formatFullDate,
       refresh,
       loadData,
-      loadMore,
       onLoad,
       infiniteScroll,
       getThemeClass,

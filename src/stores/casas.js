@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { supabase } from '../supabase'
 
+const PAGE_SIZE = 300
+
 export const useCasasStore = defineStore('casas', {
   state: () => ({
     casas: [],
@@ -53,12 +55,13 @@ export const useCasasStore = defineStore('casas', {
           .from('revisiones_casitas')
           .select('*')
           .order('created_at', { ascending: false })
+          .range(0, PAGE_SIZE - 1)
 
         if (error) throw error
         this.casas = data
-        this.allLoaded = true
-        this.hasMore = false
         this.page = 1
+        this.hasMore = data.length === PAGE_SIZE
+        this.allLoaded = !this.hasMore
       } catch (error) {
         console.error('Error fetching casas:', error.message)
       } finally {
@@ -73,14 +76,15 @@ export const useCasasStore = defineStore('casas', {
           .from('revisiones_casitas')
           .select('*')
           .order('created_at', { ascending: false })
-          .range(this.page * 500, (this.page + 1) * 500 - 1)
+          .range(this.page * PAGE_SIZE, (this.page + 1) * PAGE_SIZE - 1)
 
         if (error) throw error
         if (data.length > 0) {
           this.casas = [...this.casas, ...data]
           this.page += 1
         }
-        this.hasMore = data.length === 500
+        this.hasMore = data.length === PAGE_SIZE
+        this.allLoaded = !this.hasMore
       } catch (error) {
         console.error('Error fetching more casas:', error.message)
       } finally {

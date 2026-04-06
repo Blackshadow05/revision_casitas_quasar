@@ -6,60 +6,60 @@
       </router-view>
     </q-page-container>
 
-    <!-- Desktop: Dropdown menu button -->
-    <q-header class="desktop-nav bg-primary text-white" v-if="$q.screen.gt.md">
+    <q-header class="app-header bg-primary text-white">
       <q-toolbar>
         <q-toolbar-title class="text-weight-bold">
           Revisiones Casitas
         </q-toolbar-title>
-        
-        <q-btn-dropdown
-          flat
-          dense
-          icon="menu"
-          label="Menú"
-          class="menu-dropdown text-white"
-        >
-          <q-list>
-            <q-item clickable v-close-popup @click="goToHome">
-              <q-item-section avatar>
-                <q-icon name="home" color="primary" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>Inicio</q-item-label>
-              </q-item-section>
-            </q-item>
-            
-            <q-item clickable v-close-popup @click="goToMenus">
-              <q-item-section avatar>
-                <q-icon name="restaurant" color="primary" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>Menús</q-item-label>
-              </q-item-section>
-            </q-item>
-            
-            <q-separator />
-            
-            <q-item clickable v-close-popup @click="goToConfig">
-              <q-item-section avatar>
-                <q-icon name="settings" color="grey" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>Configuración</q-item-label>
-              </q-item-section>
-            </q-item>
-            
-            <q-item clickable v-close-popup @click="goToForms">
-              <q-item-section avatar>
-                <q-icon name="assignment" color="primary" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>Forms</q-item-label>
-              </q-item-section>
-            </q-item>
-          </q-list>
-        </q-btn-dropdown>
+
+        <div v-if="$q.screen.gt.md" class="appbar-navigation row items-center q-gutter-sm">
+          <q-btn flat no-caps dense icon="analytics" label="Operación" class="appbar-nav-btn text-white" @click="goToGoogleSheets" />
+          <q-btn flat no-caps dense icon="store" label="Puesto 01" class="appbar-nav-btn text-white" @click="goToPuesto01" />
+        </div>
+
+        <q-btn flat round dense icon="menu" class="menu-button text-white" aria-label="Abrir navegación">
+          <q-menu anchor="bottom right" self="top right" class="menu-dropdown">
+            <q-list style="min-width: 220px">
+              <q-item clickable v-close-popup @click="goToHome">
+                <q-item-section avatar>
+                  <q-icon name="home" color="primary" />
+                </q-item-section>
+                <q-item-section>
+                  <q-item-label>Inicio</q-item-label>
+                </q-item-section>
+              </q-item>
+
+              <q-item clickable v-close-popup @click="goToMenus">
+                <q-item-section avatar>
+                  <q-icon name="restaurant" color="primary" />
+                </q-item-section>
+                <q-item-section>
+                  <q-item-label>Menús</q-item-label>
+                </q-item-section>
+              </q-item>
+
+              <q-separator />
+
+              <q-item clickable v-close-popup @click="goToConfig">
+                <q-item-section avatar>
+                  <q-icon name="settings" color="grey" />
+                </q-item-section>
+                <q-item-section>
+                  <q-item-label>Configuración</q-item-label>
+                </q-item-section>
+              </q-item>
+
+              <q-item clickable v-close-popup @click="goToForms">
+                <q-item-section avatar>
+                  <q-icon name="assignment" color="primary" />
+                </q-item-section>
+                <q-item-section>
+                  <q-item-label>Forms</q-item-label>
+                </q-item-section>
+              </q-item>
+            </q-list>
+          </q-menu>
+        </q-btn>
       </q-toolbar>
     </q-header>
 
@@ -77,8 +77,9 @@
       >
         <q-tab name="home" icon="home" label="Inicio" @click="goToHome" />
         <q-tab name="menus" icon="restaurant" label="Menús" @click="goToMenus" />
+        <q-tab name="operations" icon="analytics" label="Operación" @click="goToGoogleSheets" />
+        <q-tab name="puesto01" icon="store" label="Puesto 01" @click="goToPuesto01" />
         <q-tab name="forms" icon="assignment" label="Forms" @click="goToForms" />
-        <q-tab name="settings" icon="settings" label="Configuración" class="tab-settings" @click="goToConfig" />
       </q-tabs>
     </q-footer>
 
@@ -111,6 +112,8 @@ export default defineComponent({
     watch(() => route.path, (path) => {
       if (path === '/') tab.value = 'home';
       else if (path === '/menus') tab.value = 'menus';
+      else if (path === '/google-sheets') tab.value = 'operations';
+      else if (path === '/google-sheets/puesto-01') tab.value = 'puesto01';
       else if (path === '/config') tab.value = 'settings';
       else if (path === '/forms') tab.value = 'forms';
     }, { immediate: true });
@@ -149,6 +152,14 @@ export default defineComponent({
       router.push("/menus");
     };
 
+    const goToGoogleSheets = () => {
+      router.push('/google-sheets');
+    };
+
+    const goToPuesto01 = () => {
+      router.push('/google-sheets/puesto-01');
+    };
+
     const goToForms = () => {
       router.push('/forms');
     };
@@ -162,6 +173,8 @@ export default defineComponent({
       tab,
       goToHome,
       goToMenus,
+      goToGoogleSheets,
+      goToPuesto01,
       goToForms,
       goToConfig,
     };
@@ -170,17 +183,23 @@ export default defineComponent({
 </script>
 
 <style>
+.app-header {
+  border-bottom: none;
+}
+
+.appbar-navigation {
+  margin-right: 10px;
+}
+
+.appbar-nav-btn {
+  border-radius: 999px;
+  padding: 0 14px;
+}
+
 .custom-footer {
   background: white;
   border-top: 1px solid #eee;
   padding-bottom: env(safe-area-inset-bottom);
-}
-
-.tab-settings :deep(.q-tab__label) {
-  font-size: 10px;
-  line-height: 1;
-  max-width: 60px;
-  text-align: center;
 }
 
 .custom-footer :deep(.q-tab--active .q-tab__icon) {
@@ -189,16 +208,12 @@ export default defineComponent({
   border-radius: 15px;
 }
 
-.desktop-nav {
-  border-bottom: none;
-}
-
 .menu-dropdown {
   border-radius: 8px;
-  color: white;
+  overflow: hidden;
 }
 
-.menu-dropdown :deep(.q-btn__content) {
-  font-weight: 500;
+.menu-button {
+  margin-left: 8px;
 }
 </style>

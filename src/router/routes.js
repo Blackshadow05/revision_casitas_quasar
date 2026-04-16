@@ -20,7 +20,17 @@ const routes = [
       { path: 'danos-casitas', component: () => import('pages/DanosCasitasListPage.vue') },
       { path: 'danos-casitas/:numero', component: () => import('pages/DanosCasitasDetailPage.vue') },
       { path: 'dashboard-horario', component: () => import('pages/DashboardHorarioPage.vue') },
-      { path: 'snippets', component: () => import('pages/SnippetsPage.vue') }
+      { path: 'snippets', component: () => import('pages/SnippetsPage.vue') },
+      { path: 'seguridad', component: () => import('pages/SecurityMenuPage.vue') },
+      { path: 'seguridad/bitacora', component: () => import('pages/DailyLogsPage.vue') },
+      { path: 'seguridad/incidentes', component: () => import('pages/IncidentsListPage.vue') },
+      { path: 'seguridad/incidentes/nuevo', component: () => import('pages/IncidentDetailPage.vue') },
+      { path: 'seguridad/incidentes/:id', component: () => import('pages/IncidentDetailPage.vue') },
+      { path: 'seguridad/objetos-perdidos', component: () => import('pages/LostFoundListPage.vue') },
+      { path: 'seguridad/objetos-perdidos/nuevo', component: () => import('pages/LostFoundDetailPage.vue') },
+      { path: 'seguridad/objetos-perdidos/:id', component: () => import('pages/LostFoundDetailPage.vue') },
+      { path: 'seguridad/activos', component: () => import('pages/AssetLogsPage.vue') },
+      { path: 'seguridad/tabla-puesto-01', component: () => import('pages/Puesto01TablePage.vue') }
     ]
   },
 

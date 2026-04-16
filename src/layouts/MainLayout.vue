@@ -12,10 +12,7 @@
           Revisiones Casitas
         </q-toolbar-title>
 
-        <div v-if="$q.screen.gt.md" class="appbar-navigation row items-center q-gutter-sm">
-          <q-btn flat no-caps dense icon="analytics" label="Operación" class="appbar-nav-btn text-white" @click="goToGoogleSheets" />
-          <q-btn flat no-caps dense icon="store" label="Puesto 01" class="appbar-nav-btn text-white" @click="goToPuesto01" />
-        </div>
+        <q-space />
 
         <q-btn flat round dense icon="menu" class="menu-button text-white" aria-label="Abrir navegación">
           <q-menu anchor="bottom right" self="top right" class="menu-dropdown">
@@ -57,9 +54,54 @@
                   <q-item-label>Forms</q-item-label>
                 </q-item-section>
               </q-item>
+
+              <q-item v-if="authStore.isSuperAdmin" clickable v-close-popup @click="goToSeguridad">
+                <q-item-section avatar>
+                  <q-icon name="security" color="primary" />
+                </q-item-section>
+                <q-item-section>
+                  <q-item-label>Seguridad</q-item-label>
+                </q-item-section>
+              </q-item>
             </q-list>
           </q-menu>
         </q-btn>
+      </q-toolbar>
+
+      <q-toolbar v-if="$q.screen.gt.md" class="desktop-shortcuts-toolbar">
+        <div class="desktop-shortcuts row no-wrap items-center">
+          <q-btn
+            flat
+            no-caps
+            dense
+            icon="home"
+            label="Inicio"
+            class="appbar-nav-btn text-white q-mr-md"
+            @click="goToHome"
+          />
+          <q-btn
+            flat
+            no-caps
+            dense
+            icon="schedule"
+            label="Horarios"
+            class="appbar-nav-btn text-white q-mr-md"
+            @click="goTo('/dashboard-horario')"
+          />
+          <template v-if="authStore.user?.Rol === 'admin' || authStore.isSuperAdmin">
+            <q-btn
+              v-for="item in desktopSecurityLinks"
+              :key="item.path"
+              flat
+              no-caps
+              dense
+              :icon="item.icon"
+              :label="item.label"
+              class="appbar-nav-btn text-white"
+              @click="goTo(item.path)"
+            />
+          </template>
+        </div>
       </q-toolbar>
     </q-header>
 
@@ -77,8 +119,7 @@
       >
         <q-tab name="home" icon="home" label="Inicio" @click="goToHome" />
         <q-tab name="menus" icon="restaurant" label="Menús" @click="goToMenus" />
-        <q-tab name="operations" icon="analytics" label="Operación" @click="goToGoogleSheets" />
-        <q-tab name="puesto01" icon="store" label="Puesto 01" @click="goToPuesto01" />
+        <q-tab v-if="authStore.isSuperAdmin" name="security" icon="security" label="Seguridad" @click="goToSeguridad" />
         <q-tab name="forms" icon="assignment" label="Forms" @click="goToForms" />
       </q-tabs>
     </q-footer>
@@ -94,6 +135,7 @@ import { useQuasar } from "quasar";
 import InstallPrompt from "../components/InstallPrompt.vue";
 import { useCasasStore } from "../stores/casas";
 import { useAuthStore } from "../stores/auth";
+import { desktopSecurityLinks } from "../services/securityNavigation";
 
 export default defineComponent({
   name: "MainLayout",
@@ -112,10 +154,9 @@ export default defineComponent({
     watch(() => route.path, (path) => {
       if (path === '/') tab.value = 'home';
       else if (path === '/menus') tab.value = 'menus';
-      else if (path === '/google-sheets') tab.value = 'operations';
-      else if (path === '/google-sheets/puesto-01') tab.value = 'puesto01';
-      else if (path === '/config') tab.value = 'settings';
+      else if (path === '/google-sheets' || path === '/google-sheets/puesto-01' || path.startsWith('/seguridad')) tab.value = 'security';
       else if (path === '/forms') tab.value = 'forms';
+      else tab.value = '';
     }, { immediate: true });
 
     // Iniciar/detener suscripción realtime según estado de sesión
@@ -152,6 +193,10 @@ export default defineComponent({
       router.push("/menus");
     };
 
+    const goTo = (path) => {
+      router.push(path);
+    };
+
     const goToGoogleSheets = () => {
       router.push('/google-sheets');
     };
@@ -168,15 +213,23 @@ export default defineComponent({
       router.push("/config");
     };
 
+    const goToSeguridad = () => {
+      router.push("/seguridad");
+    };
+
     return {
       q,
       tab,
+      authStore,
+      desktopSecurityLinks,
+      goTo,
       goToHome,
       goToMenus,
       goToGoogleSheets,
       goToPuesto01,
       goToForms,
       goToConfig,
+      goToSeguridad,
     };
   },
 });
@@ -187,13 +240,25 @@ export default defineComponent({
   border-bottom: none;
 }
 
-.appbar-navigation {
-  margin-right: 10px;
-}
-
 .appbar-nav-btn {
   border-radius: 999px;
   padding: 0 14px;
+}
+
+.desktop-shortcuts-toolbar {
+  min-height: 52px;
+  padding: 0 16px 12px;
+}
+
+.desktop-shortcuts {
+  gap: 8px;
+  overflow-x: auto;
+  width: 100%;
+  scrollbar-width: none;
+}
+
+.desktop-shortcuts::-webkit-scrollbar {
+  display: none;
 }
 
 .custom-footer {

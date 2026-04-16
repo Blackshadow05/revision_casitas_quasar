@@ -112,7 +112,7 @@
 
       <div class="text-h5 text-weight-bold q-mb-lg" style="color: #4CAF50;">Revisiones de Casitas</div>
 
-      <div class="row justify-center q-mb-lg">
+      <div v-if="!$q.screen.gt.md" class="row justify-center q-mb-lg">
         <q-btn
           color="orange-8"
           icon="schedule"
@@ -258,6 +258,10 @@
               dense
               bordered
               :pagination="{ rowsPerPage: 0 }"
+              virtual-scroll
+              :virtual-scroll-item-size="48"
+              :virtual-scroll-sticky-size-start="48"
+              style="height: calc(100vh - 200px)"
               class="modern-table"
               @row-click="(evt, row) => goToDetails(row)"
             >
@@ -1110,7 +1114,7 @@ export default defineComponent({
 }
 
 .modern-table :deep(.q-table__middle) {
-  max-height: calc(100vh - 400px);
+  overflow: auto;
 }
 
 .modern-table :deep(thead) {

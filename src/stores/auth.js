@@ -17,6 +17,9 @@ export const useAuthStore = defineStore('auth', {
       }
       return true
     },
+    userId: (state) => {
+      return state.user?.id || null
+    },
     daysRemaining: (state) => {
       if (!state.sessionExpiry) return 0
       const now = new Date()
@@ -60,7 +63,7 @@ export const useAuthStore = defineStore('auth', {
       try {
         const { data, error } = await supabase
           .from('Usuarios')
-          .select('Usuario, Rol, id')
+          .select('id, Usuario, Rol, password_hash')
           .eq('Usuario', username)
           .eq('password_hash', password)
           .single()
@@ -82,7 +85,7 @@ export const useAuthStore = defineStore('auth', {
           this.sessionExpiry = expiryDate
           localStorage.setItem('user', JSON.stringify(data))
           localStorage.setItem('sessionExpiry', expiryDate.toISOString())
-          return { success: true }
+          return { success: true, userId: data.id }
         }
       } catch (err) {
         this.error = 'Ocurrió un error inesperado'

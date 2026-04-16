@@ -1,15 +1,50 @@
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Manrope:wght@400;500;600;700&display=swap');
+
 :root {
   --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   --accent-color: #ff007a;
   --glass-bg: rgba(255, 255, 255, 0.7);
   --glass-border: rgba(255, 255, 255, 0.3);
   --card-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+
+  /* Apple Design Tokens */
+  --apple-bg: #f5f5f7;
+  --apple-surface: #ffffff;
+  --apple-text-primary: #1d1d1f;
+  --apple-text-secondary: rgba(0, 0, 0, 0.48);
+  --apple-blue: #0071e3;
+  --apple-blue-hover: #0077ed;
+  --apple-card-shadow: 0 3px 5px rgba(0, 0, 0, 0.04), 0 0 0 0.5px rgba(0, 0, 0, 0.06);
+  --apple-card-shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.1), 0 0 0 0.5px rgba(0, 0, 0, 0.06);
+  --apple-separator: rgba(0, 0, 0, 0.08);
+  --apple-radius-card: 12px;
+  --apple-radius-pill: 980px;
+
+  /* Uber Design Tokens */
+  --uber-black: #000000;
+  --uber-white: #ffffff;
+  --uber-chip-gray: #efefef;
+  --uber-hover-gray: #e2e2e2;
+  --uber-hover-light: #f3f3f3;
+  --uber-text-body: #4b4b4b;
+  --uber-text-muted: #afafaf;
+  --uber-border: rgba(0, 0, 0, 0.08);
+  --uber-surface: rgba(255, 255, 255, 0.92);
+  --uber-surface-muted: rgba(245, 245, 245, 0.82);
+  --uber-shadow-soft: 0 4px 16px rgba(0, 0, 0, 0.12);
+  --uber-shadow-medium: 0 12px 30px rgba(0, 0, 0, 0.12);
+  --uber-radius-card: 24px;
+  --uber-radius-soft: 18px;
+  --uber-radius-pill: 999px;
+  --uber-font-display: 'Archivo', 'Segoe UI', sans-serif;
+  --uber-font-body: 'Manrope', 'Segoe UI', sans-serif;
 }
 
 body {
-  font-family: "Inter", "Roboto", sans-serif;
-  background-color: #f0f2f5;
-  color: #1a1a1b;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text',
+    'Helvetica Neue', Arial, sans-serif;
+  background-color: var(--apple-bg);
+  color: var(--apple-text-primary);
 }
 
 .glass-header {

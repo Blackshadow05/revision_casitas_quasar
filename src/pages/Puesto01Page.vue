@@ -107,17 +107,108 @@
         </div>
       </div>
 
+      <!-- Filter Chips -->
+      <q-card class="filter-card q-mt-md">
+        <q-card-section class="q-pa-sm">
+          <div class="text-subtitle2 text-weight-bold text-grey-8 q-mb-sm">Filtrar por estado:</div>
+          <div class="row q-gutter-sm">
+            <q-chip
+              :color="statusFilter === 'all' ? 'deep-purple-7' : 'grey-3'"
+              :text-color="statusFilter === 'all' ? 'white' : 'grey-8'"
+              icon="filter_list"
+              label="Todos"
+              clickable
+              @click="statusFilter = 'all'"
+            />
+            <q-chip
+              :color="statusFilter === 'pending' ? 'amber' : 'grey-3'"
+              :text-color="statusFilter === 'pending' ? 'white' : 'grey-8'"
+              icon="hourglass_empty"
+              :label="`Pendientes (${pendingCount})`"
+              clickable
+              @click="statusFilter = 'pending'"
+            />
+            <q-chip
+              :color="statusFilter === 'checkin' ? 'green-7' : 'grey-3'"
+              :text-color="statusFilter === 'checkin' ? 'white' : 'grey-8'"
+              icon="login"
+              :label="`Check in (${checkinCount})`"
+              clickable
+              @click="statusFilter = 'checkin'"
+            />
+            <q-chip
+              :color="statusFilter === 'checkout' ? 'red-7' : 'grey-3'"
+              :text-color="statusFilter === 'checkout' ? 'white' : 'grey-8'"
+              icon="logout"
+              :label="`Check out (${checkoutCount})`"
+              clickable
+              @click="statusFilter = 'checkout'"
+            />
+          </div>
+        </q-card-section>
+      </q-card>
+
       <q-inner-loading :showing="loading">
         <q-spinner-gears size="48px" color="deep-purple-7" />
       </q-inner-loading>
 
       <div v-if="hasData" class="q-mt-lg">
-        <q-card class="data-card">
+        <!-- Desktop Table View -->
+        <q-card class="data-card gt-sm">
           <q-card-section class="section-header section-header-info">
             <div class="text-subtitle1 text-weight-bold">Registros de Puesto 01</div>
+            <div v-if="statusFilter !== 'all'" class="text-caption">
+              Filtro: {{ statusFilter === 'pending' ? 'Pendientes' : statusFilter === 'checkin' ? 'Check in' : 'Check out' }}
+            </div>
+          </q-card-section>
+          <q-table
+            :rows="filteredRegistros"
+            :columns="tableColumns"
+            row-key="id"
+            :pagination="{ rowsPerPage: 15 }"
+            flat
+            bordered
+          >
+            <template v-slot:body-cell-nombre="props">
+              <q-td :props="props">
+                <div class="text-weight-bold text-green-8">{{ props.row.ingreso.nombre || props.row.salida.nombre || 'Sin nombre' }}</div>
+                <div class="text-caption text-orange-8">Casita: {{ props.row.ingreso.casita || props.row.salida.casita || '-' }}</div>
+              </q-td>
+            </template>
+            <template v-slot:body-cell-status="props">
+              <q-td :props="props">
+                <q-badge :color="props.row.status.color" :label="props.row.status.label" rounded class="text-weight-bold" />
+              </q-td>
+            </template>
+            <template v-slot:body-cell-ingreso="props">
+              <q-td :props="props">
+                <div class="text-green-7"><span class="text-weight-bold">Hora:</span> {{ props.row.ingreso.hora || 'Pendiente' }}</div>
+                <div class="text-green-7"><span class="text-weight-bold">Placa:</span> {{ props.row.ingreso.placa || 'Sin placa' }}</div>
+                <div class="text-green-7"><span class="text-weight-bold">Oficial:</span> {{ props.row.ingreso.oficial || 'Pendiente' }}</div>
+              </q-td>
+            </template>
+            <template v-slot:body-cell-salida="props">
+              <q-td :props="props">
+                <div class="text-red-7"><span class="text-weight-bold">Hora:</span> {{ props.row.salida.hora || 'Pendiente' }}</div>
+                <div class="text-red-7"><span class="text-weight-bold">Colaborador:</span> {{ props.row.salida.colaborador || 'Pendiente' }}</div>
+                <div class="text-red-7"><span class="text-weight-bold">Motivo:</span> {{ props.row.salida.motivo || 'Pendiente' }}</div>
+                <div class="text-red-7"><span class="text-weight-bold">Oficial:</span> {{ props.row.salida.oficial || 'Pendiente' }}</div>
+                <div class="text-red-7"><span class="text-weight-bold">Placa:</span> {{ props.row.salida.placa || 'Sin placa' }}</div>
+              </q-td>
+            </template>
+          </q-table>
+        </q-card>
+
+        <!-- Mobile List View -->
+        <q-card class="data-card lt-md">
+          <q-card-section class="section-header section-header-info">
+            <div class="text-subtitle1 text-weight-bold">Registros de Puesto 01</div>
+            <div v-if="statusFilter !== 'all'" class="text-caption">
+              Filtro: {{ statusFilter === 'pending' ? 'Pendientes' : statusFilter === 'checkin' ? 'Check in' : 'Check out' }}
+            </div>
           </q-card-section>
           <q-list separator>
-            <q-item v-for="(item, index) in dashboard.registros" :key="`p01-registro-${item.id}-${index}`">
+            <q-item v-for="(item, index) in filteredRegistros" :key="`p01-registro-${item.id}-${index}`">
               <q-item-section>
                 <div class="row items-center justify-between q-col-gutter-sm">
                   <div class="col">
@@ -192,9 +283,25 @@ export default defineComponent({
     const loading = ref(false)
     const errorMessage = ref('')
     const dashboard = ref({ registros: [], fecha: null })
+    const statusFilter = ref('all')
 
     const scriptConfigured = computed(() => Boolean(import.meta.env.VITE_GOOGLE_APPS_SCRIPT_URL_PUESTO01))
-    const hasData = computed(() => dashboard.value.registros.length > 0)
+
+    const tableColumns = [
+      { name: 'nombre', label: 'Nombre / Casita', field: (row) => row.ingreso.nombre || row.salida.nombre || 'Sin nombre', align: 'left' },
+      { name: 'status', label: 'Estado', field: (row) => row.status.label, align: 'center' },
+      { name: 'ingreso', label: 'Ingreso', field: (row) => row.ingreso.hora || 'Pendiente', align: 'left' },
+      { name: 'salida', label: 'Salida', field: (row) => row.salida.hora || 'Pendiente', align: 'left' }
+    ]
+
+    const filteredRegistros = computed(() => {
+      if (statusFilter.value === 'all') {
+        return dashboard.value.registros
+      }
+      return dashboard.value.registros.filter((item) => item.status.key === statusFilter.value)
+    })
+
+    const hasData = computed(() => filteredRegistros.value.length > 0)
 
     const checkinCount = computed(() => (
       dashboard.value.registros.filter((item) => item.status.key === 'checkin').length
@@ -267,7 +374,10 @@ export default defineComponent({
       checkoutCount,
       pendingCount,
       reportDateLabel,
-      scriptConfigured
+      scriptConfigured,
+      tableColumns,
+      statusFilter,
+      filteredRegistros
     }
   }
 })
@@ -325,6 +435,23 @@ export default defineComponent({
 
 .summary-card-completed {
   background: linear-gradient(135deg, #f2fff7 0%, #ffffff 100%);
+}
+
+.filter-card {
+  border-radius: 24px;
+  box-shadow: 0 10px 28px rgba(31, 53, 82, 0.08);
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.filter-card :deep(.q-chip) {
+  transition: all 0.2s ease;
+  font-weight: 600;
+}
+
+.filter-card :deep(.q-chip:hover) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .puesto01-casita {
@@ -400,10 +527,36 @@ export default defineComponent({
   overflow: hidden;
 }
 
+.data-card :deep(.q-table__container) {
+  border-radius: 0 0 24px 24px;
+}
+
+.data-card :deep(.q-table thead tr) {
+  background: linear-gradient(135deg, #ede7f6 0%, #e8eaf6 100%);
+}
+
+.data-card :deep(.q-table thead th) {
+  font-weight: 700;
+  color: #4527a0;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.data-card :deep(.q-table tbody tr:hover) {
+  background: rgba(69, 39, 160, 0.04);
+}
+
+.data-card :deep(.q-table tbody td) {
+  vertical-align: top;
+  padding: 12px 16px;
+}
+
 .body--dark .page-header,
 .body--dark .summary-card,
 .body--dark .data-card,
-.body--dark .empty-state {
+.body--dark .empty-state,
+.body--dark .filter-card {
   background: #1f1f1f;
   border-color: rgba(255, 255, 255, 0.06);
   box-shadow: none;

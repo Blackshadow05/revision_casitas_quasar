@@ -1958,4 +1958,158 @@ export default defineComponent({
     margin: 16px;
   }
 }
+
+/* Apple-inspired visual refresh */
+.bg-grey-2 {
+  background:
+    radial-gradient(1200px 600px at 12% -10%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 65%),
+    radial-gradient(1100px 500px at 88% 0%, rgba(222, 234, 248, 0.7), rgba(222, 234, 248, 0) 62%),
+    linear-gradient(180deg, #f4f7fb 0%, #edf2f7 100%);
+}
+
+.q-page > .row.items-center.q-mb-lg {
+  max-width: 1120px;
+  margin: 10px auto 22px !important;
+  padding: 10px 12px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.64);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+}
+
+.q-page > .row.items-center.q-mb-lg .text-h5 {
+  font-size: clamp(1.2rem, 2.3vw, 1.55rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #1c1d1f !important;
+}
+
+.q-page > .q-form {
+  max-width: 1120px;
+  margin: 0 auto;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 18px 60px rgba(16, 24, 40, 0.09);
+  border-radius: 30px;
+  padding: 20px clamp(12px, 3vw, 32px) 26px;
+  backdrop-filter: blur(22px);
+}
+
+.section-container,
+.error-row,
+.error-section {
+  border-radius: 20px;
+  padding: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(249, 251, 255, 0.88));
+}
+
+.section-label {
+  color: #1f2937;
+  font-size: 0.96rem;
+  letter-spacing: -0.01em;
+}
+
+.category-header {
+  background: linear-gradient(120deg, rgba(223, 235, 249, 0.95), rgba(238, 246, 255, 0.95));
+  color: #0f4d92;
+  border: 1px solid rgba(133, 173, 219, 0.28);
+  border-radius: 14px;
+  padding: 9px 14px;
+}
+
+.custom-select-btn {
+  border-radius: 14px !important;
+  border: 1px solid rgba(203, 213, 225, 0.95) !important;
+  background: linear-gradient(180deg, #ffffff, #f8fafc) !important;
+  color: #334155 !important;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08) !important;
+  font-weight: 600 !important;
+}
+
+.custom-select-btn:hover {
+  border-color: #93b3d8 !important;
+  transform: translateY(-1px);
+}
+
+.custom-select-btn.selected {
+  border-color: #1266d6 !important;
+  color: #0c4fb0 !important;
+  background: linear-gradient(180deg, #f2f7ff, #eaf2ff) !important;
+  box-shadow: 0 10px 24px rgba(18, 102, 214, 0.2) !important;
+}
+
+.input-styled :deep(.q-field__control) {
+  border-radius: 14px !important;
+  border: 1px solid rgba(203, 213, 225, 0.75);
+  background: linear-gradient(180deg, #ffffff, #fafcff) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 6px 14px rgba(15, 23, 42, 0.05) !important;
+}
+
+.submit-btn {
+  background: linear-gradient(135deg, #0a64d8 0%, #1380f5 100%) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 14px 28px rgba(19, 128, 245, 0.35) !important;
+  letter-spacing: 0.01em;
+}
+
+.photo-btn {
+  border-radius: 14px !important;
+  border-color: rgba(146, 165, 191, 0.75) !important;
+  background: linear-gradient(180deg, #f9fbff, #f2f6fb) !important;
+}
+
+.share-modal-card {
+  border-radius: 22px;
+  border: 1px solid rgba(216, 224, 234, 0.9);
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+}
+
+.share-btn-native,
+.share-btn-secondary {
+  background: linear-gradient(135deg, #0f67db, #1f86f7) !important;
+  color: #fff !important;
+}
+
+.share-btn-native:hover,
+.share-btn-secondary:hover {
+  background: linear-gradient(135deg, #0f5ec9, #1a78dd) !important;
+}
+
+.section-container,
+.row.q-col-gutter-md {
+  animation: rise-in 420ms ease both;
+}
+
+.section-container:nth-of-type(2n) {
+  animation-delay: 40ms;
+}
+
+.section-container:nth-of-type(3n) {
+  animation-delay: 80ms;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 768px) {
+  .q-page > .q-form {
+    border-radius: 22px;
+    padding: 14px 10px 22px;
+  }
+
+  .q-page > .row.items-center.q-mb-lg {
+    margin-top: 2px !important;
+    border-radius: 14px;
+    padding: 8px;
+  }
+}
 </style>

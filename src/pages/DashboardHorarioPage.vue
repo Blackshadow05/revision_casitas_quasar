@@ -1,5 +1,5 @@
 <template>
-  <q-page class="q-pa-md dashboard-horario lt-md">
+  <q-page class="q-pa-md dashboard-horario">
     <div class="row items-center q-mb-md">
       <q-btn flat round icon="arrow_back" @click="$router.push('/config')" />
       <div class="text-h5 q-ml-sm">Dashboard Horario</div>
@@ -19,7 +19,7 @@
     <!-- ==================== TAB HORARIOS ==================== -->
     <div v-show="activeTab === 'horarios'">
       <!-- Date picker -->
-      <div class="row items-center q-mb-md q-gutter-sm">
+      <div v-if="!$q.screen.gt.md" class="row items-center q-mb-md q-gutter-sm">
         <q-icon name="event" size="sm" color="primary" />
         <q-input
           v-model="selectedDate"
@@ -41,154 +41,142 @@
       </q-banner>
 
       <template v-if="!loading">
-        <!-- Turno Diurno -->
-        <q-card class="q-mb-md">
-          <q-card-section class="bg-red-6 text-white">
-            <div class="row items-center">
-              <q-icon name="wb_sunny" size="sm" class="q-mr-sm" />
-              <div class="text-subtitle1 text-weight-bold">Turno Diurno</div>
-              <q-space />
-              <q-badge color="white" text-color="red-8" :label="turnoDiurno.length" />
-            </div>
-          </q-card-section>
-          <q-list separator>
-            <q-item v-for="emp in turnoDiurno" :key="emp.id">
-              <q-item-section avatar>
-                <q-avatar color="red-2" text-color="red-9">
-                  {{ emp.empleado.charAt(0).toUpperCase() }}
-                </q-avatar>
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>{{ emp.empleado }}</q-item-label>
-              </q-item-section>
-              <q-item-section side>
-                <q-badge outline color="red-8" :label="emp.turno" />
-              </q-item-section>
-            </q-item>
-            <q-item v-if="turnoDiurno.length === 0">
-              <q-item-section class="text-grey text-center">Sin personal en este turno</q-item-section>
-            </q-item>
-          </q-list>
-        </q-card>
+        <!-- VISTA MÓVIL (Normal) -->
+        <div v-if="!$q.screen.gt.md">
+          <turno-cards
+            :turno-diurno="turnoDiurno"
+            :turno-partida="turnoPartida"
+            :turno-mixto="turnoMixto"
+            :turno-nocturno="turnoNocturno"
+            :turno-otros="turnoOtros"
+          />
+        </div>
 
-        <!-- Jornada Partida -->
-        <q-card class="q-mb-md">
-          <q-card-section class="bg-orange-7 text-white">
-            <div class="row items-center">
-              <q-icon name="schedule" size="sm" class="q-mr-sm" />
-              <div class="text-subtitle1 text-weight-bold">Jornada Partida</div>
-              <q-space />
-              <q-badge color="white" text-color="orange-9" :label="turnoPartida.length" />
+        <!-- VISTA PC (3 días en filas) -->
+        <div v-else class="column q-gutter-y-xl container-pc-horarios">
+          <div v-for="dia in horarios3Dias" :key="dia.fecha" class="day-row">
+            <div class="row items-center q-mb-md">
+              <q-icon name="event" color="primary" size="md" class="q-mr-sm" />
+              <div class="text-h6 text-primary">{{ formatFechaLarga(dia.fecha) }}</div>
+              <q-badge color="grey-3" text-color="grey-9" class="q-ml-md" label="3 turnos principales" />
             </div>
-          </q-card-section>
-          <q-list separator>
-            <q-item v-for="emp in turnoPartida" :key="emp.id">
-              <q-item-section avatar>
-                <q-avatar color="orange-2" text-color="orange-9">
-                  {{ emp.empleado.charAt(0).toUpperCase() }}
-                </q-avatar>
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>{{ emp.empleado }}</q-item-label>
-              </q-item-section>
-              <q-item-section side>
-                <q-badge outline color="orange-8" :label="emp.turno" />
-              </q-item-section>
-            </q-item>
-            <q-item v-if="turnoPartida.length === 0">
-              <q-item-section class="text-grey text-center">Sin personal en esta jornada</q-item-section>
-            </q-item>
-          </q-list>
-        </q-card>
+            
+            <div class="row q-col-gutter-lg">
+              <!-- Diurno -->
+              <div class="col-12 col-sm-6 col-md-3">
+                <q-card flat bordered class="full-height shadow-1">
+                  <q-card-section class="bg-red-6 text-white q-py-sm">
+                    <div class="row items-center">
+                      <q-icon name="wb_sunny" size="sm" class="q-mr-sm" />
+                      <div class="text-subtitle1 text-weight-bold">Diurno</div>
+                      <q-space />
+                      <q-badge color="white" text-color="red-8" :label="dia.diurno.length" />
+                    </div>
+                  </q-card-section>
+                  <q-list separator class="q-py-xs">
+                    <q-item v-for="emp in dia.diurno" :key="emp.id" class="q-px-md">
+                      <q-item-section>
+                        <q-item-label class="text-weight-medium">{{ emp.empleado }}</q-item-label>
+                      </q-item-section>
+                      <q-item-section side>
+                        <q-badge outline color="red-8" :label="emp.turno" class="text-bold" />
+                      </q-item-section>
+                    </q-item>
+                    <q-item v-if="dia.diurno.length === 0">
+                      <q-item-section class="text-grey text-caption text-center q-py-md">Sin personal</q-item-section>
+                    </q-item>
+                  </q-list>
+                </q-card>
+              </div>
 
-        <!-- Turno Mixto -->
-        <q-card class="q-mb-md">
-          <q-card-section class="bg-green-6 text-white">
-            <div class="row items-center">
-              <q-icon name="brightness_6" size="sm" class="q-mr-sm" />
-              <div class="text-subtitle1 text-weight-bold">Turno Mixto</div>
-              <q-space />
-              <q-badge color="white" text-color="green-8" :label="turnoMixto.length" />
-            </div>
-          </q-card-section>
-          <q-list separator>
-            <q-item v-for="emp in turnoMixto" :key="emp.id">
-              <q-item-section avatar>
-                <q-avatar color="green-2" text-color="green-9">
-                  {{ emp.empleado.charAt(0).toUpperCase() }}
-                </q-avatar>
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>{{ emp.empleado }}</q-item-label>
-              </q-item-section>
-              <q-item-section side>
-                <q-badge outline color="green-8" :label="emp.turno" />
-              </q-item-section>
-            </q-item>
-            <q-item v-if="turnoMixto.length === 0">
-              <q-item-section class="text-grey text-center">Sin personal en este turno</q-item-section>
-            </q-item>
-          </q-list>
-        </q-card>
+              <!-- Partida -->
+              <div class="col-12 col-sm-6 col-md-3">
+                <q-card flat bordered class="full-height shadow-1">
+                  <q-card-section class="bg-orange-7 text-white q-py-sm">
+                    <div class="row items-center">
+                      <q-icon name="schedule" size="sm" class="q-mr-sm" />
+                      <div class="text-subtitle1 text-weight-bold">Partida</div>
+                      <q-space />
+                      <q-badge color="white" text-color="orange-9" :label="dia.partida.length" />
+                    </div>
+                  </q-card-section>
+                  <q-list separator class="q-py-xs">
+                    <q-item v-for="emp in dia.partida" :key="emp.id" class="q-px-md">
+                      <q-item-section>
+                        <q-item-label class="text-weight-medium">{{ emp.empleado }}</q-item-label>
+                      </q-item-section>
+                      <q-item-section side>
+                        <q-badge outline color="orange-8" :label="emp.turno" class="text-bold" />
+                      </q-item-section>
+                    </q-item>
+                    <q-item v-if="dia.partida.length === 0">
+                      <q-item-section class="text-grey text-caption text-center q-py-md">Sin personal</q-item-section>
+                    </q-item>
+                  </q-list>
+                </q-card>
+              </div>
 
-        <!-- Turno Nocturno -->
-        <q-card class="q-mb-md">
-          <q-card-section class="bg-blue-8 text-white">
-            <div class="row items-center">
-              <q-icon name="nights_stay" size="sm" class="q-mr-sm" />
-              <div class="text-subtitle1 text-weight-bold">Turno Nocturno</div>
-              <q-space />
-              <q-badge color="white" text-color="blue-8" :label="turnoNocturno.length" />
-            </div>
-          </q-card-section>
-          <q-list separator>
-            <q-item v-for="emp in turnoNocturno" :key="emp.id">
-              <q-item-section avatar>
-                <q-avatar color="blue-2" text-color="blue-9">
-                  {{ emp.empleado.charAt(0).toUpperCase() }}
-                </q-avatar>
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>{{ emp.empleado }}</q-item-label>
-              </q-item-section>
-              <q-item-section side>
-                <q-badge outline color="blue-8" :label="emp.turno" />
-              </q-item-section>
-            </q-item>
-            <q-item v-if="turnoNocturno.length === 0">
-              <q-item-section class="text-grey text-center">Sin personal en este turno</q-item-section>
-            </q-item>
-          </q-list>
-        </q-card>
+              <!-- Mixto -->
+              <div class="col-12 col-sm-6 col-md-3">
+                <q-card flat bordered class="full-height shadow-1">
+                  <q-card-section class="bg-green-6 text-white q-py-sm">
+                    <div class="row items-center">
+                      <q-icon name="brightness_6" size="sm" class="q-mr-sm" />
+                      <div class="text-subtitle1 text-weight-bold">Mixto</div>
+                      <q-space />
+                      <q-badge color="white" text-color="green-8" :label="dia.mixto.length" />
+                    </div>
+                  </q-card-section>
+                  <q-list separator class="q-py-xs">
+                    <q-item v-for="emp in dia.mixto" :key="emp.id" class="q-px-md">
+                      <q-item-section>
+                        <q-item-label class="text-weight-medium">{{ emp.empleado }}</q-item-label>
+                      </q-item-section>
+                      <q-item-section side>
+                        <q-badge outline color="green-8" :label="emp.turno" class="text-bold" />
+                      </q-item-section>
+                    </q-item>
+                    <q-item v-if="dia.mixto.length === 0">
+                      <q-item-section class="text-grey text-caption text-center q-py-md">Sin personal</q-item-section>
+                    </q-item>
+                  </q-list>
+                </q-card>
+              </div>
 
-        <!-- Otros -->
-        <q-card v-if="turnoOtros.length > 0" class="q-mb-md">
-          <q-card-section class="bg-yellow-7 text-black">
-            <div class="row items-center">
-              <q-icon name="info" size="sm" class="q-mr-sm" />
-              <div class="text-subtitle1 text-weight-bold">Otros</div>
-              <q-space />
-              <q-badge color="white" text-color="yellow-9" :label="turnoOtros.length" />
+              <!-- Nocturno -->
+              <div class="col-12 col-sm-6 col-md-3">
+                <q-card flat bordered class="full-height shadow-1">
+                  <q-card-section class="bg-blue-8 text-white q-py-sm">
+                    <div class="row items-center">
+                      <q-icon name="nights_stay" size="sm" class="q-mr-sm" />
+                      <div class="text-subtitle1 text-weight-bold">Nocturno</div>
+                      <q-space />
+                      <q-badge color="white" text-color="blue-8" :label="dia.nocturno.length" />
+                    </div>
+                  </q-card-section>
+                  <q-list separator class="q-py-xs">
+                    <q-item v-for="emp in dia.nocturno" :key="emp.id" class="q-px-md">
+                      <q-item-section>
+                        <q-item-label class="text-weight-medium">{{ emp.empleado }}</q-item-label>
+                      </q-item-section>
+                      <q-item-section side>
+                        <q-badge outline color="blue-8" :label="emp.turno" class="text-bold" />
+                      </q-item-section>
+                    </q-item>
+                    <q-item v-if="dia.nocturno.length === 0">
+                      <q-item-section class="text-grey text-caption text-center q-py-md">Sin personal</q-item-section>
+                    </q-item>
+                  </q-list>
+                </q-card>
+              </div>
             </div>
-          </q-card-section>
-          <q-list separator>
-            <q-item v-for="emp in turnoOtros" :key="emp.id">
-              <q-item-section avatar>
-                <q-avatar color="yellow-2" text-color="yellow-10">
-                  {{ emp.empleado.charAt(0).toUpperCase() }}
-                </q-avatar>
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>{{ emp.empleado }}</q-item-label>
-              </q-item-section>
-              <q-item-section side>
-                <q-badge outline color="yellow-8" :label="emp.turno" />
-              </q-item-section>
-            </q-item>
-          </q-list>
-        </q-card>
+          </div>
+        </div>
       </template>
     </div>
+
+    <!-- ... rest of the tabs ... -->
+
 
     <!-- ==================== TAB EXTRAS ==================== -->
     <div v-show="activeTab === 'extras'">
@@ -1228,18 +1216,75 @@ export default defineComponent({
     async function fetchHorarios() {
       loading.value = true;
       errorMsg.value = "";
-      const { data, error } = await supabase
-        .from("horarios")
-        .select("id, empleado, turno, fecha")
-        .eq("fecha", selectedDate.value)
-        .order("empleado");
 
-      if (error) {
-        errorMsg.value = error.message;
-      } else {
-        horarios.value = data || [];
+      try {
+        if ($q.screen.gt.md) {
+          // Obtener fechas: hoy, mañana y pasado mañana
+          const hoy = new Date();
+          const fechas = [];
+          for (let i = 0; i < 3; i++) {
+            const d = new Date(hoy);
+            d.setDate(hoy.getDate() + i);
+            fechas.push(formatDate(d));
+          }
+
+          const { data, error } = await supabase
+            .from("horarios")
+            .select("id, empleado, turno, fecha")
+            .in("fecha", fechas)
+            .order("fecha")
+            .order("empleado");
+
+          if (error) throw error;
+          horarios.value = data || [];
+        } else {
+          const { data, error } = await supabase
+            .from("horarios")
+            .select("id, empleado, turno, fecha")
+            .eq("fecha", selectedDate.value)
+            .order("empleado");
+
+          if (error) throw error;
+          horarios.value = data || [];
+        }
+      } catch (err) {
+        errorMsg.value = err.message;
+      } finally {
+        loading.value = false;
       }
-      loading.value = false;
+    }
+
+    const horarios3Dias = computed(() => {
+      if (!$q.screen.gt.md) return [];
+      
+      const hoy = new Date();
+      const dias = [];
+      for (let i = 0; i < 3; i++) {
+        const d = new Date(hoy);
+        d.setDate(hoy.getDate() + i);
+        const f = formatDate(d);
+        const diaData = horarios.value.filter(h => h.fecha === f);
+        
+        dias.push({
+          fecha: f,
+          diurno: diaData.filter(h => turnosDiurno.includes(normalizar(h.turno))),
+          partida: diaData.filter(h => turnosPartida.includes(normalizar(h.turno))),
+          mixto: diaData.filter(h => turnosMixto.includes(normalizar(h.turno))),
+          nocturno: diaData.filter(h => turnosNocturno.includes(normalizar(h.turno))),
+          otros: diaData.filter(h => {
+            const t = normalizar(h.turno);
+            return !turnosDiurno.includes(t) && !turnosPartida.includes(t) && !turnosMixto.includes(t) && !turnosNocturno.includes(t);
+          })
+        });
+      }
+      return dias;
+    });
+
+    function formatFechaLarga(fechaStr) {
+      if (!fechaStr) return "";
+      const [y, m, d] = fechaStr.split("-").map(Number);
+      const date = new Date(y, m - 1, d);
+      return date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
     }
 
     async function fetchExtras() {
@@ -1307,6 +1352,8 @@ export default defineComponent({
       turnoNocturno,
       turnoOtros,
       fetchHorarios,
+      horarios3Dias,
+      formatFechaLarga,
       showDiasDialog,
       selectedExtra,
       openDiasDialog,
@@ -1361,5 +1408,22 @@ export default defineComponent({
 .dashboard-horario {
   max-width: 700px;
   margin: 0 auto;
+}
+
+@media (min-width: 1024px) {
+  .dashboard-horario {
+    max-width: 1200px;
+  }
+
+  /* Hacer las columnas de los turnos más anchas horizontalmente */
+  .container-pc-horarios .col-12.col-sm-6.col-md-3 {
+    flex: 0 0 24%;
+    max-width: 24%;
+  }
+
+  /* Asegurar que las tarjetas tengan un ancho mínimo para que el contenido no quede apretado */
+  .container-pc-horarios q-card {
+    min-width: 260px;
+  }
 }
 </style>

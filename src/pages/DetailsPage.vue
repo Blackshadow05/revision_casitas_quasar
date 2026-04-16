@@ -1,5 +1,5 @@
 <template>
-  <q-page class="bg-grey-1">
+  <q-page style="background: #f5f5f7;">
     <!-- Image Slider at the top (Optional, but useful) -->
     <div v-if="images.length > 0" class="image-header">
       <q-carousel
@@ -403,15 +403,14 @@
             />
           </div>
 
-          <!-- Submit Buttons -->
+          <!-- Guardado Cancel buttons -->
           <div class="row q-gutter-sm q-mt-xl q-pb-xl">
             <div class="col">
               <q-btn
                 label="Cancelar"
-                color="grey"
                 unelevated
                 class="full-width"
-                style="border-radius: 12px; height: 48px;"
+                style="border-radius: 980px; height: 48px; background: rgba(0,0,0,0.07); color: #1d1d1f; font-weight: 600; text-transform: none;"
                 @click="cancelEditing"
               />
             </div>
@@ -419,10 +418,9 @@
               <q-btn
                 label="Guardar Cambios"
                 type="submit"
-                color="primary"
                 unelevated
                 class="full-width submit-btn"
-                style="border-radius: 12px; height: 48px;"
+                style="border-radius: 980px; height: 48px; text-transform: none;"
                 :loading="savingEdit"
               />
             </div>
@@ -435,10 +433,10 @@
         <!-- Top Title Section -->
         <div class="q-px-lg q-pt-lg q-pb-md header-gradient" :class="{ 'rounded-top': images.length > 0 }">
           <div v-if="images.length === 0" class="row items-center q-mb-md">
-             <q-btn flat round dense icon="arrow_back" color="dark" @click="$router.back()" />
+             <q-btn flat round dense icon="arrow_back" style="color: #1d1d1f; background: rgba(0,0,0,0.06); border-radius: 50%;" @click="$router.back()" />
           </div>
           <div class="row items-center justify-between">
-            <div class="text-h4 text-weight-bolder text-dark">Casita {{ casa.casita || '--' }}</div>
+            <div style="font-size: 28px; font-weight: 700; color: #1d1d1f; letter-spacing: -0.5px;">Casita {{ casa.casita || '--' }}</div>
             <q-btn
               v-if="canEdit"
               icon="edit"
@@ -449,7 +447,7 @@
               @click="startEditing"
             />
           </div>
-          <div class="text-subtitle1 text-grey-7 q-mb-md">Revisión completa</div>
+          <div style="font-size: 15px; color: rgba(0,0,0,0.48); margin-bottom: 14px; letter-spacing: -0.2px;">Revisión completa</div>
 
           <!-- Indicador de Nota Extra -->
           <div v-if="casa.nota_extra" class="row items-center q-mb-md">
@@ -1932,8 +1930,9 @@ export default defineComponent({
 
 <style scoped>
 .content-container {
-  background-color: #f8f9fa;
+  background-color: #f5f5f7;
   min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
 }
 
 .rounded-top {
@@ -1973,48 +1972,50 @@ export default defineComponent({
 }
 
 .rounded-header-img {
-  border-radius: 24px;
+  border-radius: 18px;
   transition: transform 0.3s ease;
 }
 
 .rounded-header-img:hover {
-  transform: translateY(-5px);
+  transform: translateY(-3px);
 }
 
 .bg-white-glass {
-  background: rgba(255, 255, 255, 0.7) !important;
-  backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.8) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
+/* ─── Info Cards ─── */
 .info-card {
-  padding: 12px 16px;
-  border-radius: 16px;
-  border: 1px solid rgba(0,0,0,0.03);
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: none;
 }
 
 .inspector-card {
-  background-color: #e0f7f4;
+  background-color: rgba(0, 113, 227, 0.06);
 }
 
 .date-card {
-  background-color: #effbf0;
+  background-color: rgba(52, 199, 89, 0.07);
 }
 
+/* ─── Section Cards ─── */
 .section-card {
-  background: white;
-  border-radius: 24px;
+  background: #ffffff;
+  border-radius: 16px;
   padding: 20px;
-  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.04), 0 0 0 0.5px rgba(0, 0, 0, 0.06);
+  transition: box-shadow 0.2s ease;
 }
 
 .section-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1), 0 0 0 0.5px rgba(0, 0, 0, 0.06);
 }
 
 .action-hero-card {
-  border-radius: 20px;
+  border-radius: 14px;
   padding: 16px;
 }
 
@@ -2034,7 +2035,7 @@ export default defineComponent({
 .icon-box-small {
   width: 40px;
   height: 40px;
-  border-radius: 12px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2050,30 +2051,32 @@ export default defineComponent({
 }
 
 .status-chip {
-  background-color: #00D26A;
+  background-color: #0071e3;
   color: white;
-  padding: 6px 14px;
-  border-radius: 12px;
+  padding: 6px 16px;
+  border-radius: 980px;
   font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
 }
 
 .border-bottom-light {
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .count-badge {
-  background-color: #e8fdf2;
-  color: #00D26A;
-  min-width: 28px;
+  background-color: rgba(0, 113, 227, 0.08);
+  color: #0071e3;
+  min-width: 32px;
   height: 28px;
   border-radius: 14px;
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .count-badge-error {
-  background-color: #ffebee;
-  color: #f44336;
+  background-color: rgba(255, 59, 48, 0.08);
+  color: #ff3b30;
 }
 
 .rounded-12 {
@@ -2081,10 +2084,10 @@ export default defineComponent({
 }
 
 .action-btn {
-  background: #4CAF50 !important;
+  background: #0071e3 !important;
   color: white;
-  border-radius: 16px;
-  font-weight: 700;
+  border-radius: 980px;
+  font-weight: 600;
   text-transform: none;
 }
 
@@ -2128,100 +2131,99 @@ export default defineComponent({
 
 /* Theme Red - Check Out */
 .theme-red .header-gradient {
-  background: linear-gradient(135deg, #ffebee 0%, #ffffff 100%);
+  background: linear-gradient(135deg, #fff2f2 0%, #f5f5f7 100%);
 }
 .theme-red .theme-action-card {
-  background: linear-gradient(90deg, #f44336 0%, #ff5252 100%);
+  background: linear-gradient(90deg, #ff3b30 0%, #ff6b60 100%);
 }
 .theme-red .theme-status-chip {
-  background-color: #f44336;
+  background-color: #ff3b30;
 }
 
 /* Theme Green - Check In */
 .theme-green .header-gradient {
-  background: linear-gradient(135deg, #e8fdf2 0%, #ffffff 100%);
+  background: linear-gradient(135deg, #f0fff6 0%, #f5f5f7 100%);
 }
 .theme-green .theme-action-card {
-  background: linear-gradient(90deg, #00D26A 0%, #00e676 100%);
+  background: linear-gradient(90deg, #34c759 0%, #30d158 100%);
 }
 .theme-green .theme-status-chip {
-  background-color: #00D26A;
+  background-color: #34c759;
 }
 
 /* Theme Gold - Si/No */
 .theme-gold .header-gradient {
-  background: linear-gradient(135deg, #fff8e1 0%, #ffffff 100%);
+  background: linear-gradient(135deg, #fffbf0 0%, #f5f5f7 100%);
 }
 .theme-gold .theme-action-card {
-  background: linear-gradient(90deg, #ffc107 0%, #ffd54f 100%);
+  background: linear-gradient(90deg, #ff9f0a 0%, #ffcc02 100%);
 }
 .theme-gold .theme-status-chip {
-  background-color: #ffc107;
-  color: #333;
+  background-color: #ff9f0a;
+  color: white;
 }
 
 /* Theme Orange - Room Move */
 .theme-orange .header-gradient {
-  background: linear-gradient(135deg, #fff3e0 0%, #ffffff 100%);
+  background: linear-gradient(135deg, #fff5ec 0%, #f5f5f7 100%);
 }
 .theme-orange .theme-action-card {
-  background: linear-gradient(90deg, #ff9800 0%, #ffa726 100%);
+  background: linear-gradient(90deg, #ff6b2b 0%, #ff9500 100%);
 }
 .theme-orange .theme-status-chip {
-  background-color: #ff9800;
-  color: #333;
+  background-color: #ff6b2b;
 }
 
 /* Theme Blue - Upsell */
 .theme-blue .header-gradient {
-  background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
+  background: linear-gradient(135deg, #f0f7ff 0%, #f5f5f7 100%);
 }
 .theme-blue .theme-action-card {
-  background: linear-gradient(90deg, #2196f3 0%, #42a5f5 100%);
+  background: linear-gradient(90deg, #0071e3 0%, #5ac8fa 100%);
 }
 .theme-blue .theme-status-chip {
-  background-color: #2196f3;
+  background-color: #0071e3;
 }
 
-/* Theme Purple - Guardar Upsell */
+/* Theme Purple */
 .theme-purple .header-gradient {
-  background: linear-gradient(135deg, #f3e5f5 0%, #ffffff 100%);
+  background: linear-gradient(135deg, #f8f0ff 0%, #f5f5f7 100%);
 }
 .theme-purple .theme-action-card {
-  background: linear-gradient(90deg, #9c27b0 0%, #ab47bc 100%);
+  background: linear-gradient(90deg, #bf5af2 0%, #9b59b6 100%);
 }
 .theme-purple .theme-status-chip {
-  background-color: #9c27b0;
+  background-color: #bf5af2;
 }
 
-/* Theme Yellow - Room Move */
+/* Theme Yellow */
 .theme-yellow .header-gradient {
-  background: linear-gradient(135deg, #fffde7 0%, #ffffff 100%);
+  background: linear-gradient(135deg, #fffde0 0%, #f5f5f7 100%);
 }
 .theme-yellow .theme-action-card {
-  background: linear-gradient(90deg, #ffeb3b 0%, #fff176 100%);
+  background: linear-gradient(90deg, #ffd60a 0%, #ffcc02 100%);
 }
 .theme-yellow .theme-status-chip {
-  background-color: #ffeb3b;
+  background-color: #ffd60a;
   color: #333;
 }
 
-/* Theme Brown - Back to Back / Show Room */
+/* Theme Brown */
 .theme-brown .header-gradient {
-  background: linear-gradient(135deg, #efebe9 0%, #ffffff 100%);
+  background: linear-gradient(135deg, #f5f0eb 0%, #f5f5f7 100%);
 }
 .theme-brown .theme-action-card {
-  background: linear-gradient(90deg, #795548 0%, #8d6e63 100%);
+  background: linear-gradient(90deg, #6e4e37 0%, #8e6a56 100%);
 }
 .theme-brown .theme-status-chip {
-  background-color: #795548;
+  background-color: #6e4e37;
 }
 
 .z-max {
   z-index: 1000;
 }
 
-/* Nota Extra Styles */
+/* ─── Nota Extra ─── */
 .nota-extra-image {
   width: 100%;
   max-width: 300px;
@@ -2232,12 +2234,13 @@ export default defineComponent({
 }
 
 .nota-extra-badge {
-  background: linear-gradient(135deg, #ff9800 0%, #ffa726 100%);
+  background: linear-gradient(135deg, #ff9500 0%, #ffcc02 100%);
   color: white;
-  padding: 6px 14px;
-  border-radius: 20px;
+  padding: 6px 16px;
+  border-radius: 980px;
   font-size: 13px;
-  box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(255, 149, 0, 0.3);
 }
 
 .photo-preview-container {
@@ -2250,7 +2253,7 @@ export default defineComponent({
   max-width: 200px;
   height: 120px;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: 10px;
   cursor: pointer;
 }
 
@@ -2261,8 +2264,8 @@ export default defineComponent({
 }
 
 .compression-info {
-  background: #f5f5f5;
-  border-radius: 6px;
+  background: #f5f5f7;
+  border-radius: 8px;
   padding: 8px 12px;
   font-size: 11px;
 }
@@ -2273,7 +2276,7 @@ export default defineComponent({
   gap: 6px;
 }
 
-/* Photo Bottom Sheet */
+/* ─── Photo Bottom Sheet ─── */
 .photo-bottom-sheet {
   border-radius: 20px 20px 0 0;
 }
@@ -2290,30 +2293,30 @@ export default defineComponent({
   flex-direction: column;
   align-items: center;
   padding: 20px;
-  border-radius: 16px;
-  background: #f5f5f5;
+  border-radius: 14px;
+  background: #f5f5f7;
   cursor: pointer;
   transition: background 0.2s;
 }
 
 .photo-option:hover {
-  background: #e0e0e0;
+  background: #e9e9eb;
 }
 
 .photo-option-label {
   margin-top: 8px;
   font-weight: 600;
   font-size: 14px;
-  color: #333;
+  color: #1d1d1f;
 }
 
 .photo-option-subtitle {
   margin-top: 4px;
   font-size: 12px;
-  color: #666;
+  color: rgba(0, 0, 0, 0.48);
 }
 
-/* Image Modal */
+/* ─── Image Modal ─── */
 .image-modal-card {
   background: black;
   display: flex;
@@ -2344,59 +2347,59 @@ export default defineComponent({
 }
 
 .photo-btn {
-  background: #f5f5f5;
-  color: #424242;
-  border-radius: 8px;
+  background: #f5f5f7;
+  color: #1d1d1f;
+  border-radius: 10px;
   height: 120px;
+  border: 1.5px dashed rgba(0, 0, 0, 0.15);
 }
 
 .photo-btn:hover {
-  background: #e0e0e0;
+  background: #e9e9eb;
 }
 
-.rounded-12 {
-  border-radius: 12px;
-}
-
-/* Edit Mode Styles */
+/* ─── Edit Mode Styles ─── */
 .edit-btn {
-  border-radius: 20px;
-  padding: 4px 16px;
+  border-radius: 980px;
+  padding: 4px 18px;
   font-weight: 600;
   font-size: 0.875rem;
 }
 
 .edit-form-container {
-  background: white;
+  background: #f5f5f7;
   min-height: 100vh;
 }
 
 .edit-form-container .section-label {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 600;
-  color: #424242;
+  color: #1d1d1f;
   display: flex;
   align-items: center;
 }
 
 .edit-form-container .required-asterisk {
-  color: #ef5350;
+  color: #ff3b30;
   margin-left: 4px;
   font-weight: bold;
 }
 
 .edit-form-container .section-container {
-  background: transparent;
-  margin-bottom: 20px;
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.06);
+  margin-bottom: 12px;
 }
 
 .edit-form-container .category-header {
-  background: #e3f2fd;
-  border-radius: 12px;
-  padding: 8px 12px;
+  background: rgba(0, 113, 227, 0.06);
+  border-radius: 10px;
+  padding: 8px 14px;
   display: inline-flex;
   align-items: center;
-  color: #1976d2;
+  color: #0071e3;
   margin-bottom: 16px;
   margin-top: 8px;
 }
@@ -2408,50 +2411,49 @@ export default defineComponent({
 .edit-form-container .category-title {
   font-weight: 700;
   margin-left: 8px;
-  font-size: 1rem;
+  font-size: 0.95rem;
 }
 
 .edit-form-container .button-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
 }
 
 .edit-form-container .custom-select-btn {
-  background: white !important;
-  color: #616161 !important;
-  border-radius: 12px !important;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
-  border: 1px solid transparent !important;
+  background: #ffffff !important;
+  color: rgba(0, 0, 0, 0.6) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1) !important;
+  border: 1.5px solid transparent !important;
   text-transform: none !important;
   font-weight: 500 !important;
   padding: 8px 16px !important;
-  min-height: 44px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 42px;
+  transition: all 0.15s ease;
 }
 
 .edit-form-container .custom-select-btn:active {
-  transform: scale(0.95);
+  transform: scale(0.96);
 }
 
 .edit-form-container .custom-select-btn.selected {
-  border: 2px solid #4CAF50 !important;
-  color: #4CAF50 !important;
-  box-shadow: 0 10px 15px -3px rgba(76, 175, 80, 0.1), 0 4px 6px -2px rgba(76, 175, 80, 0.05) !important;
+  border: 1.5px solid #0071e3 !important;
+  color: #0071e3 !important;
+  background: rgba(0, 113, 227, 0.05) !important;
+  box-shadow: none !important;
 }
 
 .edit-form-container .input-styled :deep(.q-field__control) {
   background: white !important;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05) !important;
-  border-radius: 12px !important;
+  border-radius: 10px !important;
 }
 
 .edit-form-container .submit-btn {
-  background: #4CAF50 !important;
+  background: #0071e3 !important;
   color: white !important;
-  border-radius: 12px !important;
-  font-weight: 700 !important;
-  box-shadow: 0 4px 14px 0 rgba(76, 175, 80, 0.39) !important;
+  border-radius: 980px !important;
+  font-weight: 600 !important;
 }
 
 @media (max-width: 600px) {
@@ -2459,23 +2461,23 @@ export default defineComponent({
     padding: 4px 12px;
     font-size: 0.8rem;
   }
-  
+
   .edit-form-container .button-grid {
-    gap: 8px;
+    gap: 6px;
   }
-  
+
   .edit-form-container .custom-select-btn {
     padding: 6px 12px !important;
-    min-height: 40px;
+    min-height: 38px;
   }
 }
 
-/* Historial Styles */
+/* ─── Historial Styles ─── */
 .log-content {
-  background: #f8f9fa;
-  border-radius: 12px;
+  background: #f5f5f7;
+  border-radius: 10px;
   padding: 12px;
-  border: 1px solid #edf0f2;
+  border: 0.5px solid rgba(0, 0, 0, 0.08);
 }
 
 .log-row {
@@ -2495,26 +2497,26 @@ export default defineComponent({
 }
 
 .old-value .log-tag {
-  color: #ef5350;
+  color: #ff3b30;
 }
 
 .new-value .log-tag {
-  color: #4caf50;
+  color: #34c759;
 }
 
 .log-text {
-  color: #424242;
+  color: #1d1d1f;
   line-height: 1.4;
   word-break: break-word;
 }
 
 .old-value {
-  border-bottom: 1px dashed #e0e0e0;
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.1);
   margin-bottom: 6px;
   padding-bottom: 6px;
 }
 
-/* Desktop: proper desktop layout */
+/* Desktop layout */
 @media (min-width: 1024px) {
   .content-container {
     max-width: 1100px;
@@ -2564,22 +2566,18 @@ export default defineComponent({
     margin: 0;
   }
 
-  /* Make the Seguridad section span full width */
   .q-pa-md.q-gutter-y-lg > .section-card:first-child {
     grid-column: 1 / -1;
   }
 
-  /* Notes and Nota Extra sections span full width */
   .q-pa-md.q-gutter-y-lg > .section-card:has(.text-body2) {
     grid-column: 1 / -1;
   }
 
-  /* Historial spans full width */
   .q-pa-md.q-gutter-y-lg > .section-card:last-child {
     grid-column: 1 / -1;
   }
 
-  /* Full width buttons */
   .q-pa-md.q-gutter-y-lg > .q-mt-lg {
     grid-column: 1 / -1;
   }
@@ -2589,7 +2587,6 @@ export default defineComponent({
     padding: 24px;
   }
 
-  /* Wider count badges and item rows on desktop */
   .section-card .row.items-center.justify-between {
     padding: 8px 0;
   }

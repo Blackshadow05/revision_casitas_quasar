@@ -189,7 +189,7 @@
             
             <template v-slot:subtitle>
               <div class="log-entry-time">
-                {{ formatDateTime(log.created_at) }}
+                {{ formatDateTime(log.hora_bitacora || log.created_at) }}
               </div>
             </template>
 
@@ -264,6 +264,29 @@
                 <q-icon name="event_note" />
               </template>
             </q-select>
+
+            <!-- Campo Hora con selector -->
+            <q-input
+              v-model="newLog.hora"
+              label="Hora"
+              outlined
+              rounded
+              mask="time"
+              :rules="['time']"
+              class="q-mb-md"
+            >
+              <template v-slot:prepend>
+                <q-icon name="access_time" class="cursor-pointer">
+                  <q-popup-proxy cover transition-show="scale" transition-hide="scale">
+                    <q-time v-model="newLog.hora" format24h>
+                      <div class="row items-center justify-end">
+                        <q-btn v-close-popup label="Cerrar" color="primary" flat />
+                      </div>
+                    </q-time>
+                  </q-popup-proxy>
+                </q-icon>
+              </template>
+            </q-input>
 
             <!-- Campo Oficial que Recibe (solo si es Entrega de turno) -->
             <q-select
@@ -462,7 +485,9 @@
 
             <!-- Fecha y hora -->
             <div class="text-caption text-grey-6 q-mb-xs">Fecha y hora</div>
-            <div class="text-body1 text-weight-medium q-mb-md">{{ formatDateTime(selectedLog.created_at) }}</div>
+            <div class="text-body1 text-weight-medium q-mb-md">
+              {{ formatDateTime(selectedLog.hora_bitacora || selectedLog.created_at) }}
+            </div>
 
             <!-- Tipo de evento -->
             <div class="text-caption text-grey-6 q-mb-xs">Tipo de evento</div>
@@ -671,6 +696,7 @@ export default defineComponent({
       nombre_bitacora: '',
       event_type: '',
       description: '',
+      hora: '', // Campo para la hora seleccionada
       oficial_recibe: '',
       colaboradores_turno: [],
       activos: {
@@ -875,7 +901,7 @@ export default defineComponent({
       const userName = authStore.user?.Usuario
       const userRole = authStore.user?.Rol
 
-      return logs.value.filter(log => {
+      const list = logs.value.filter(log => {
         const bitName = log.nombre_bitacora
 
         // Reglas de visibilidad por Usuario/Rol
@@ -911,7 +937,7 @@ export default defineComponent({
         }
         
         if (quickFilter.value === 'today') {
-          const d = parseDateValue(log.created_at)
+          const d = parseDateValue(log.hora_bitacora || log.created_at)
           if (!d || !isSameCalendarDay(d, new Date())) return false
         }
 
@@ -928,8 +954,15 @@ export default defineComponent({
           (log.colaborador || log.guard_id || '').toLowerCase().includes(term) ||
           (log.oficial_recibe || '').toLowerCase().includes(term) ||
           (log.description || '').toLowerCase().includes(term) ||
-          formatDateTime(log.created_at).toLowerCase().includes(term)
+          formatDateTime(log.hora_bitacora || log.created_at).toLowerCase().includes(term)
         )
+      })
+
+      // Ordenar por hora_bitacora (o created_at si no tiene) descendente
+      return list.sort((a, b) => {
+        const dateA = new Date(a.hora_bitacora || a.created_at)
+        const dateB = new Date(b.hora_bitacora || b.created_at)
+        return dateB - dateA
       })
     })
 
@@ -1048,6 +1081,7 @@ export default defineComponent({
         nombre_bitacora: '',
         event_type: '',
         description: '',
+        hora: '', // Resetear hora
         oficial_recibe: '',
         colaboradores_turno: [],
         activos: {
@@ -1109,16 +1143,26 @@ export default defineComponent({
       try {
         // Obtener fecha y hora del dispositivo sin zona horaria
         const now = new Date()
-        const localDateTime = now.getFullYear() + '-' +
-          String(now.getMonth() + 1).padStart(2, '0') + '-' +
-          String(now.getDate()).padStart(2, '0') + ' ' +
+        const yyyy = now.getFullYear()
+        const mm = String(now.getMonth() + 1).padStart(2, '0')
+        const dd = String(now.getDate()).padStart(2, '0')
+
+        const localDateTime = yyyy + '-' + mm + '-' + dd + ' ' +
           String(now.getHours()).padStart(2, '0') + ':' +
           String(now.getMinutes()).padStart(2, '0') + ':' +
           String(now.getSeconds()).padStart(2, '0')
 
+        // Combinar fecha actual con la hora seleccionada para hora_bitacora
+        let horaBitacora = localDateTime
+        if (newLog.value.hora) {
+          // newLog.value.hora viene en formato HH:mm (por el q-time)
+          horaBitacora = `${yyyy}-${mm}-${dd} ${newLog.value.hora}:00`
+        }
+
         const record = {
           // Campos automáticos (no visibles en formulario)
           created_at: localDateTime,
+          hora_bitacora: horaBitacora, // Guardar la hora seleccionada con la fecha de hoy
           guard_id: userId.value,
           colaborador: authStore.user?.Usuario || 'Desconocido',
 
@@ -1231,8 +1275,8 @@ export default defineComponent({
     linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0)),
     #0b0b0b;
   color: var(--uber-white);
-  border-radius: 32px;
-  padding: 20px;
+  border-radius: 28px;
+  padding: 16px 18px;
   box-shadow: var(--uber-shadow-medium);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -1240,8 +1284,8 @@ export default defineComponent({
 .logs-hero__topbar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 24px;
+  gap: 10px;
+  margin-bottom: 16px;
 }
 
 .logs-back-btn,
@@ -1258,7 +1302,7 @@ export default defineComponent({
 .filter-card__label {
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
 }
 
@@ -1269,13 +1313,13 @@ export default defineComponent({
 
 .logs-hero__count {
   margin-left: auto;
-  min-width: 54px;
-  padding: 8px 14px;
+  min-width: 48px;
+  padding: 6px 12px;
   border-radius: var(--uber-radius-pill);
   background: var(--uber-white);
   color: var(--uber-black);
   font-family: var(--uber-font-display);
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   text-align: center;
 }
@@ -1283,7 +1327,7 @@ export default defineComponent({
 .logs-hero__content {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.95fr);
-  gap: 24px;
+  gap: 18px;
 }
 
 .logs-hero__title,
@@ -1294,23 +1338,24 @@ export default defineComponent({
 }
 
 .logs-hero__title {
-  margin: 12px 0 0;
-  font-size: clamp(2.3rem, 4vw, 3.9rem);
+  margin: 8px 0 0;
+  font-size: clamp(1.95rem, 3.2vw, 3.15rem);
   line-height: 0.96;
 }
 
 .logs-hero__description {
   max-width: 50ch;
-  margin: 18px 0 0;
+  margin: 12px 0 0;
   color: rgba(255, 255, 255, 0.68);
+  font-size: 0.94rem;
   line-height: 1.65;
 }
 
 .logs-hero__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 28px;
+  gap: 10px;
+  margin-top: 18px;
 }
 
 .logs-primary-btn,
@@ -1329,14 +1374,14 @@ export default defineComponent({
 
 .logs-hero__stats {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .logs-stat-card {
   background: rgba(255, 255, 255, 0.06);
-  border-radius: 24px;
+  border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 18px;
+  padding: 14px;
 }
 
 .logs-stat-card__label {
@@ -1344,17 +1389,17 @@ export default defineComponent({
 }
 
 .logs-stat-card__value {
-  margin-top: 10px;
+  margin-top: 8px;
   font-family: var(--uber-font-display);
-  font-size: clamp(2rem, 4vw, 2.8rem);
+  font-size: clamp(1.7rem, 3vw, 2.35rem);
   font-weight: 700;
   line-height: 1;
 }
 
 .logs-stat-card__meta {
-  margin-top: 10px;
+  margin-top: 8px;
   color: rgba(255, 255, 255, 0.62);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .filter-card {
@@ -1572,17 +1617,26 @@ export default defineComponent({
   }
 
   .logs-hero {
-    padding: 16px;
+    padding: 12px 14px;
   }
 
   .logs-hero__title {
-    font-size: 2.5rem;
+    font-size: 2rem;
+  }
+
+  .logs-hero__topbar {
+    margin-bottom: 12px;
+  }
+
+  .logs-hero__description {
+    margin-top: 10px;
+    font-size: 0.88rem;
   }
 
   .logs-hero__stats {
     display: flex;
     overflow-x: auto;
-    gap: 10px;
+    gap: 8px;
     padding-bottom: 4px;
     scrollbar-width: none;
   }
@@ -1592,7 +1646,8 @@ export default defineComponent({
   }
 
   .logs-stat-card {
-    min-width: 160px;
+    min-width: 148px;
+    padding: 12px;
   }
 
   .filter-card__header,

@@ -13,7 +13,7 @@
             <div class="puesto01-hero__kicker">Control de accesos</div>
             <h1 class="puesto01-hero__title">Tabla Puesto 01</h1>
             <p class="puesto01-hero__description">
-              Panel operativo para movimientos, tours y registros manuales. Estado actual: {{ scopeLabel }}.
+              Registro operativo Puesto 01 ingresos,salidas y tours de huespedes. Estado actual: {{ scopeLabel }}.
             </p>
 
             <div class="puesto01-hero__actions gt-sm">
@@ -53,8 +53,8 @@
       <section class="puesto01-command-card q-mb-md">
         <div class="puesto01-command-card__header">
           <div>
-            <div class="puesto01-command-card__eyebrow">Command Deck</div>
-            <div class="puesto01-command-card__title">Filtra por estado, fecha o texto sin salir del tablero.</div>
+            <div class="puesto01-command-card__eyebrow"></div>
+            <div class="puesto01-command-card__title">Filtra por estado, fecha o texto.</div>
           </div>
           <div class="puesto01-panel-tag">{{ scopeLabel }}</div>
         </div>
@@ -158,7 +158,7 @@
                   map-options
                 />
               </div>
-              <div v-if="manualMovementForm.tipo && manualMovementForm.tipo !== 'Outside Guest'" class="col-12 col-md-6">
+              <div v-if="manualMovementForm.tipo && (isEditMode || manualMovementForm.tipo !== 'Outside Guest')" class="col-12 col-md-6">
                 <q-input v-model="manualMovementForm.casita" label="Casita *" outlined rounded />
               </div>
             </div>
@@ -167,7 +167,7 @@
               <q-input v-model="manualMovementForm.nombre" label="Nombre *" outlined rounded class="q-mb-md" />
 
               <q-input
-                v-if="manualRequiresColaborador"
+                v-if="isEditMode || manualRequiresColaborador"
                 v-model="manualMovementForm.colaborador"
                 label="Colaborador"
                 outlined
@@ -178,7 +178,7 @@
               <q-input v-model="manualMovementForm.placa" label="Placa" outlined rounded class="q-mb-md" />
 
               <q-input
-                v-if="manualRequiresDetalle"
+                v-if="isEditMode || manualRequiresDetalle"
                 v-model="manualMovementForm.detalle"
                 label="Detalle"
                 outlined
@@ -189,7 +189,7 @@
               />
 
               <q-input
-                v-if="manualRequiresHoraIngreso && manualMovementForm.tipo !== 'EXPERIENCIA'"
+                v-if="isEditMode || (manualRequiresHoraIngreso && manualMovementForm.tipo !== 'EXPERIENCIA')"
                 v-model="manualMovementForm.horaIngreso"
                 label="Hora ingreso *"
                 outlined
@@ -199,7 +199,7 @@
               />
 
               <q-input
-                v-if="manualRequiresOficialIngreso && manualMovementForm.tipo !== 'EXPERIENCIA'"
+                v-if="isEditMode || (manualRequiresOficialIngreso && manualMovementForm.tipo !== 'EXPERIENCIA')"
                 v-model="manualMovementForm.oficialIngreso"
                 label="Oficial ingreso *"
                 outlined
@@ -208,7 +208,7 @@
               />
 
               <q-input
-                v-if="manualRequiresHoraSalida"
+                v-if="isEditMode || manualRequiresHoraSalida"
                 v-model="manualMovementForm.horaSalida"
                 label="Hora salida *"
                 outlined
@@ -218,7 +218,7 @@
               />
 
               <q-input
-                v-if="manualRequiresOficialSalida"
+                v-if="isEditMode || manualRequiresOficialSalida"
                 v-model="manualMovementForm.oficialSalida"
                 label="Oficial salida *"
                 outlined
@@ -229,17 +229,27 @@
 
           <q-card-section v-else-if="showCheckInDialog" class="q-pt-md">
             <div class="row q-col-gutter-md q-mb-sm">
-              <div class="col-12 col-md-6">
+              <div v-if="!isOutsideGuestType(checkInForm.tipo)" class="col-12 col-md-6">
                 <q-input v-model="checkInForm.casita" label="Casita" outlined rounded readonly />
               </div>
-              <div class="col-12 col-md-6">
+              <div :class="isOutsideGuestType(checkInForm.tipo) ? 'col-12' : 'col-12 col-md-6'">
                 <q-input v-model="checkInForm.tipo" label="Tipo" outlined rounded readonly />
               </div>
             </div>
 
             <q-input v-model="checkInForm.nombre" label="Nombre *" outlined rounded class="q-mb-md" />
-            <q-input v-model="checkInForm.colaborador" label="Colaborador" outlined rounded class="q-mb-md" />
+            <q-input v-if="!isOutsideGuestType(checkInForm.tipo)" v-model="checkInForm.colaborador" label="Colaborador" outlined rounded class="q-mb-md" />
             <q-input v-model="checkInForm.placa" label="Placa" outlined rounded class="q-mb-md" />
+            <q-input
+              v-if="isOutsideGuestType(checkInForm.tipo)"
+              v-model="checkInForm.detalle"
+              label="Detalle"
+              outlined
+              rounded
+              type="textarea"
+              autogrow
+              class="q-mb-md"
+            />
             <q-input v-model="checkInForm.horaIngreso" label="Hora de ingreso *" outlined rounded class="q-mb-md" placeholder="Ej: 14:30" />
             <q-input v-model="checkInForm.oficial" label="Oficial *" outlined rounded />
           </q-card-section>
@@ -270,7 +280,7 @@
               rounded
               no-caps
               color="primary"
-              label="Guardar movimiento"
+              :label="isEditMode ? 'Actualizar' : 'Guardar movimiento'"
               :loading="saving"
               :disable="!canSubmitManualMovement"
               @click="saveManualMovement"
@@ -389,7 +399,7 @@
                     <div class="text-caption text-grey-6">Casitas</div>
                     <div class="text-h6 text-weight-bold casitas-list">{{ operation.casitasLabel || 'Sin casita' }}</div>
                   </div>
-                  <q-badge :color="getTypeColor(operation.tipo)" :label="operation.tipo || 'Sin tipo'" rounded />
+                  <q-badge :color="getTypeColor(operation.displayTipo || operation.tipo)" :label="operation.displayTipo || operation.tipo || 'Sin tipo'" rounded />
                 </div>
 
                 <div class="q-mt-sm">
@@ -410,9 +420,9 @@
                     rounded
                     no-caps
                     color="red"
-                    label="Registrar Check in"
+                    :label="getCheckInButtonLabel(operation)"
                     :disable="!authStore.canAdd"
-                            @click="openGroupCheckIn(operation)"
+                    @click="handleCheckInAction(operation)"
                   />
                 </div>
               </div>
@@ -434,7 +444,12 @@
                     <div class="text-caption text-grey-6">Casitas</div>
                     <div class="text-h6 text-weight-bold casitas-list">{{ operation.casitasLabel || 'Sin casita' }}</div>
                   </div>
-                  <q-badge :color="getTypeColor(operation.tipo)" :label="operation.tipo || 'Sin tipo'" rounded />
+                  <q-badge :color="getTypeColor(operation.displayTipo || operation.tipo)" :label="operation.displayTipo || operation.tipo || 'Sin tipo'" rounded />
+                </div>
+
+                <div class="q-mt-sm">
+                  <div class="text-caption text-grey-6">Nombre</div>
+                  <div class="text-body2 text-grey-8">{{ operation.linkedPuestoRow?.nombre || operation.nombre || 'Sin nombre' }}</div>
                 </div>
 
                 <div class="q-mt-sm">
@@ -500,6 +515,10 @@
                     <div class="text-body2 text-grey-8">Hora ingreso: {{ operation.linkedPuestoRow?.horaIngreso || 'Sin hora' }}</div>
                     <div class="text-body2 text-grey-8">Oficial ingreso: {{ operation.linkedPuestoRow?.oficialIngreso || 'Sin oficial' }}</div>
                   </div>
+                </div>
+
+                <div v-if="searchScope === 'completados' && selectedDate === getLocalDateString()" class="row justify-end q-mt-sm">
+                  <q-btn flat round color="primary" icon="edit" size="sm" @click="openEditDialog(operation)" />
                 </div>
               </div>
             </div>
@@ -770,6 +789,7 @@ export default defineComponent({
         nombre: '',
         colaborador: '',
         placa: '',
+        detalle: '',
         horaIngreso: '',
         oficial: authStore.user?.Usuario || '',
         casita: '',
@@ -807,11 +827,55 @@ export default defineComponent({
       return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
     }
 
+    // New helper to convert "Sunday, April 12th" to "2026-04-12"
+    // Using current year as base
+    function parseTextDateToISO (text) {
+      if (!text || typeof text !== 'string') return ''
+      
+      const months = {
+        'January': '01', 'February': '02', 'March': '03', 'April': '04',
+        'May': '05', 'June': '06', 'July': '07', 'August': '08',
+        'September': '09', 'October': '10', 'November': '11', 'December': '12'
+      }
+
+      // Format: "Sunday, April 12th" -> Match "April" and "12"
+      const match = text.match(/([A-Z][a-z]+),\s+([A-Z][a-z]+)\s+(\d+)/)
+      if (match) {
+        const monthName = match[2]
+        const day = match[3].padStart(2, '0')
+        const month = months[monthName]
+        if (month) {
+          const year = new Date().getFullYear() // Base year
+          return `${year}-${month}-${day}`
+        }
+      }
+      return ''
+    }
+
     const normalizeDateOnly = (value) => {
       if (!value) return ''
-      if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+
+      // If it matches the text format "Sunday, April 12th"
+      if (typeof value === 'string' && value.includes(',')) {
+        const mapped = parseTextDateToISO(value)
+        if (mapped) return mapped
+      }
+
+      // Handle "YYYY-MM-DD HH:mm:ss" from Supabase which might be treated as UTC by new Date() 
+      // if not careful. We want to treat it as LOCAL to the device.
+      if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(value)) {
+        // Just take the date part directly if it's already in the local date format
         return value.slice(0, 10)
       }
+
+      // Standard ISO string "YYYY-MM-DDTHH:mm:ssZ"
+      if (typeof value === 'string' && value.includes('T')) {
+        const parsed = new Date(value)
+        if (!Number.isNaN(parsed.getTime())) {
+          return getLocalDateString(parsed)
+        }
+      }
+
       const parsed = new Date(value)
       if (Number.isNaN(parsed.getTime())) return ''
       return getLocalDateString(parsed)
@@ -820,13 +884,27 @@ export default defineComponent({
     const normalizeType = (value) => String(value || '').trim().toUpperCase()
     const normalizeSalidaLlegada = (value) => String(value || '').trim().toUpperCase()
     const normalizeTypeKey = (value) => normalizeType(value).replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim()
+    const isOutsideGuestCasita = (value) => {
+      const normalized = normalizeTypeKey(value)
+      return normalized === 'OUTSIDE GUEST' || normalized === 'OUTSIDE GUESTS'
+    }
     const isExperienceType = (type) => {
       const normalized = normalizeType(type)
       return normalized === 'EXPERIENCIA' || normalized === 'EXPERIENCIAS'
     }
-    const isOutsideGuestType = (type) => normalizeTypeKey(type) === 'OUTSIDE GUEST'
+    const isOutsideGuestType = (type) => isOutsideGuestCasita(type)
+    const resolveCheckInType = (casita) => isOutsideGuestCasita(casita) ? 'Outside Guest' : 'CHECK-IN'
     const isSalidaHuespedType = (type) => normalizeTypeKey(type) === 'SALIDA HUESPED'
     const isTourType = (type) => isExperienceType(type) || isOutsideGuestType(type)
+    const hasMemoOperationIds = (item) => Array.isArray(item?.operationIds) && item.operationIds.length > 0
+    const isOutsideGuestRecord = (item) => {
+      if (!item || typeof item !== 'object') return false
+      if (isOutsideGuestType(item.tipo) || isOutsideGuestCasita(item.casita)) return true
+      if (isOutsideGuestCasita(item.baseOperation?.casita) || isOutsideGuestType(item.baseOperation?.tipo)) return true
+      if (isOutsideGuestCasita(item.linkedPuestoRow?.casita) || isOutsideGuestType(item.linkedPuestoRow?.tipo)) return true
+      return Array.isArray(item.casitas) && item.casitas.some(isOutsideGuestCasita)
+    }
+    const isOutsideGuestMemoOperation = (item) => hasMemoOperationIds(item) && isOutsideGuestRecord(item)
     const isPlaceholderValue = (value) => {
       const normalized = String(value || '').trim().toUpperCase()
       return !normalized || normalized === 'X'
@@ -846,6 +924,14 @@ export default defineComponent({
     const extractPuestoValue = (row, upperKey, lowerKey) => {
       if (!row || typeof row !== 'object') return ''
       return row[upperKey] ?? row[lowerKey] ?? ''
+    }
+
+    const pickPuesto = (row, ...keys) => {
+      if (!row || typeof row !== 'object') return ''
+      for (const k of keys) {
+        if (row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== '') return row[k]
+      }
+      return ''
     }
 
     const revealInlineForm = async () => {
@@ -870,40 +956,40 @@ export default defineComponent({
       showManualMovementForm.value = true
     }
 
-    const openEditDialog = (operation) => {
+    const openEditDialog = async (operation) => {
       closeAllInlineForms()
-      selectedOperation.value = operation
+
+      const linkedPuestoId = operation?.linkedPuestoId || operation?.linkedPuestoRow?.id || operation?.id || null
+      selectedOperation.value = {
+        ...operation,
+        linkedPuestoId
+      }
       isEditMode.value = true
 
-      const row = operation.linkedPuestoRow || operation
-      const isActuallyIn = isCheckIn(row.tipo) || (isTourType(row.tipo) && hasRealValue(row.horaIngreso))
-
-      if (isActuallyIn) {
-        checkInDialogMode.value = 'checkin'
-        checkInForm.value = {
-          nombre: row.nombre || '',
-          colaborador: row.colaboradorIngreso || '',
-          placa: row.placa || '',
-          horaIngreso: row.horaIngreso || '',
-          oficial: row.oficialIngreso || authStore.user?.Usuario || '',
-          casita: row.casita || '',
-          tipo: row.tipo || 'CHECK-IN'
+      let row = operation.linkedPuestoRow || operation
+      if (linkedPuestoId) {
+        try {
+          const fetched = await fetchPuestoRowById(linkedPuestoId)
+          if (fetched) row = fetched
+        } catch (err) {
+          console.warn('Unable to fetch full Puesto_01 row, falling back to provided operation', err)
         }
-        showCheckInDialog.value = true
-      } else {
-        checkOutDialogMode.value = 'checkout'
-        checkOutForm.value = {
-          nombre: row.nombre || '',
-          colaborador: row.colaboradorIngreso || '',
-          placa: row.placa || '',
-          horaSalida: row.horaSalida || '',
-          oficial: row.oficialSalida || authStore.user?.Usuario || '',
-          casita: row.casita || '',
-          detalle: row.detalle || '',
-          tipo: row.tipo || 'CHECK-OUT'
-        }
-        showCheckOutDialog.value = true
       }
+
+      manualMovementForm.value = {
+        tipo: pickPuesto(row, 'Tipo', 'tipo') || '',
+        casita: pickPuesto(row, 'Casita', 'casita'),
+        nombre: pickPuesto(row, 'Nombre', 'nombre'),
+        colaborador: pickPuesto(row, 'colaboradorIngreso', 'colaborador', 'colaborador_ingreso'),
+        placa: pickPuesto(row, 'Placa', 'placa'),
+        detalle: pickPuesto(row, 'Detalle', 'detalle', 'experiencias'),
+        horaIngreso: pickPuesto(row, 'Hora_ingreso', 'hora_ingreso', 'horaIngreso'),
+        oficialIngreso: pickPuesto(row, 'Oficial_ingreso', 'oficial_ingreso', 'oficialIngreso') || authStore.user?.Usuario || '',
+        horaSalida: pickPuesto(row, 'Hora_salida', 'hora_salida', 'horaSalida'),
+        oficialSalida: pickPuesto(row, 'Oficial_salida', 'oficial_salida', 'oficialSalida') || authStore.user?.Usuario || ''
+      }
+
+      showManualMovementForm.value = true
     }
 
     const isCheckIn = (type) => normalizeType(type) === 'CHECK-IN'
@@ -913,9 +999,13 @@ export default defineComponent({
       const explicitCategory = item?.operationCategory
       if (explicitCategory) return explicitCategory
 
+      if (isOutsideGuestRecord(item)) {
+        return isOutsideGuestMemoOperation(item) ? 'CHECK-IN' : 'CHECK-OUT'
+      }
+
       const typeKey = normalizeTypeKey(item?.tipo)
       if (typeKey === 'CHECK IN') return 'CHECK-IN'
-      if (typeKey === 'CHECK OUT' || typeKey === 'OUTSIDE GUEST') return 'CHECK-OUT'
+      if (typeKey === 'CHECK OUT') return 'CHECK-OUT'
       if (isExperienceType(item?.tipo) || typeKey === 'SALIDA HUESPED') return 'EXPERIENCIA'
       return normalizeType(item?.tipo)
     }
@@ -933,6 +1023,7 @@ export default defineComponent({
       const typeKey = normalizeTypeKey(type)
       if (normalized === 'CHECK-IN') return 'green'
       if (normalized === 'CHECK-OUT' || typeKey === 'SALIDA HUESPED') return 'orange'
+      if (isOutsideGuestType(type)) return 'blue-grey'
       if (isTourType(normalized)) return 'deep-purple'
       return 'grey'
     }
@@ -1008,17 +1099,18 @@ export default defineComponent({
         .map((group) => {
           const linkedPuesto = puestoRows.value.find((row) => hasOperationMemoMatch(group.operationIds, row.idOperacionMemo))
           const normalizedType = normalizeType(group.tipo)
+          const isOutsideMemoGroup = isOutsideGuestMemoOperation(group)
 
           const baseCasitas = group.casitas.length > 0 ? group.casitas.join(', ') : 'Sin casita'
           const displayCasitas = linkedPuesto?.casita || baseCasitas
-          const displayTipo = linkedPuesto?.tipo || group.tipo
+          const displayTipo = linkedPuesto?.tipo || (isOutsideMemoGroup ? 'Outside Guest' : group.tipo)
           const displaySummary = linkedPuesto
             ? `Nombre: ${linkedPuesto.nombre || 'Sin nombre'}`
             : (group.salida_llegada || 'Sin dato')
           const displayDetail = linkedPuesto
             ? (linkedPuesto.detalle || `Hora ingreso: ${linkedPuesto.horaIngreso || 'Sin hora'} | Hora salida: ${linkedPuesto.horaSalida || 'Sin hora'} | Oficial ingreso: ${linkedPuesto.oficialIngreso || 'Sin oficial'} | Oficial salida: ${linkedPuesto.oficialSalida || 'Sin oficial'}`)
             : (group.experiencias || 'Sin detalle')
-          const isHiddenByPuesto = Boolean(linkedPuesto) && (normalizedType === 'CHECK-IN' || normalizedType === 'CHECK-OUT')
+          const isHiddenByPuesto = Boolean(linkedPuesto) && (normalizedType === 'CHECK-IN' || normalizedType === 'CHECK-OUT' || isOutsideMemoGroup)
           const hasTourSalida = Boolean(linkedPuesto) && hasRealValue(linkedPuesto.horaSalida)
           const hasTourIngreso = Boolean(linkedPuesto) && hasRealValue(linkedPuesto.horaIngreso)
 
@@ -1045,8 +1137,11 @@ export default defineComponent({
         .filter((row) => splitOperationMemoIds(row.idOperacionMemo).length === 0)
         .map((row) => {
           const displayColumnType = getDisplayColumnType(row)
+          const displayCasitaLabel = isOutsideGuestType(row.tipo)
+            ? (row.casita || 'Outside Guest')
+            : (row.casita || 'Sin casita')
           const manualPendingMode = isOutsideGuestType(row.tipo)
-            ? (hasRealValue(row.horaIngreso) && !hasRealValue(row.horaSalida) ? 'outside-guest-out' : '')
+            ? (!hasRealValue(row.horaSalida) ? 'outside-guest-out' : '')
             : (displayColumnType === 'EXPERIENCIA' && !hasRealValue(row.horaIngreso)
                 ? (isSalidaHuespedType(row.tipo) ? 'guest-exit-in' : 'tour-in')
                 : '')
@@ -1068,8 +1163,8 @@ export default defineComponent({
             manualPendingMode,
             hasTourSalida: hasRealValue(row.horaSalida),
             hasTourIngreso: hasRealValue(row.horaIngreso),
-            displayCasitas: row.casita || 'Sin casita',
-            casitasLabel: row.casita || 'Sin casita',
+            displayCasitas: displayCasitaLabel,
+            casitasLabel: displayCasitaLabel,
             displaySummary: `Nombre: ${row.nombre || 'Sin nombre'}`,
             displayDetail: buildManualRowDetail(row),
             isHiddenByPuesto: false
@@ -1141,6 +1236,11 @@ export default defineComponent({
 
     const heroStats = computed(() => ([
       {
+        label: 'Pendientes',
+        value: pendingOperations.value.length,
+        meta: 'Cards pendientes'
+      },
+      {
         label: 'Experiencias',
         value: filteredByType('EXPERIENCIA', currentBoardItems.value).length,
         meta: 'Tours visibles'
@@ -1178,11 +1278,12 @@ export default defineComponent({
 
     const canSubmitCheckIn = computed(() => {
       const form = checkInForm.value
+      const requiresCasita = !isOutsideGuestType(form.tipo)
       return Boolean(
         form.nombre.trim() &&
         form.horaIngreso.trim() &&
         form.oficial.trim() &&
-        form.casita.trim() &&
+        (!requiresCasita || form.casita.trim()) &&
         form.tipo.trim()
       )
     })
@@ -1222,6 +1323,14 @@ export default defineComponent({
     const canSubmitManualMovement = computed(() => {
       const form = manualMovementForm.value
 
+      if (isEditMode.value) {
+        return Boolean(
+          form.tipo &&
+          form.nombre.trim() &&
+          (isOutsideGuestType(form.tipo) || form.casita.trim())
+        )
+      }
+
       if (!form.tipo || !form.nombre.trim()) return false
       if (form.tipo !== 'Outside Guest' && !form.casita.trim()) return false
 
@@ -1251,6 +1360,7 @@ export default defineComponent({
       if (isEditMode.value) return 'Editar movimiento'
       if (checkInDialogMode.value === 'tour-in') return 'Registrar ingreso tour'
       if (checkInDialogMode.value === 'guest-exit-in') return 'Registrar ingreso huesped'
+      if (checkInDialogMode.value === 'outside-guest-in') return 'Registrar ingreso outside'
       return 'Registrar Check in'
     })
 
@@ -1258,6 +1368,7 @@ export default defineComponent({
       if (isEditMode.value) return 'Actualizar'
       if (checkInDialogMode.value === 'tour-in') return 'Guardar ingreso tour'
       if (checkInDialogMode.value === 'guest-exit-in') return 'Guardar ingreso huesped'
+      if (checkInDialogMode.value === 'outside-guest-in') return 'Guardar ingreso outside'
       return 'Guardar check in'
     })
 
@@ -1266,14 +1377,18 @@ export default defineComponent({
     })
 
     const activeInlineFormTitle = computed(() => {
-      if (showManualMovementForm.value) return 'Ingresar movimiento'
+      if (showManualMovementForm.value) return isEditMode.value ? 'Editar movimiento' : 'Ingresar movimiento'
       if (showCheckInDialog.value) return checkInDialogTitle.value
       if (showCheckOutDialog.value) return checkOutDialogTitle.value
       return 'Formulario'
     })
 
     const activeInlineFormCaption = computed(() => {
-      if (showManualMovementForm.value) return 'Registra un movimiento directamente en Puesto_01'
+      if (showManualMovementForm.value) {
+        return isEditMode.value
+          ? 'Edita todos los campos disponibles de Puesto_01'
+          : 'Registra un movimiento directamente en Puesto_01'
+      }
       return `Casita ${selectedOperation.value?.casita || '-'}`
     })
 
@@ -1318,6 +1433,49 @@ export default defineComponent({
         oficialSalida: row.Oficial_salida || row.oficial_salida || '',
         fechaUpdate: row.fecha_update || ''
       }))
+    }
+
+    const fetchPuestoRowById = async (id) => {
+      if (!id) return null
+      try {
+        let { data, error } = await supabase
+          .from('Puesto_01')
+          .select('id, id_operacion_memo, Nombre, Casita, Tipo, Placa, Detalle, colaborador_ingreso, Hora_ingreso, Oficial_ingreso, Hora_salida, Oficial_salida, Fecha, fecha_update')
+          .eq('id', id)
+          .limit(1)
+
+        if (error || !data || data.length === 0) {
+          const lower = await supabase
+            .from('puesto_01')
+            .select('id, id_operacion_memo, nombre, casita, tipo, placa, detalle, colaborador_ingreso, hora_ingreso, oficial_ingreso, hora_salida, oficial_salida, fecha, fecha_update')
+            .eq('id', id)
+            .limit(1)
+          data = lower.data
+          error = lower.error
+        }
+
+        if (error || !data || data.length === 0) return null
+
+        const row = data[0]
+        return {
+          id: row.id,
+          idOperacionMemo: row.id_operacion_memo || '',
+          nombre: extractPuestoValue(row, 'Nombre', 'nombre'),
+          casita: extractPuestoValue(row, 'Casita', 'casita'),
+          tipo: extractPuestoValue(row, 'Tipo', 'tipo'),
+          placa: extractPuestoValue(row, 'Placa', 'placa'),
+          detalle: extractPuestoValue(row, 'Detalle', 'detalle'),
+          colaboradorIngreso: row.colaborador_ingreso || '',
+          horaIngreso: row.Hora_ingreso || row.hora_ingreso || '',
+          oficialIngreso: row.Oficial_ingreso || row.oficial_ingreso || '',
+          horaSalida: row.Hora_salida || row.hora_salida || '',
+          oficialSalida: row.Oficial_salida || row.oficial_salida || '',
+          fechaUpdate: row.fecha_update || ''
+        }
+      } catch (err) {
+        console.error('Error fetching Puesto_01 row by id:', err)
+        return null
+      }
     }
 
     const fetchAllPuestoRows = async () => {
@@ -1371,14 +1529,14 @@ export default defineComponent({
         const targetDate = selectedDate.value || getLocalDateString()
         let { data, error } = await supabase
           .from('operaciones_memo')
-          .select('id, casita, tipo, experiencias, salida_llegada, fecha_update')
+          .select('id, casita, tipo, experiencias, salida_llegada, fecha_update, fecha')
           .order('fecha_update', { ascending: false })
           .limit(1000)
 
         if (error) {
           const fallback = await supabase
             .from('operaciones_memo')
-            .select('id, casita, tipo, experiencias, "salida llegada", fecha_update')
+            .select('id, casita, tipo, experiencias, "salida llegada", fecha_update, fecha')
             .order('fecha_update', { ascending: false })
             .limit(1000)
 
@@ -1393,7 +1551,13 @@ export default defineComponent({
 
         if (error) throw error
 
-        operations.value = (data || []).filter((item) => normalizeDateOnly(item.fecha_update) === targetDate)
+        // Use 'fecha' field if available (format "Sunday, April 12th"), 
+        // fall back to 'fecha_update' if needed
+        operations.value = (data || []).filter((item) => {
+          const textDateISO = parseTextDateToISO(item.fecha)
+          const dateToCompare = textDateISO || normalizeDateOnly(item.fecha_update)
+          return dateToCompare === targetDate
+        })
         await fetchPuestoRows(targetDate)
       } catch (err) {
         console.error('Error fetching operaciones_memo:', err)
@@ -1409,16 +1573,19 @@ export default defineComponent({
     const openCheckInDialog = (operation) => {
       closeAllInlineForms()
       selectedOperation.value = operation
-      checkInDialogMode.value = 'checkin'
+      const casitaValue = operation.casita || ''
+      const resolvedTipo = resolveCheckInType(casitaValue)
+      checkInDialogMode.value = resolvedTipo === 'Outside Guest' ? 'outside-guest-in' : 'checkin'
       checkInForm.value = {
         ...createEmptyCheckInForm(),
         nombre: operation.linkedPuestoId ? extractPuestoValue(operation.linkedPuestoRow || {}, 'Nombre', 'nombre') : '',
-        colaborador: operation.linkedPuestoRow?.colaboradorIngreso || '',
+        colaborador: resolvedTipo === 'Outside Guest' ? '' : (operation.linkedPuestoRow?.colaboradorIngreso || ''),
         placa: operation.linkedPuestoId ? extractPuestoValue(operation.linkedPuestoRow || {}, 'Placa', 'placa') : '',
+        detalle: resolvedTipo === 'Outside Guest' ? (operation.experiencias || operation.displayDetail || '') : (operation.linkedPuestoRow?.detalle || ''),
         horaIngreso: operation.linkedPuestoRow?.horaIngreso || '',
         oficial: operation.linkedPuestoRow?.oficialIngreso || authStore.user?.Usuario || '',
-        casita: operation.casita || '',
-        tipo: operation.tipo || 'CHECK-IN'
+        casita: casitaValue,
+        tipo: resolvedTipo
       }
       showCheckInDialog.value = true
       revealInlineForm()
@@ -1434,7 +1601,7 @@ export default defineComponent({
         colaborador: operation.linkedPuestoRow?.colaboradorIngreso || '',
         placa: operation.linkedPuestoRow?.placa || '',
         horaIngreso: '',
-        oficial: '',
+        oficial: authStore.user?.Usuario || '',
         casita: operation.casita || '',
         tipo: operation.tipo || 'EXPERIENCIA'
       }
@@ -1482,9 +1649,11 @@ export default defineComponent({
       const casitaConcat = Array.isArray(group.casitas) && group.casitas.length > 0
         ? group.casitas.join(',')
         : (group.baseOperation?.casita || '')
+      const resolvedTipo = resolveCheckInType(casitaConcat)
       const op = {
         ...group.baseOperation,
         casita: casitaConcat,
+        tipo: resolvedTipo,
         id_operacion_memo: group.idOperacionMemo || group.baseOperation?.id || '',
         linkedPuestoId: group.linkedPuestoId || null,
         linkedPuestoRow: group.linkedPuestoId
@@ -1539,6 +1708,8 @@ export default defineComponent({
           : null
       }
       openCheckOutDialog(op, 'tour')
+      // Pre-fill official for tour out
+      checkOutForm.value.oficial = authStore.user?.Usuario || ''
     }
 
     const openManualOutsideGuestOut = (group) => {
@@ -1572,6 +1743,15 @@ export default defineComponent({
       return 'Registrar Check out'
     }
 
+    const getCheckInButtonLabel = (operation) => {
+      if (isOutsideGuestMemoOperation(operation)) return 'Registrar ingreso outside'
+      return 'Registrar Check in'
+    }
+
+    const handleCheckInAction = (operation) => {
+      openGroupCheckIn(operation)
+    }
+
     const handleCheckOutAction = (operation) => {
       if (operation?.manualPendingMode === 'outside-guest-out') {
         openManualOutsideGuestOut(operation)
@@ -1591,17 +1771,19 @@ export default defineComponent({
     const buildInsertPayload = () => {
       const targetDate = selectedDate.value || getLocalDateString()
       const form = checkInForm.value
+      const isOutsideGuest = isOutsideGuestType(form.tipo)
 
       return {
         Nombre: form.nombre.trim(),
-        Casita: form.casita.trim(),
+        Casita: isOutsideGuest ? '' : form.casita.trim(),
         Tipo: form.tipo.trim(),
         Placa: form.placa.trim(),
         colaborador_ingreso: form.colaborador.trim(),
         Hora_ingreso: form.horaIngreso.trim(),
         Oficial_ingreso: form.oficial.trim(),
-        Hora_salida: 'X',
-        id_operacion_memo: selectedOperation.value?.id_operacion_memo || selectedOperation.value?.id || '',
+        Hora_salida: isOutsideGuest ? '' : 'X',
+        Detalle: form.detalle ? form.detalle.trim() : '',
+        id_operacion_memo: isOutsideGuest ? '' : (selectedOperation.value?.id_operacion_memo || selectedOperation.value?.id || ''),
         Fecha: targetDate,
         fecha_update: getLocalFullDateTimeString()
       }
@@ -1610,17 +1792,19 @@ export default defineComponent({
     const buildLowercaseInsertPayload = () => {
       const form = checkInForm.value
       const targetDate = selectedDate.value || getLocalDateString()
+      const isOutsideGuest = isOutsideGuestType(form.tipo)
 
       return {
         nombre: form.nombre.trim(),
-        casita: form.casita.trim(),
+        casita: isOutsideGuest ? '' : form.casita.trim(),
         tipo: form.tipo.trim(),
         placa: form.placa.trim(),
         colaborador_ingreso: form.colaborador.trim(),
         hora_ingreso: form.horaIngreso.trim(),
         oficial_ingreso: form.oficial.trim(),
-        hora_salida: 'X',
-        id_operacion_memo: selectedOperation.value?.id_operacion_memo || selectedOperation.value?.id || '',
+        hora_salida: isOutsideGuest ? '' : 'X',
+        detalle: form.detalle ? form.detalle.trim() : '',
+        id_operacion_memo: isOutsideGuest ? '' : (selectedOperation.value?.id_operacion_memo || selectedOperation.value?.id || ''),
         fecha: targetDate,
         fecha_update: getLocalFullDateTimeString()
       }
@@ -1628,42 +1812,54 @@ export default defineComponent({
 
     const buildCheckInUpdatePayload = () => {
       const form = checkInForm.value
+      const isOutsideGuest = isOutsideGuestType(form.tipo)
 
       const payload = {
+        Tipo: isOutsideGuest ? 'Outside Guest' : form.tipo.trim(),
         Hora_ingreso: form.horaIngreso.trim(),
         Oficial_ingreso: form.oficial.trim(),
         fecha_update: getLocalFullDateTimeString()
       }
-
+ 
       if (isEditMode.value) {
         payload.Nombre = form.nombre.trim()
-        payload.Casita = form.casita.trim()
+        payload.Casita = isOutsideGuest ? '' : form.casita.trim()
         payload.Placa = form.placa.trim()
         payload.colaborador_ingreso = form.colaborador.trim()
       }
-
+ 
+      if (isEditMode.value && isOutsideGuest) {
+        payload.Detalle = form.detalle ? form.detalle.trim() : ''
+      }
+ 
       return payload
     }
-
+ 
     const buildCheckInLowercaseUpdatePayload = () => {
       const form = checkInForm.value
-
+      const isOutsideGuest = isOutsideGuestType(form.tipo)
+ 
       const payload = {
+        tipo: isOutsideGuest ? 'Outside Guest' : form.tipo.trim(),
         hora_ingreso: form.horaIngreso.trim(),
         oficial_ingreso: form.oficial.trim(),
         fecha_update: getLocalFullDateTimeString()
       }
-
+ 
       if (isEditMode.value) {
         payload.nombre = form.nombre.trim()
-        payload.casita = form.casita.trim()
+        payload.casita = isOutsideGuest ? '' : form.casita.trim()
         payload.placa = form.placa.trim()
         payload.colaborador_ingreso = form.colaborador.trim()
       }
-
+ 
+      if (isEditMode.value && isOutsideGuest) {
+        payload.detalle = form.detalle ? form.detalle.trim() : ''
+      }
+ 
       return payload
     }
-
+ 
     const buildCheckOutInsertPayload = () => {
       const targetDate = selectedDate.value || getLocalDateString()
       const form = checkOutForm.value
@@ -1807,30 +2003,91 @@ export default defineComponent({
       }
     }
 
+    const buildManualUpdatePayload = () => {
+      const form = manualMovementForm.value
+      const isOutsideGuest = isOutsideGuestType(form.tipo)
+
+      return {
+        Nombre: form.nombre.trim(),
+        Casita: isOutsideGuest ? '' : form.casita.trim(),
+        Tipo: form.tipo.trim(),
+        Placa: form.placa.trim(),
+        colaborador_ingreso: form.colaborador.trim(),
+        Hora_ingreso: form.horaIngreso.trim(),
+        Oficial_ingreso: form.oficialIngreso.trim(),
+        Hora_salida: form.horaSalida.trim(),
+        Oficial_salida: form.oficialSalida.trim(),
+        Detalle: form.detalle.trim(),
+        fecha_update: getLocalFullDateTimeString()
+      }
+    }
+
+    const buildManualLowercaseUpdatePayload = () => {
+      const payload = buildManualUpdatePayload()
+      return {
+        nombre: payload.Nombre,
+        casita: payload.Casita,
+        tipo: payload.Tipo,
+        placa: payload.Placa,
+        colaborador_ingreso: payload.colaborador_ingreso,
+        hora_ingreso: payload.Hora_ingreso,
+        oficial_ingreso: payload.Oficial_ingreso,
+        hora_salida: payload.Hora_salida,
+        oficial_salida: payload.Oficial_salida,
+        detalle: payload.Detalle,
+        fecha_update: payload.fecha_update
+      }
+    }
+
     const saveManualMovement = async () => {
       if (!canSubmitManualMovement.value) return
 
       saving.value = true
       try {
-        let result = await supabase.from('Puesto_01').insert(buildManualInsertPayload())
-        if (result.error) {
-          result = await supabase.from('puesto_01').insert(buildManualLowercaseInsertPayload())
+        let result
+
+        if (isEditMode.value) {
+          const targetId = selectedOperation.value?.linkedPuestoId || selectedOperation.value?.linkedPuestoRow?.id || selectedOperation.value?.id
+
+          if (!targetId) {
+            throw new Error('No se encontró el id del registro para editar')
+          }
+
+          result = await supabase
+            .from('Puesto_01')
+            .update(buildManualUpdatePayload())
+            .eq('id', targetId)
+
+          if (result.error) {
+            result = await supabase
+              .from('puesto_01')
+              .update(buildManualLowercaseUpdatePayload())
+              .eq('id', targetId)
+          }
+        } else {
+          result = await supabase.from('Puesto_01').insert(buildManualInsertPayload())
+          if (result.error) {
+            result = await supabase.from('puesto_01').insert(buildManualLowercaseInsertPayload())
+          }
         }
 
         if (result.error) throw result.error
 
         $q.notify({
           type: 'positive',
-          message: 'Movimiento registrado en Puesto_01'
+          message: isEditMode.value ? 'Registro actualizado en Puesto_01' : 'Movimiento registrado en Puesto_01'
         })
 
         await fetchOperations()
+        if (completadosDateMode.value === 'todos') {
+          await fetchAllPuestoRows()
+        }
         closeAllInlineForms()
       } catch (err) {
         console.error('Error saving manual movement in Puesto_01:', err)
         $q.notify({
           type: 'negative',
-          message: 'No se pudo guardar el movimiento en Puesto_01'
+          message: isEditMode.value ? 'No se pudo actualizar el registro en Puesto_01' : 'No se pudo guardar el movimiento en Puesto_01'
         })
       } finally {
         saving.value = false
@@ -1873,7 +2130,9 @@ export default defineComponent({
             ? 'Registro actualizado en Puesto_01'
             : shouldUpdateTourRow
               ? (isGuestExitIn ? 'Ingreso huesped actualizado en Puesto_01' : 'Ingreso tour actualizado en Puesto_01')
-              : 'Check in registrado en Puesto_01'
+              : checkInDialogMode.value === 'outside-guest-in'
+                ? 'Ingreso outside registrado en Puesto_01'
+                : 'Check in registrado en Puesto_01'
         })
 
         await fetchOperations()
@@ -1886,6 +2145,8 @@ export default defineComponent({
             ? 'No se pudo actualizar el registro'
             : checkInDialogMode.value === 'guest-exit-in'
               ? 'No se pudo guardar el ingreso huesped en Puesto_01'
+              : checkInDialogMode.value === 'outside-guest-in'
+                ? 'No se pudo guardar el ingreso outside en Puesto_01'
               : 'No se pudo guardar el check in en Puesto_01'
         })
       } finally {
@@ -1970,7 +2231,34 @@ export default defineComponent({
       }
     })
 
-    onMounted(fetchOperations)
+    onMounted(() => {
+      fetchOperations()
+
+      // Escucha de cambios en tiempo real para Puesto_01
+      supabase
+        .channel('puesto-01-local-updates')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'Puesto_01' },
+          () => {
+            fetchOperations()
+            if (completadosDateMode.value === 'todos') {
+              fetchAllPuestoRows()
+            }
+          }
+        )
+        .subscribe()
+
+      // Escucha de cambios en tiempo real para operaciones_memo
+      supabase
+        .channel('operaciones-memo-local-updates')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'operaciones_memo' },
+          () => fetchOperations()
+        )
+        .subscribe()
+    })
 
     return {
       authStore,
@@ -2010,6 +2298,7 @@ export default defineComponent({
       canSubmitCheckIn,
       canSubmitCheckOut,
       canSubmitManualMovement,
+      isEditMode,
       manualRequiresColaborador,
       manualRequiresDetalle,
       manualRequiresHoraIngreso,
@@ -2029,7 +2318,9 @@ export default defineComponent({
       openGroupTourIn,
       openGroupTourOut,
       openManualMovementForm,
+      getCheckInButtonLabel,
       getTourButtonLabel,
+      handleCheckInAction,
       getCheckOutButtonLabel,
       handleTourAction,
       handleCheckOutAction,
@@ -2068,8 +2359,8 @@ export default defineComponent({
     linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0)),
     #0b0b0b;
   color: var(--uber-white);
-  border-radius: 32px;
-  padding: 20px;
+  border-radius: 28px;
+  padding: 16px 18px;
   box-shadow: var(--uber-shadow-medium);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -2077,8 +2368,8 @@ export default defineComponent({
 .puesto01-hero__topbar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 24px;
+  gap: 10px;
+  margin-bottom: 16px;
 }
 
 .puesto01-back-btn {
@@ -2093,7 +2384,7 @@ export default defineComponent({
 .puesto01-panel-tag {
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
 }
 
@@ -2104,13 +2395,13 @@ export default defineComponent({
 
 .puesto01-hero__count {
   margin-left: auto;
-  min-width: 54px;
-  padding: 8px 14px;
+  min-width: 48px;
+  padding: 6px 12px;
   border-radius: var(--uber-radius-pill);
   background: var(--uber-white);
   color: var(--uber-black);
   font-family: var(--uber-font-display);
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   text-align: center;
 }
@@ -2118,7 +2409,7 @@ export default defineComponent({
 .puesto01-hero__content {
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.95fr);
-  gap: 24px;
+  gap: 18px;
 }
 
 .puesto01-hero__title,
@@ -2128,23 +2419,24 @@ export default defineComponent({
 }
 
 .puesto01-hero__title {
-  margin: 12px 0 0;
-  font-size: clamp(2.3rem, 4vw, 3.8rem);
+  margin: 8px 0 0;
+  font-size: clamp(1.95rem, 3.2vw, 3.1rem);
   line-height: 0.96;
 }
 
 .puesto01-hero__description {
   max-width: 52ch;
-  margin: 18px 0 0;
+  margin: 12px 0 0;
   color: rgba(255, 255, 255, 0.68);
+  font-size: 0.94rem;
   line-height: 1.65;
 }
 
 .puesto01-hero__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 28px;
+  gap: 10px;
+  margin-top: 18px;
 }
 
 .puesto01-primary-btn,
@@ -2162,14 +2454,14 @@ export default defineComponent({
 
 .puesto01-hero__stats {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .puesto01-stat-card {
   background: rgba(255, 255, 255, 0.06);
-  border-radius: 24px;
+  border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 18px;
+  padding: 14px;
 }
 
 .puesto01-stat-card__label {
@@ -2177,17 +2469,17 @@ export default defineComponent({
 }
 
 .puesto01-stat-card__value {
-  margin-top: 10px;
+  margin-top: 8px;
   font-family: var(--uber-font-display);
-  font-size: clamp(2rem, 4vw, 2.8rem);
+  font-size: clamp(1.7rem, 3vw, 2.35rem);
   font-weight: 700;
   line-height: 1;
 }
 
 .puesto01-stat-card__meta {
-  margin-top: 10px;
+  margin-top: 8px;
   color: rgba(255, 255, 255, 0.62);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .puesto01-command-card {
@@ -2404,13 +2696,26 @@ export default defineComponent({
   }
 
   .puesto01-hero {
-    padding: 16px;
+    padding: 12px 14px;
+  }
+
+  .puesto01-hero__topbar {
+    margin-bottom: 12px;
+  }
+
+  .puesto01-hero__title {
+    font-size: 2rem;
+  }
+
+  .puesto01-hero__description {
+    margin-top: 10px;
+    font-size: 0.88rem;
   }
 
   .puesto01-hero__stats {
     display: flex;
     overflow-x: auto;
-    gap: 10px;
+    gap: 8px;
     padding-bottom: 4px;
     scrollbar-width: none;
   }
@@ -2420,7 +2725,8 @@ export default defineComponent({
   }
 
   .puesto01-stat-card {
-    min-width: 160px;
+    min-width: 148px;
+    padding: 12px;
   }
 
   .puesto01-command-card__header {

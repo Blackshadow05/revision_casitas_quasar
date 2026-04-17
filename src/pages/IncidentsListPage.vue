@@ -15,7 +15,17 @@
           <div class="row items-center q-gutter-sm">
             <div class="result-pill">{{ filteredIncidents.length }}</div>
             <q-btn dense flat icon="filter_list" @click="$q.fullscreen.toggle()" label="Filtrar" />
-            <q-btn dense flat color="primary" label="Nuevo" @click="router.push('/seguridad/incidentes/nuevo')" :disable="!isLoggedIn" />
+            <q-btn
+              unelevated
+              rounded
+              padding="8px 20px"
+              color="primary"
+              icon="add"
+              class="gt-sm text-weight-bold"
+              label="Reportar incidente"
+              @click="router.push('/seguridad/incidentes/nuevo')"
+              :disable="!isLoggedIn"
+            />
           </div>
         </div>
       </div>
@@ -127,7 +137,7 @@
       </div>
 
       <!-- FAB -->
-      <q-page-sticky position="bottom-right" :offset="[16, 16]">
+      <q-page-sticky position="bottom-right" :offset="[16, 16]" class="lt-md">
         <q-btn fab icon="add" color="primary" @click="router.push('/seguridad/incidentes/nuevo')" :disable="!isLoggedIn" />
       </q-page-sticky>
     </div>
@@ -279,20 +289,29 @@ export default defineComponent({
 .controls-row {
   display: flex;
   gap: 12px;
-  align-items: flex-start;
+  align-items: center;
   flex-wrap: wrap;
 }
 
 .search-input {
-  min-width: 260px;
-  max-width: 640px;
-  flex: 1 1 420px;
+  flex: 1 1 300px;
+}
+
+@media (max-width: 600px) {
+  .controls-row {
+    gap: 8px;
+  }
+  .search-input {
+    flex: 1 1 100%;
+    margin-bottom: 4px;
+  }
 }
 
 .filters-row {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .quick-filter-row {

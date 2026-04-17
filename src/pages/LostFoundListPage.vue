@@ -428,8 +428,8 @@ export default defineComponent({
     linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0)),
     #0b0b0b;
   color: #ffffff;
-  border-radius: 32px;
-  padding: 20px;
+  border-radius: 28px;
+  padding: 16px 18px;
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -437,8 +437,8 @@ export default defineComponent({
 .lf-hero__topbar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 24px;
+  gap: 10px;
+  margin-bottom: 16px;
 }
 
 .lf-back-btn {
@@ -453,7 +453,7 @@ export default defineComponent({
 .lf-filter-summary__label {
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
 }
 
@@ -463,13 +463,13 @@ export default defineComponent({
 
 .lf-hero__count {
   margin-left: auto;
-  min-width: 54px;
-  padding: 8px 14px;
+  min-width: 48px;
+  padding: 6px 12px;
   border-radius: 999px;
   background: #ffffff;
   color: #050505;
   font-family: 'Archivo', 'Segoe UI', sans-serif;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   text-align: center;
 }
@@ -477,13 +477,13 @@ export default defineComponent({
 .lf-hero__grid {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.9fr);
-  gap: 24px;
+  gap: 18px;
   align-items: stretch;
 }
 
 .lf-kicker {
   color: rgba(255, 255, 255, 0.64);
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .lf-hero__title,
@@ -496,20 +496,20 @@ export default defineComponent({
 .lf-hero__title {
   margin: 0;
   max-width: 10ch;
-  font-size: clamp(2.2rem, 4vw, 4rem);
+  font-size: clamp(1.95rem, 3.2vw, 3.15rem);
   line-height: 0.98;
 }
 
 .lf-hero__title--small {
-  font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+  font-size: clamp(1.6rem, 2.8vw, 2.35rem);
   max-width: none;
 }
 
 .lf-hero__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 28px;
+  gap: 10px;
+  margin-top: 18px;
 }
 
 .lf-primary-btn,
@@ -536,22 +536,22 @@ export default defineComponent({
 }
 
 .lf-auth-hint {
-  margin-top: 12px;
+  margin-top: 10px;
   color: rgba(255, 255, 255, 0.6);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .lf-hero__stats {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .lf-stat-card {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 24px;
-  padding: 18px;
-  min-height: 124px;
+  border-radius: 20px;
+  padding: 14px;
+  min-height: 108px;
 }
 
 .lf-stat-card__label {
@@ -923,19 +923,19 @@ export default defineComponent({
   }
 
   .lf-hero {
-    padding: 16px;
+    padding: 12px 14px;
   }
 
   .lf-hero__grid {
-    gap: 16px;
+    gap: 12px;
   }
 
   .lf-hero__stats {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     overflow-x: auto;
     padding-bottom: 4px;
-    margin-top: 16px;
+    margin-top: 12px;
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
@@ -945,11 +945,11 @@ export default defineComponent({
   }
 
   .lf-stat-card {
-    min-width: 140px;
+    min-width: 132px;
     flex: 1;
     min-height: auto;
-    padding: 12px 14px;
-    border-radius: 16px;
+    padding: 10px 12px;
+    border-radius: 14px;
   }
 
   .lf-stat-card__label {
@@ -966,12 +966,12 @@ export default defineComponent({
   }
 
   .lf-hero__topbar {
-    margin-bottom: 18px;
+    margin-bottom: 12px;
   }
 
   .lf-hero__title {
     max-width: none;
-    font-size: 2.3rem;
+    font-size: 1.95rem;
   }
 
   .lf-hero__actions {

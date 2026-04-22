@@ -578,14 +578,40 @@
               </div>
               <div v-else-if="canSignReceipt" class="q-mt-sm column items-center">
                 <div class="text-body2 text-grey-7 q-mb-sm">Por favor, firme aquí para confirmar recepción:</div>
-                <canvas ref="signatureCanvas" class="bg-grey-2 shadow-2" style="border: 1px solid #ccc; width: 100%; max-width: 400px; height: 200px; border-radius: 8px;"></canvas>
-                <div class="q-mt-md row q-gutter-sm justify-center">
-                  <q-btn label="Limpiar" color="negative" flat @click="clearSignature" />
-                  <q-btn label="Firmar recibo de puesto" color="primary" @click="saveSignature" :loading="savingSignature" />
-                </div>
+                <q-btn
+                  unelevated
+                  icon="open_in_full"
+                  label="Abrir firma a pantalla completa"
+                  class="full-width"
+                  @click="openSignatureDialog"
+                />
+                <div class="text-caption text-grey-6 q-mt-sm">Use este botón para firmar en una vista más amplia y cómoda en dispositivos móviles.</div>
               </div>
               <div v-else class="text-body2 text-grey-5 italic q-mt-xs">Pendiente de firma</div>
             </div>
+
+            <q-dialog v-model="showSignatureDialog" :fullscreen="isMobileScreen" persistent transition-show="slide-up" transition-hide="slide-down">
+              <q-card class="shadow-3" :style="signatureDialogStyle">
+                <q-bar>
+                  <q-btn dense flat icon="close" @click="showSignatureDialog = false" />
+                  <div class="text-h6">Firma de recibo</div>
+                  <q-space />
+                  <q-btn dense flat icon="screen_rotation" :label="showLandscapeMode ? 'Vertical' : 'Horizontal'" @click="toggleLandscapeMode" />
+                  <q-btn dense flat icon="delete" label="Limpiar" @click="clearSignature" />
+                </q-bar>
+                <q-card-section class="q-pa-none" style="display: flex; flex-direction: column; height: 100%;">
+                  <canvas
+                    ref="signatureCanvas"
+                    class="bg-grey-2"
+                    :style="signatureCanvasStyle"
+                  ></canvas>
+                </q-card-section>
+                <q-card-actions align="right">
+                  <q-btn flat label="Cancelar" @click="showSignatureDialog = false" />
+                  <q-btn color="primary" label="Firmar recibo de puesto" @click="saveSignature" :loading="savingSignature" />
+                </q-card-actions>
+              </q-card>
+            </q-dialog>
 
           </q-card-section>
         </q-card>
@@ -595,7 +621,7 @@
 </template>
 
 <script>
-import { defineComponent, ref, computed, onMounted, nextTick } from 'vue'
+import { defineComponent, ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '../supabase'
 import { useAuthStore } from '../stores/auth'
@@ -625,6 +651,8 @@ export default defineComponent({
     const showFilters = ref($q.screen.gt.sm)
     const showAddDialog = ref(false)
     const showDetailDialog = ref(false)
+    const showSignatureDialog = ref(false)
+    const showLandscapeMode = ref(false)
     const selectedLog = ref(null)
     const users = ref([])
     const userOptions = ref([])
@@ -710,10 +738,16 @@ export default defineComponent({
     // Mostrar campo Oficial que Recibe solo si es "Entrega de turno"
     const showOficialRecibe = computed(() => newLog.value.event_type === 'Entrega de turno')
 
-    // Mostrar Colaboradores en turno solo si es "Entrega de turno" Y es Admin/SuperAdmin
+    // Mostrar Colaboradores en turno solo si la bitácora es "Supervisores General" y el usuario es Admin/SuperAdmin
     const showColaboradoresTurno = computed(() =>
-      newLog.value.event_type === 'Entrega de turno' && isSuperAdminOrAdmin.value
+      newLog.value.nombre_bitacora === 'Supervisores General' && isSuperAdminOrAdmin.value
     )
+
+    watch(showColaboradoresTurno, (show) => {
+      if (!show) {
+        newLog.value.colaboradores_turno = []
+      }
+    })
 
     // Mostrar Activos Entregados solo si es "Entrega de turno"
     const showActivosEntregados = computed(() => newLog.value.event_type === 'Entrega de turno')
@@ -731,6 +765,22 @@ export default defineComponent({
         filters.splice(1, 0, { label: 'Míos', value: 'mine', icon: 'person' })
       }
       return filters
+    })
+
+    const isMobileScreen = computed(() => $q.screen.lt.sm)
+
+    const signatureDialogStyle = computed(() => {
+      if (showLandscapeMode.value) {
+        return isMobileScreen.value
+          ? 'min-width: 100vw; width: 100vw; min-height: 70vh; height: 100vh;'
+          : 'min-width: 95vw; width: 95vw; min-height: 65vh;'
+      }
+      return 'min-width: 90vw; min-height: 90vh; max-width: 1000px;'
+    })
+
+    const signatureCanvasStyle = computed(() => {
+      const canvasHeight = showLandscapeMode.value ? '60vh' : '70vh'
+      return `border: 1px solid #ccc; width: 100%; height: ${canvasHeight}; border-radius: 8px;`
     })
 
     const canSignReceipt = computed(() => {
@@ -754,6 +804,19 @@ export default defineComponent({
 
         signaturePad.value = new SignaturePad(canvas)
       }
+    }
+
+    const openSignatureDialog = async () => {
+      showLandscapeMode.value = false
+      showSignatureDialog.value = true
+      await nextTick()
+      initSignaturePad()
+    }
+
+    const toggleLandscapeMode = async () => {
+      showLandscapeMode.value = !showLandscapeMode.value
+      await nextTick()
+      initSignaturePad()
     }
 
     const clearSignature = () => {
@@ -799,6 +862,7 @@ export default defineComponent({
         if (updateError) throw updateError
 
         selectedLog.value.firma = fileUrl
+        showSignatureDialog.value = false
         $q.notify({ type: 'positive', message: 'Firma guardada correctamente' })
       } catch (err) {
         console.error('Error saving signature:', err)
@@ -1231,6 +1295,13 @@ export default defineComponent({
       showOficialRecibe,
       showColaboradoresTurno,
       showActivosEntregados,
+      showSignatureDialog,
+      showLandscapeMode,
+      isMobileScreen,
+      openSignatureDialog,
+      toggleLandscapeMode,
+      signatureDialogStyle,
+      signatureCanvasStyle,
       signatureCanvas,
       savingSignature,
       canSignReceipt,

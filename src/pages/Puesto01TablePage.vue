@@ -1,60 +1,63 @@
 <template>
-  <q-page class="puesto01-page q-pa-md">
+  <q-page class="puesto01-page">
     <div class="puesto01-shell">
-      <section class="puesto01-hero q-mb-lg">
-        <div class="puesto01-hero__topbar">
+      <section class="puesto01-appbar q-mb-md">
+        <div class="puesto01-appbar__row">
           <q-btn flat round dense icon="arrow_back" class="puesto01-back-btn" @click="router.push('/seguridad')" />
-          <div class="puesto01-hero__eyebrow">Gate Operations</div>
-          <div class="puesto01-hero__count">{{ activeOperationsCount }}</div>
+
+          <div class="puesto01-appbar__copy">
+            <div class="puesto01-appbar__eyebrow">Gate Operations</div>
+            <h1 class="puesto01-appbar__title">Puesto 01</h1>
+          </div>
+
+          <div class="puesto01-appbar__count">{{ activeOperationsCount }}</div>
         </div>
 
-        <div class="puesto01-hero__content">
-          <div class="puesto01-hero__copy">
-            <div class="puesto01-hero__kicker">Control de accesos</div>
-            <h1 class="puesto01-hero__title">Tabla Puesto 01</h1>
-            <p class="puesto01-hero__description">
-              Registro operativo Puesto 01 ingresos,salidas y tours de huespedes. Estado actual: {{ scopeLabel }}.
-            </p>
+        <div class="puesto01-appbar__meta">
+          <div class="puesto01-appbar__scope">{{ scopeLabel }}</div>
+          <p class="puesto01-appbar__description">
+            Control de accesos, ingresos, salidas y tours de huespedes.
+          </p>
+        </div>
 
-            <div class="puesto01-hero__actions gt-sm">
-              <q-btn
-                v-if="authStore.canAdd"
-                no-caps
-                unelevated
-                rounded
-                icon="add"
-                label="Ingresar movimiento"
-                class="puesto01-primary-btn"
-                @click="openManualMovementForm"
-              />
-              <q-btn
-                v-if="searchTerm"
-                no-caps
-                flat
-                rounded
-                icon="close"
-                label="Limpiar búsqueda"
-                class="puesto01-secondary-btn"
-                @click="searchTerm = ''"
-              />
-            </div>
-          </div>
+        <div class="puesto01-appbar__actions">
+          <q-btn
+            v-if="authStore.canAdd"
+            no-caps
+            unelevated
+            rounded
+            icon="add"
+            label="Ingresar movimiento"
+            class="puesto01-primary-btn"
+            @click="openManualMovementForm"
+          />
+          <q-btn
+            v-if="searchTerm"
+            no-caps
+            flat
+            rounded
+            icon="close"
+            label="Limpiar búsqueda"
+            class="puesto01-secondary-btn"
+            @click="searchTerm = ''"
+          />
+        </div>
 
-          <div class="puesto01-hero__stats">
-            <article v-for="stat in heroStats" :key="stat.label" class="puesto01-stat-card">
-              <div class="puesto01-stat-card__label">{{ stat.label }}</div>
-              <div class="puesto01-stat-card__value">{{ stat.value }}</div>
-              <div class="puesto01-stat-card__meta">{{ stat.meta }}</div>
-            </article>
-          </div>
+        <div class="puesto01-summary-strip">
+          <article v-for="stat in heroStats" :key="stat.label" class="puesto01-summary-card">
+            <div class="puesto01-summary-card__label">{{ stat.label }}</div>
+            <div class="puesto01-summary-card__value">{{ stat.value }}</div>
+            <div class="puesto01-summary-card__meta">{{ stat.meta }}</div>
+          </article>
         </div>
       </section>
 
       <section class="puesto01-command-card q-mb-md">
         <div class="puesto01-command-card__header">
-          <div>
-            <div class="puesto01-command-card__eyebrow"></div>
-            <div class="puesto01-command-card__title">Filtra por estado, fecha o texto.</div>
+          <div class="puesto01-command-card__copy">
+            <div class="puesto01-command-card__eyebrow">Command Center</div>
+            <div class="puesto01-command-card__title">Buscar y filtrar movimientos.</div>
+            <div class="puesto01-command-card__description">.</div>
           </div>
           <div class="puesto01-panel-tag">{{ scopeLabel }}</div>
         </div>
@@ -164,7 +167,7 @@
             </div>
 
             <template v-if="manualMovementForm.tipo">
-              <q-input v-model="manualMovementForm.nombre" label="Nombre *" outlined rounded class="q-mb-md" />
+              <q-input v-model="manualMovementForm.nombre" label="Nombre cliente *" outlined rounded class="q-mb-md" />
 
               <q-input
                 v-if="isEditMode || manualRequiresColaborador"
@@ -237,7 +240,7 @@
               </div>
             </div>
 
-            <q-input v-model="checkInForm.nombre" label="Nombre *" outlined rounded class="q-mb-md" />
+            <q-input v-model="checkInForm.nombre" label="Nombre cliente *" outlined rounded class="q-mb-md" />
             <q-input v-if="!isOutsideGuestType(checkInForm.tipo)" v-model="checkInForm.colaborador" label="Colaborador" outlined rounded class="q-mb-md" />
             <q-input v-model="checkInForm.placa" label="Placa" outlined rounded class="q-mb-md" />
             <q-input
@@ -264,7 +267,7 @@
               </div>
             </div>
 
-            <q-input v-model="checkOutForm.nombre" label="Nombre *" outlined rounded class="q-mb-md" />
+            <q-input v-model="checkOutForm.nombre" label="Nombre cliente *" outlined rounded class="q-mb-md" />
             <q-input v-model="checkOutForm.colaborador" label="Colaborador" outlined rounded class="q-mb-md" />
             <q-input v-model="checkOutForm.placa" label="Placa" outlined rounded class="q-mb-md" />
             <q-input v-if="showCheckOutDetailField" v-model="checkOutForm.detalle" label="Detalle" outlined rounded type="textarea" autogrow class="q-mb-md" />
@@ -320,45 +323,68 @@
         <!-- Column 1: EXPERIENCIA -->
         <div class="operations-column">
           <div class="column-header experiencia-header">
-            <q-icon name="star" color="deep-purple" size="20px" />
-            <span class="column-title">Experiencias</span>
+            <div class="column-header__main">
+              <q-icon name="star" color="deep-purple" size="20px" />
+              <span class="column-title">Experiencias</span>
+            </div>
+            <div class="column-header__count">{{ filteredByType('EXPERIENCIA', pendingOperations).length }}</div>
           </div>
           <div class="column-cards">
             <div v-for="operation in filteredByType('EXPERIENCIA', pendingOperations)" :key="operation.groupKey" class="operation-card native-card">
               <div class="operation-card-inner q-pa-md">
-                <div class="row items-start justify-between q-col-gutter-sm">
+                <div 
+                  class="row items-center justify-between q-col-gutter-sm cursor-pointer"
+                  @click="$q.screen.lt.md && toggleExpand(operation.groupKey)"
+                >
                   <div class="col">
                     <div class="text-caption text-grey-6">Casitas</div>
                     <div class="text-h6 text-weight-bold casitas-list">{{ operation.displayCasitas || 'Sin casita' }}</div>
                   </div>
-                  <q-badge :color="getTypeColor(operation.tipo)" :label="operation.displayTipo || operation.tipo || 'Sin tipo'" rounded />
+                  <div class="column items-end">
+                    <q-badge :color="getTypeColor(operation.tipo)" :label="operation.displayTipo || operation.tipo || 'Sin tipo'" rounded class="q-mb-xs" />
+                    <q-icon 
+                      v-if="$q.screen.lt.md"
+                      :name="isExpanded(operation.groupKey) ? 'expand_less' : 'expand_more'" 
+                      size="20px" 
+                      color="grey-6"
+                    />
+                  </div>
                 </div>
 
-                <div class="q-mt-sm">
-                  <div class="text-caption text-grey-6">Datos registrados</div>
-                  <div class="text-body2 text-grey-8">{{ operation.displaySummary || operation.salida_llegada || 'Sin dato' }}</div>
-                </div>
-
-                <div class="q-mt-sm text-caption text-grey-7">Placa: {{ operation.linkedPuestoRow?.placa || 'Sin placa' }}</div>
-
-                <div class="q-mt-sm">
+                <div class="q-mt-sm lt-md">
                   <div class="text-caption text-grey-6">Detalle</div>
                   <div class="text-body2 text-grey-8">{{ operation.displayDetail || operation.experiencias || 'Sin detalle' }}</div>
                 </div>
 
-                <div class="q-mt-md experience-block experience-grid">
-                  <div class="info-section-exit">
-                    <div class="text-caption text-red-7 text-weight-bold q-mb-xs">Salida tour</div>
-                    <div class="text-body2 text-grey-8">Colaborador: {{ operation.linkedPuestoRow?.colaboradorIngreso || 'Sin colaborador' }}</div>
-                    <div class="text-body2 text-grey-8">Hora salida: {{ operation.linkedPuestoRow?.horaSalida || 'Sin hora' }}</div>
-                    <div class="text-body2 text-grey-8">Oficial salida: {{ operation.linkedPuestoRow?.oficialSalida || 'Sin oficial' }}</div>
+                <q-slide-transition>
+                  <div v-show="!$q.screen.lt.md || isExpanded(operation.groupKey)">
+                    <div class="q-mt-sm">
+                      <div class="text-caption text-grey-6">Datos registrados</div>
+                      <div class="text-body2 text-grey-8">{{ operation.displaySummary || operation.salida_llegada || 'Sin dato' }}</div>
+                    </div>
+
+                    <div class="q-mt-sm text-caption text-grey-7">Placa: {{ operation.linkedPuestoRow?.placa || 'Sin placa' }}</div>
+
+                    <div class="q-mt-sm gt-sm">
+                      <div class="text-caption text-grey-6">Detalle</div>
+                      <div class="text-body2 text-grey-8">{{ operation.displayDetail || operation.experiencias || 'Sin detalle' }}</div>
+                    </div>
+
+                    <div class="q-mt-md experience-block experience-grid">
+                      <div class="info-section-exit">
+                        <div class="text-caption text-red-7 text-weight-bold q-mb-xs">Salida tour</div>
+                        <div class="text-body2 text-grey-8">Colaborador: {{ operation.linkedPuestoRow?.colaboradorIngreso || 'Sin colaborador' }}</div>
+                        <div class="text-body2 text-grey-8">Hora salida: {{ operation.linkedPuestoRow?.horaSalida || 'Sin hora' }}</div>
+                        <div class="text-body2 text-grey-8">Oficial salida: {{ operation.linkedPuestoRow?.oficialSalida || 'Sin oficial' }}</div>
+                      </div>
+                      <div class="info-section-entry">
+                        <div class="text-caption text-green-7 text-weight-bold q-mb-xs">Ingreso tour</div>
+                        <div class="text-body2 text-grey-8">Hora ingreso: {{ operation.linkedPuestoRow?.horaIngreso || 'Sin hora' }}</div>
+                        <div class="text-body2 text-grey-8">Oficial ingreso: {{ operation.linkedPuestoRow?.oficialIngreso || 'Sin oficial' }}</div>
+                      </div>
+                    </div>
                   </div>
-                  <div class="info-section-entry">
-                    <div class="text-caption text-green-7 text-weight-bold q-mb-xs">Ingreso tour</div>
-                    <div class="text-body2 text-grey-8">Hora ingreso: {{ operation.linkedPuestoRow?.horaIngreso || 'Sin hora' }}</div>
-                    <div class="text-body2 text-grey-8">Oficial ingreso: {{ operation.linkedPuestoRow?.oficialIngreso || 'Sin oficial' }}</div>
-                  </div>
-                </div>
+                </q-slide-transition>
 
                 <div class="row items-center justify-between q-mt-md">
                   <q-btn
@@ -371,7 +397,7 @@
                     @click="handleTourAction(operation)"
                   />
                   <q-btn
-                    v-if="searchScope === 'completados' && selectedDate === getLocalDateString()"
+                    v-if="searchScope === 'completados'"
                     flat
                     round
                     color="primary"
@@ -388,31 +414,49 @@
         <!-- Column 2: CHECK-IN -->
         <div class="operations-column">
           <div class="column-header checkin-header">
-            <q-icon name="login" color="green" size="20px" />
-            <span class="column-title">Check-In</span>
+            <div class="column-header__main">
+              <q-icon name="login" color="green" size="20px" />
+              <span class="column-title">Check-In</span>
+            </div>
+            <div class="column-header__count">{{ filteredByType('CHECK-IN', pendingOperations).length }}</div>
           </div>
           <div class="column-cards">
             <div v-for="operation in filteredByType('CHECK-IN', pendingOperations)" :key="operation.groupKey" class="operation-card native-card">
               <div class="operation-card-inner q-pa-md">
-                <div class="row items-start justify-between q-col-gutter-sm">
+                <div 
+                  class="row items-center justify-between q-col-gutter-sm cursor-pointer"
+                  @click="$q.screen.lt.md && toggleExpand(operation.groupKey)"
+                >
                   <div class="col">
                     <div class="text-caption text-grey-6">Casitas</div>
                     <div class="text-h6 text-weight-bold casitas-list">{{ operation.casitasLabel || 'Sin casita' }}</div>
                   </div>
-                  <q-badge :color="getTypeColor(operation.displayTipo || operation.tipo)" :label="operation.displayTipo || operation.tipo || 'Sin tipo'" rounded />
+                  <div class="column items-end">
+                    <q-badge :color="getTypeColor(operation.displayTipo || operation.tipo)" :label="operation.displayTipo || operation.tipo || 'Sin tipo'" rounded class="q-mb-xs" />
+                    <q-icon 
+                      v-if="$q.screen.lt.md"
+                      :name="isExpanded(operation.groupKey) ? 'expand_less' : 'expand_more'" 
+                      size="20px" 
+                      color="grey-6"
+                    />
+                  </div>
                 </div>
 
-                <div class="q-mt-sm">
-                  <div class="text-caption text-grey-6">Salida/Llegada</div>
-                  <div class="text-body2 text-grey-8">{{ operation.salida_llegada || 'Sin dato' }}</div>
-                </div>
+                <q-slide-transition>
+                  <div v-show="!$q.screen.lt.md || isExpanded(operation.groupKey)">
+                    <div class="q-mt-sm">
+                      <div class="text-caption text-grey-6">Salida/Llegada</div>
+                      <div class="text-body2 text-grey-8">{{ operation.salida_llegada || 'Sin dato' }}</div>
+                    </div>
 
-                <div class="q-mt-sm text-caption text-grey-7">Placa: {{ operation.linkedPuestoRow?.placa || 'Sin placa' }}</div>
+                    <div class="q-mt-sm text-caption text-grey-7">Placa: {{ operation.linkedPuestoRow?.placa || 'Sin placa' }}</div>
 
-                <div class="q-mt-sm">
-                  <div class="text-caption text-grey-6">Detalle</div>
-                  <div class="text-body2 text-grey-8">{{ operation.displayDetail || operation.experiencias || 'Sin detalle' }}</div>
-                </div>
+                    <div class="q-mt-sm">
+                      <div class="text-caption text-grey-6">Detalle</div>
+                      <div class="text-body2 text-grey-8">{{ operation.displayDetail || operation.experiencias || 'Sin detalle' }}</div>
+                    </div>
+                  </div>
+                </q-slide-transition>
 
                 <div class="row items-center justify-between q-mt-md">
                   <q-btn
@@ -433,36 +477,54 @@
         <!-- Column 3: CHECK-OUT -->
         <div class="operations-column">
           <div class="column-header checkout-header">
-            <q-icon name="logout" color="orange" size="20px" />
-            <span class="column-title">Check-Out</span>
+            <div class="column-header__main">
+              <q-icon name="logout" color="orange" size="20px" />
+              <span class="column-title">Check-Out</span>
+            </div>
+            <div class="column-header__count">{{ filteredByType('CHECK-OUT', pendingOperations).length }}</div>
           </div>
           <div class="column-cards">
             <div v-for="operation in filteredByType('CHECK-OUT', pendingOperations)" :key="operation.groupKey" class="operation-card native-card">
               <div class="operation-card-inner q-pa-md">
-                <div class="row items-start justify-between q-col-gutter-sm">
+                <div 
+                  class="row items-center justify-between q-col-gutter-sm cursor-pointer"
+                  @click="$q.screen.lt.md && toggleExpand(operation.groupKey)"
+                >
                   <div class="col">
                     <div class="text-caption text-grey-6">Casitas</div>
                     <div class="text-h6 text-weight-bold casitas-list">{{ operation.casitasLabel || 'Sin casita' }}</div>
                   </div>
-                  <q-badge :color="getTypeColor(operation.displayTipo || operation.tipo)" :label="operation.displayTipo || operation.tipo || 'Sin tipo'" rounded />
+                  <div class="column items-end">
+                    <q-badge :color="getTypeColor(operation.displayTipo || operation.tipo)" :label="operation.displayTipo || operation.tipo || 'Sin tipo'" rounded class="q-mb-xs" />
+                    <q-icon 
+                      v-if="$q.screen.lt.md"
+                      :name="isExpanded(operation.groupKey) ? 'expand_less' : 'expand_more'" 
+                      size="20px" 
+                      color="grey-6"
+                    />
+                  </div>
                 </div>
 
-                <div class="q-mt-sm">
-                  <div class="text-caption text-grey-6">Nombre</div>
-                  <div class="text-body2 text-grey-8">{{ operation.linkedPuestoRow?.nombre || operation.nombre || 'Sin nombre' }}</div>
-                </div>
+                <q-slide-transition>
+                  <div v-show="!$q.screen.lt.md || isExpanded(operation.groupKey)">
+                    <div class="q-mt-sm">
+                      <div class="text-caption text-grey-6">Nombre</div>
+                      <div class="text-body2 text-grey-8">{{ operation.linkedPuestoRow?.nombre || operation.nombre || 'Sin nombre' }}</div>
+                    </div>
 
-                <div class="q-mt-sm">
-                  <div class="text-caption text-grey-6">Salida/Llegada</div>
-                  <div class="text-body2 text-grey-8">{{ operation.salida_llegada || 'Sin dato' }}</div>
-                </div>
+                    <div class="q-mt-sm">
+                      <div class="text-caption text-grey-6">Salida/Llegada</div>
+                      <div class="text-body2 text-grey-8">{{ operation.salida_llegada || 'Sin dato' }}</div>
+                    </div>
 
-                <div class="q-mt-sm text-caption text-grey-7">Placa: {{ operation.linkedPuestoRow?.placa || 'Sin placa' }}</div>
+                    <div class="q-mt-sm text-caption text-grey-7">Placa: {{ operation.linkedPuestoRow?.placa || 'Sin placa' }}</div>
 
-                <div class="q-mt-sm">
-                  <div class="text-caption text-grey-6">Detalle</div>
-                  <div class="text-body2 text-grey-8">{{ operation.displayDetail || operation.experiencias || 'Sin detalle' }}</div>
-                </div>
+                    <div class="q-mt-sm">
+                      <div class="text-caption text-grey-6">Detalle</div>
+                      <div class="text-body2 text-grey-8">{{ operation.displayDetail || operation.experiencias || 'Sin detalle' }}</div>
+                    </div>
+                  </div>
+                </q-slide-transition>
 
                 <div class="row items-center justify-between q-mt-md">
                   <q-btn
@@ -484,40 +546,64 @@
       <div v-else-if="searchScope === 'completados' && completadosDateMode === 'fecha' && completedOperations.length > 0" class="operations-grid">
         <div class="operations-column">
           <div class="column-header experiencia-header">
-            <q-icon name="star" color="deep-purple" size="20px" />
-            <span class="column-title">Tours Completados</span>
+            <div class="column-header__main">
+              <q-icon name="star" color="deep-purple" size="20px" />
+              <span class="column-title">Tours Completados</span>
+            </div>
+            <div class="column-header__count">{{ filteredByType('EXPERIENCIA', completedOperations).length }}</div>
           </div>
           <div class="column-cards">
             <div v-for="operation in filteredByType('EXPERIENCIA', completedOperations)" :key="`done-tour-${operation.groupKey}`" class="operation-card native-card">
               <div class="operation-card-inner q-pa-md">
-                <div class="row items-start justify-between q-col-gutter-sm">
+                <div 
+                  class="row items-center justify-between q-col-gutter-sm cursor-pointer"
+                  @click="$q.screen.lt.md && toggleExpand(`done-tour-${operation.groupKey}`)"
+                >
                   <div class="col">
                     <div class="text-caption text-grey-6">Casitas</div>
                     <div class="text-h6 text-weight-bold casitas-list">{{ operation.displayCasitas || operation.casitasLabel || 'Sin casita' }}</div>
                   </div>
-                  <q-badge color="deep-purple" :label="operation.displayTipo || operation.tipo || 'EXPERIENCIA'" rounded />
-                </div>
-                <div class="q-mt-sm text-body2 text-grey-8">{{ operation.displaySummary || 'Sin dato' }}</div>
-                <div class="q-mt-sm text-caption text-grey-6">Placa: {{ operation.linkedPuestoRow?.placa || 'Sin placa' }}</div>
-                <div class="q-mt-sm">
-                  <div class="text-caption text-grey-6">Detalle</div>
-                  <div class="text-body2 text-grey-8">{{ operation.displayDetail || 'Sin detalle' }}</div>
-                </div>
-                <div class="q-mt-sm experience-block experience-grid">
-                  <div>
-                    <div class="text-caption text-grey-6 q-mb-xs">Salida tour</div>
-                    <div class="text-body2 text-grey-8">Colaborador: {{ operation.linkedPuestoRow?.colaboradorIngreso || 'Sin colaborador' }}</div>
-                    <div class="text-body2 text-grey-8">Hora salida: {{ operation.linkedPuestoRow?.horaSalida || 'Sin hora' }}</div>
-                    <div class="text-body2 text-grey-8">Oficial salida: {{ operation.linkedPuestoRow?.oficialSalida || 'Sin oficial' }}</div>
-                  </div>
-                  <div>
-                    <div class="text-caption text-grey-6 q-mb-xs">Ingreso tour</div>
-                    <div class="text-body2 text-grey-8">Hora ingreso: {{ operation.linkedPuestoRow?.horaIngreso || 'Sin hora' }}</div>
-                    <div class="text-body2 text-grey-8">Oficial ingreso: {{ operation.linkedPuestoRow?.oficialIngreso || 'Sin oficial' }}</div>
+                  <div class="column items-end">
+                    <q-badge color="deep-purple" :label="operation.displayTipo || operation.tipo || 'EXPERIENCIA'" rounded class="q-mb-xs" />
+                    <q-icon 
+                      v-if="$q.screen.lt.md"
+                      :name="isExpanded(`done-tour-${operation.groupKey}`) ? 'expand_less' : 'expand_more'" 
+                      size="20px" 
+                      color="grey-6"
+                    />
                   </div>
                 </div>
 
-                <div v-if="searchScope === 'completados' && selectedDate === getLocalDateString()" class="row justify-end q-mt-sm">
+                <div class="q-mt-sm lt-md">
+                  <div class="text-caption text-grey-6">Detalle</div>
+                  <div class="text-body2 text-grey-8">{{ operation.displayDetail || 'Sin detalle' }}</div>
+                </div>
+
+                <q-slide-transition>
+                  <div v-show="!$q.screen.lt.md || isExpanded(`done-tour-${operation.groupKey}`)">
+                    <div class="q-mt-sm text-body2 text-grey-8">{{ operation.displaySummary || 'Sin dato' }}</div>
+                    <div class="q-mt-sm text-caption text-grey-6">Placa: {{ operation.linkedPuestoRow?.placa || 'Sin placa' }}</div>
+                    <div class="q-mt-sm gt-sm">
+                      <div class="text-caption text-grey-6">Detalle</div>
+                      <div class="text-body2 text-grey-8">{{ operation.displayDetail || 'Sin detalle' }}</div>
+                    </div>
+                    <div class="q-mt-sm experience-block experience-grid">
+                      <div>
+                        <div class="text-caption text-grey-6 q-mb-xs">Salida tour</div>
+                        <div class="text-body2 text-grey-8">Colaborador: {{ operation.linkedPuestoRow?.colaboradorIngreso || 'Sin colaborador' }}</div>
+                        <div class="text-body2 text-grey-8">Hora salida: {{ operation.linkedPuestoRow?.horaSalida || 'Sin hora' }}</div>
+                        <div class="text-body2 text-grey-8">Oficial salida: {{ operation.linkedPuestoRow?.oficialSalida || 'Sin oficial' }}</div>
+                      </div>
+                      <div>
+                        <div class="text-caption text-grey-6 q-mb-xs">Ingreso tour</div>
+                        <div class="text-body2 text-grey-8">Hora ingreso: {{ operation.linkedPuestoRow?.horaIngreso || 'Sin hora' }}</div>
+                        <div class="text-body2 text-grey-8">Oficial ingreso: {{ operation.linkedPuestoRow?.oficialIngreso || 'Sin oficial' }}</div>
+                      </div>
+                    </div>
+                  </div>
+                </q-slide-transition>
+
+                <div v-if="searchScope === 'completados'" class="row justify-end q-mt-sm">
                   <q-btn flat round color="primary" icon="edit" size="sm" @click="openEditDialog(operation)" />
                 </div>
               </div>
@@ -527,30 +613,48 @@
 
         <div class="operations-column">
           <div class="column-header checkin-header">
-            <q-icon name="login" color="green" size="20px" />
-            <span class="column-title">Check-In Completados</span>
+            <div class="column-header__main">
+              <q-icon name="login" color="green" size="20px" />
+              <span class="column-title">Check-In Completados</span>
+            </div>
+            <div class="column-header__count">{{ filteredByType('CHECK-IN', completedOperations).length }}</div>
           </div>
           <div class="column-cards">
             <div v-for="operation in filteredByType('CHECK-IN', completedOperations)" :key="`done-in-${operation.groupKey}`" class="operation-card native-card">
               <div class="operation-card-inner q-pa-md">
-                <div class="row items-start justify-between q-col-gutter-sm">
+                <div 
+                  class="row items-center justify-between q-col-gutter-sm cursor-pointer"
+                  @click="$q.screen.lt.md && toggleExpand(`done-in-${operation.groupKey}`)"
+                >
                   <div class="col">
                     <div class="text-caption text-grey-6">Casitas</div>
                     <div class="text-h6 text-weight-bold casitas-list">{{ operation.displayCasitas || operation.casitasLabel || 'Sin casita' }}</div>
                   </div>
-                  <q-badge color="green" :label="operation.displayTipo || operation.tipo || 'CHECK-IN'" rounded />
+                  <div class="column items-end">
+                    <q-badge color="green" :label="operation.displayTipo || operation.tipo || 'CHECK-IN'" rounded class="q-mb-xs" />
+                    <q-icon 
+                      v-if="$q.screen.lt.md"
+                      :name="isExpanded(`done-in-${operation.groupKey}`) ? 'expand_less' : 'expand_more'" 
+                      size="20px" 
+                      color="grey-6"
+                    />
+                  </div>
                 </div>
-                <div class="q-mt-sm text-body2 text-grey-8">Nombre: {{ operation.linkedPuestoRow?.nombre || 'Sin nombre' }}</div>
-                <div class="q-mt-sm">
-                  <div class="text-caption text-grey-6">Detalle</div>
-                  <div class="text-body2 text-grey-8">{{ operation.displayDetail || 'Sin detalle' }}</div>
-                </div>
-                <div class="q-mt-sm text-caption text-grey-6">Colaborador: {{ operation.linkedPuestoRow?.colaboradorIngreso || 'Sin colaborador' }}</div>
-                <div class="text-caption text-grey-6">Hora ingreso: {{ operation.linkedPuestoRow?.horaIngreso || 'Sin hora' }}</div>
-                <div class="text-caption text-grey-6">Oficial ingreso: {{ operation.linkedPuestoRow?.oficialIngreso || 'Sin oficial' }}</div>
-                <div class="text-caption text-grey-6">Placa: {{ operation.linkedPuestoRow?.placa || 'Sin placa' }}</div>
-                
-                <div v-if="searchScope === 'completados' && selectedDate === getLocalDateString()" class="row justify-end q-mt-sm">
+
+                <q-slide-transition>
+                  <div v-show="!$q.screen.lt.md || isExpanded(`done-in-${operation.groupKey}`)">
+                    <div class="q-mt-sm text-body2 text-grey-8">Nombre: {{ operation.linkedPuestoRow?.nombre || 'Sin nombre' }}</div>
+                    <div class="q-mt-sm">
+                      <div class="text-caption text-grey-6">Detalle</div>
+                      <div class="text-body2 text-grey-8">{{ operation.displayDetail || 'Sin detalle' }}</div>
+                    </div>
+                    <div class="q-mt-sm text-caption text-grey-6">Colaborador: {{ operation.linkedPuestoRow?.colaboradorIngreso || 'Sin colaborador' }}</div>
+                    <div class="text-caption text-grey-6">Hora ingreso: {{ operation.linkedPuestoRow?.horaIngreso || 'Sin hora' }}</div>
+                    <div class="text-caption text-grey-6">Oficial ingreso: {{ operation.linkedPuestoRow?.oficialIngreso || 'Sin oficial' }}</div>
+                    <div class="text-caption text-grey-6">Placa: {{ operation.linkedPuestoRow?.placa || 'Sin placa' }}</div>
+                  </div>
+                </q-slide-transition>
+                <div v-if="searchScope === 'completados'" class="row justify-end q-mt-sm">
                   <q-btn flat round color="primary" icon="edit" size="sm" @click="openEditDialog(operation)" />
                 </div>
               </div>
@@ -560,30 +664,49 @@
 
         <div class="operations-column">
           <div class="column-header checkout-header">
-            <q-icon name="logout" color="orange" size="20px" />
-            <span class="column-title">Check-Out Completados</span>
+            <div class="column-header__main">
+              <q-icon name="logout" color="orange" size="20px" />
+              <span class="column-title">Check-Out Completados</span>
+            </div>
+            <div class="column-header__count">{{ filteredByType('CHECK-OUT', completedOperations).length }}</div>
           </div>
           <div class="column-cards">
             <div v-for="operation in filteredByType('CHECK-OUT', completedOperations)" :key="`done-out-${operation.groupKey}`" class="operation-card native-card">
               <div class="operation-card-inner q-pa-md">
-                <div class="row items-start justify-between q-col-gutter-sm">
+                <div 
+                  class="row items-center justify-between q-col-gutter-sm cursor-pointer"
+                  @click="$q.screen.lt.md && toggleExpand(`done-out-${operation.groupKey}`)"
+                >
                   <div class="col">
                     <div class="text-caption text-grey-6">Casitas</div>
                     <div class="text-h6 text-weight-bold casitas-list">{{ operation.displayCasitas || operation.casitasLabel || 'Sin casita' }}</div>
                   </div>
-                  <q-badge color="orange" :label="operation.displayTipo || operation.tipo || 'CHECK-OUT'" rounded />
+                  <div class="column items-end">
+                    <q-badge color="orange" :label="operation.displayTipo || operation.tipo || 'CHECK-OUT'" rounded class="q-mb-xs" />
+                    <q-icon 
+                      v-if="$q.screen.lt.md"
+                      :name="isExpanded(`done-out-${operation.groupKey}`) ? 'expand_less' : 'expand_more'" 
+                      size="20px" 
+                      color="grey-6"
+                    />
+                  </div>
                 </div>
-                <div class="q-mt-sm text-body2 text-grey-8">Nombre: {{ operation.linkedPuestoRow?.nombre || 'Sin nombre' }}</div>
-                <div class="q-mt-sm">
-                  <div class="text-caption text-grey-6">Detalle</div>
-                  <div class="text-body2 text-grey-8">{{ operation.displayDetail || 'Sin detalle' }}</div>
-                </div>
-                <div class="q-mt-sm text-caption text-grey-6">Colaborador: {{ operation.linkedPuestoRow?.colaboradorIngreso || 'Sin colaborador' }}</div>
-                <div class="text-caption text-grey-6">Hora salida: {{ operation.linkedPuestoRow?.horaSalida || 'Sin hora' }}</div>
-                <div class="text-caption text-grey-6">Oficial salida: {{ operation.linkedPuestoRow?.oficialSalida || 'Sin oficial' }}</div>
-                <div class="text-caption text-grey-6">Placa: {{ operation.linkedPuestoRow?.placa || 'Sin placa' }}</div>
 
-                <div v-if="searchScope === 'completados' && selectedDate === getLocalDateString()" class="row justify-end q-mt-sm">
+                <q-slide-transition>
+                  <div v-show="!$q.screen.lt.md || isExpanded(`done-out-${operation.groupKey}`)">
+                    <div class="q-mt-sm text-body2 text-grey-8">Nombre: {{ operation.linkedPuestoRow?.nombre || 'Sin nombre' }}</div>
+                    <div class="q-mt-sm">
+                      <div class="text-caption text-grey-6">Detalle</div>
+                      <div class="text-body2 text-grey-8">{{ operation.displayDetail || 'Sin detalle' }}</div>
+                    </div>
+                    <div class="q-mt-sm text-caption text-grey-6">Colaborador: {{ operation.linkedPuestoRow?.colaboradorIngreso || 'Sin colaborador' }}</div>
+                    <div class="text-caption text-grey-6">Hora salida: {{ operation.linkedPuestoRow?.horaSalida || 'Sin hora' }}</div>
+                    <div class="text-caption text-grey-6">Oficial salida: {{ operation.linkedPuestoRow?.oficialSalida || 'Sin oficial' }}</div>
+                    <div class="text-caption text-grey-6">Placa: {{ operation.linkedPuestoRow?.placa || 'Sin placa' }}</div>
+                  </div>
+                </q-slide-transition>
+
+                <div v-if="searchScope === 'completados'" class="row justify-end q-mt-sm">
                   <q-btn flat round color="primary" icon="edit" size="sm" @click="openEditDialog(operation)" />
                 </div>
               </div>
@@ -595,41 +718,63 @@
       <div v-else-if="searchScope === 'completados' && completadosDateMode === 'todos' && filteredAllPuesto.length > 0" class="operations-grid">
         <div class="operations-column">
           <div class="column-header experiencia-header">
-            <q-icon name="star" color="deep-purple" size="20px" />
-            <span class="column-title">Tours ({{ filteredByType('EXPERIENCIA', filteredAllPuesto).length }})</span>
+            <div class="column-header__main">
+              <q-icon name="star" color="deep-purple" size="20px" />
+              <span class="column-title">Tours</span>
+            </div>
+            <div class="column-header__count">{{ filteredByType('EXPERIENCIA', filteredAllPuesto).length }}</div>
           </div>
           <div class="column-cards">
             <div v-for="row in filteredByType('EXPERIENCIA', filteredAllPuesto)" :key="`all-tour-${row.id}`" class="operation-card native-card">
               <div class="operation-card-inner q-pa-md">
-                <div class="row items-start justify-between q-col-gutter-sm">
+                <div 
+                  class="row items-center justify-between q-col-gutter-sm cursor-pointer"
+                  @click="$q.screen.lt.md && toggleExpand(`all-tour-${row.id}`)"
+                >
                   <div class="col">
                     <div class="text-caption text-grey-6">Casita</div>
                     <div class="text-h6 text-weight-bold casitas-list">{{ row.casita || 'Sin casita' }}</div>
                   </div>
-                  <q-badge :color="getTypeColor(row.tipo)" :label="row.tipo || 'EXPERIENCIA'" rounded />
+                  <div class="column items-end">
+                    <q-badge :color="getTypeColor(row.tipo)" :label="row.tipo || 'EXPERIENCIA'" rounded class="q-mb-xs" />
+                    <q-icon 
+                      v-if="$q.screen.lt.md"
+                      :name="isExpanded(`all-tour-${row.id}`) ? 'expand_less' : 'expand_more'" 
+                      size="20px" 
+                      color="grey-6"
+                    />
+                  </div>
                 </div>
-                <div class="q-mt-sm text-body2 text-grey-8">Nombre: {{ row.nombre || 'Sin nombre' }}</div>
-                <div class="q-mt-sm">
+
+                <div class="q-mt-sm lt-md">
                   <div class="text-caption text-grey-6">Detalle</div>
                   <div class="text-body2 text-grey-8">{{ row.detalle || 'Sin detalle' }}</div>
                 </div>
-                <div class="q-mt-xs text-caption text-grey-6">Fecha: {{ row.fecha || 'Sin fecha' }}</div>
-                <div class="q-mt-xs text-caption text-grey-6">Placa: {{ row.placa || 'Sin placa' }}</div>
-                <div class="q-mt-sm">
-                  <div class="text-caption text-grey-6 text-weight-bold" style="color: #d32f2f;">Salida</div>
-                  <div class="text-body2 text-grey-8">Colaborador: {{ row.colaboradorIngreso || 'Sin colaborador' }}</div>
-                  <div class="text-body2 text-grey-8">Hora salida: {{ row.horaSalida || 'Sin hora' }}</div>
-                  <div class="text-body2 text-grey-8">Oficial salida: {{ row.oficialSalida || 'Sin oficial' }}</div>
-                </div>
-                <div class="q-mt-sm">
-                  <div class="text-caption text-grey-6 text-weight-bold" style="color: #2e7d32;">Ingreso</div>
-                  <div class="text-body2 text-grey-8">Hora ingreso: {{ row.horaIngreso || 'Sin hora' }}</div>
-                  <div class="text-body2 text-grey-8">Oficial ingreso: {{ row.oficialIngreso || 'Sin oficial' }}</div>
-                </div>
-                <div class="q-mt-xs text-caption text-grey-6">Placa: {{ row.placa || 'Sin placa' }}</div>
-                <div class="q-mt-xs text-caption text-grey-6">Fecha: {{ row.fecha || 'Sin fecha' }}</div>
+
+                <q-slide-transition>
+                  <div v-show="!$q.screen.lt.md || isExpanded(`all-tour-${row.id}`)">
+                    <div class="q-mt-sm text-body2 text-grey-8">Nombre: {{ row.nombre || 'Sin nombre' }}</div>
+                    <div class="q-mt-sm gt-sm">
+                      <div class="text-caption text-grey-6">Detalle</div>
+                      <div class="text-body2 text-grey-8">{{ row.detalle || 'Sin detalle' }}</div>
+                    </div>
+                    <div class="q-mt-xs text-caption text-grey-6">Fecha: {{ row.fecha || 'Sin fecha' }}</div>
+                    <div class="q-mt-xs text-caption text-grey-6">Placa: {{ row.placa || 'Sin placa' }}</div>
+                    <div class="q-mt-sm">
+                      <div class="text-caption text-grey-6 text-weight-bold" style="color: #d32f2f;">Salida</div>
+                      <div class="text-body2 text-grey-8">Colaborador: {{ row.colaboradorIngreso || 'Sin colaborador' }}</div>
+                      <div class="text-body2 text-grey-8">Hora salida: {{ row.horaSalida || 'Sin hora' }}</div>
+                      <div class="text-body2 text-grey-8">Oficial salida: {{ row.oficialSalida || 'Sin oficial' }}</div>
+                    </div>
+                    <div class="q-mt-sm">
+                      <div class="text-caption text-grey-6 text-weight-bold" style="color: #2e7d32;">Ingreso</div>
+                      <div class="text-body2 text-grey-8">Hora ingreso: {{ row.horaIngreso || 'Sin hora' }}</div>
+                      <div class="text-body2 text-grey-8">Oficial ingreso: {{ row.oficialIngreso || 'Sin oficial' }}</div>
+                    </div>
+                  </div>
+                </q-slide-transition>
                 
-                <div v-if="searchScope === 'completados' && selectedDate === getLocalDateString()" class="row justify-end q-mt-sm">
+                <div v-if="searchScope === 'completados'" class="row justify-end q-mt-sm">
                   <q-btn flat round color="primary" icon="edit" size="sm" @click="openEditDialog(row)" />
                 </div>
               </div>
@@ -639,31 +784,50 @@
 
         <div class="operations-column">
           <div class="column-header checkin-header">
-            <q-icon name="login" color="green" size="20px" />
-            <span class="column-title">Check-In ({{ filteredByType('CHECK-IN', filteredAllPuesto).length }})</span>
+            <div class="column-header__main">
+              <q-icon name="login" color="green" size="20px" />
+              <span class="column-title">Check-In</span>
+            </div>
+            <div class="column-header__count">{{ filteredByType('CHECK-IN', filteredAllPuesto).length }}</div>
           </div>
           <div class="column-cards">
             <div v-for="row in filteredByType('CHECK-IN', filteredAllPuesto)" :key="`all-in-${row.id}`" class="operation-card native-card">
               <div class="operation-card-inner q-pa-md">
-                <div class="row items-start justify-between q-col-gutter-sm">
+                <div 
+                  class="row items-center justify-between q-col-gutter-sm cursor-pointer"
+                  @click="$q.screen.lt.md && toggleExpand(`all-in-${row.id}`)"
+                >
                   <div class="col">
                     <div class="text-caption text-grey-6">Casita</div>
                     <div class="text-h6 text-weight-bold casitas-list">{{ row.casita || 'Sin casita' }}</div>
                   </div>
-                  <q-badge color="green" :label="row.tipo || 'CHECK-IN'" rounded />
+                  <div class="column items-end">
+                    <q-badge color="green" :label="row.tipo || 'CHECK-IN'" rounded class="q-mb-xs" />
+                    <q-icon 
+                      v-if="$q.screen.lt.md"
+                      :name="isExpanded(`all-in-${row.id}`) ? 'expand_less' : 'expand_more'" 
+                      size="20px" 
+                      color="grey-6"
+                    />
+                  </div>
                 </div>
-                <div class="q-mt-sm text-body2 text-grey-8">Nombre: {{ row.nombre || 'Sin nombre' }}</div>
-                <div class="q-mt-sm">
-                  <div class="text-caption text-grey-6">Detalle</div>
-                  <div class="text-body2 text-grey-8">{{ row.detalle || 'Sin detalle' }}</div>
-                </div>
-                <div class="q-mt-xs text-caption text-grey-6">Fecha: {{ row.fecha || 'Sin fecha' }}</div>
-                <div class="text-caption text-grey-6">Colaborador: {{ row.colaboradorIngreso || 'Sin colaborador' }}</div>
-                <div class="text-caption text-grey-6">Hora ingreso: {{ row.horaIngreso || 'Sin hora' }}</div>
-                <div class="text-caption text-grey-6">Oficial ingreso: {{ row.oficialIngreso || 'Sin oficial' }}</div>
-                <div class="text-caption text-grey-6">Placa: {{ row.placa || 'Sin placa' }}</div>
 
-                <div v-if="searchScope === 'completados' && selectedDate === getLocalDateString()" class="row justify-end q-mt-sm">
+                <q-slide-transition>
+                  <div v-show="!$q.screen.lt.md || isExpanded(`all-in-${row.id}`)">
+                    <div class="q-mt-sm text-body2 text-grey-8">Nombre: {{ row.nombre || 'Sin nombre' }}</div>
+                    <div class="q-mt-sm">
+                      <div class="text-caption text-grey-6">Detalle</div>
+                      <div class="text-body2 text-grey-8">{{ row.detalle || 'Sin detalle' }}</div>
+                    </div>
+                    <div class="q-mt-xs text-caption text-grey-6">Fecha: {{ row.fecha || 'Sin fecha' }}</div>
+                    <div class="text-caption text-grey-6">Colaborador: {{ row.colaboradorIngreso || 'Sin colaborador' }}</div>
+                    <div class="text-caption text-grey-6">Hora ingreso: {{ row.horaIngreso || 'Sin hora' }}</div>
+                    <div class="text-caption text-grey-6">Oficial ingreso: {{ row.oficialIngreso || 'Sin oficial' }}</div>
+                    <div class="text-caption text-grey-6">Placa: {{ row.placa || 'Sin placa' }}</div>
+                  </div>
+                </q-slide-transition>
+
+                <div v-if="searchScope === 'completados'" class="row justify-end q-mt-sm">
                   <q-btn flat round color="primary" icon="edit" size="sm" @click="openEditDialog(row)" />
                 </div>
               </div>
@@ -673,31 +837,50 @@
 
         <div class="operations-column">
           <div class="column-header checkout-header">
-            <q-icon name="logout" color="orange" size="20px" />
-            <span class="column-title">Check-Out ({{ filteredByType('CHECK-OUT', filteredAllPuesto).length }})</span>
+            <div class="column-header__main">
+              <q-icon name="logout" color="orange" size="20px" />
+              <span class="column-title">Check-Out</span>
+            </div>
+            <div class="column-header__count">{{ filteredByType('CHECK-OUT', filteredAllPuesto).length }}</div>
           </div>
           <div class="column-cards">
             <div v-for="row in filteredByType('CHECK-OUT', filteredAllPuesto)" :key="`all-out-${row.id}`" class="operation-card native-card">
               <div class="operation-card-inner q-pa-md">
-                <div class="row items-start justify-between q-col-gutter-sm">
+                <div 
+                  class="row items-center justify-between q-col-gutter-sm cursor-pointer"
+                  @click="$q.screen.lt.md && toggleExpand(`all-out-${row.id}`)"
+                >
                   <div class="col">
                     <div class="text-caption text-grey-6">Casita</div>
                     <div class="text-h6 text-weight-bold casitas-list">{{ row.casita || 'Sin casita' }}</div>
                   </div>
-                  <q-badge color="orange" :label="row.tipo || 'CHECK-OUT'" rounded />
+                  <div class="column items-end">
+                    <q-badge color="orange" :label="row.tipo || 'CHECK-OUT'" rounded class="q-mb-xs" />
+                    <q-icon 
+                      v-if="$q.screen.lt.md"
+                      :name="isExpanded(`all-out-${row.id}`) ? 'expand_less' : 'expand_more'" 
+                      size="20px" 
+                      color="grey-6"
+                    />
+                  </div>
                 </div>
-                <div class="q-mt-sm text-body2 text-grey-8">Nombre: {{ row.nombre || 'Sin nombre' }}</div>
-                <div class="q-mt-sm">
-                  <div class="text-caption text-grey-6">Detalle</div>
-                  <div class="text-body2 text-grey-8">{{ row.detalle || 'Sin detalle' }}</div>
-                </div>
-                <div class="q-mt-xs text-caption text-grey-6">Fecha: {{ row.fecha || 'Sin fecha' }}</div>
-                <div class="text-caption text-grey-6">Colaborador: {{ row.colaboradorIngreso || 'Sin colaborador' }}</div>
-                <div class="text-caption text-grey-6">Hora salida: {{ row.horaSalida || 'Sin hora' }}</div>
-                <div class="text-caption text-grey-6">Oficial salida: {{ row.oficialSalida || 'Sin oficial' }}</div>
-                <div class="text-caption text-grey-6">Placa: {{ row.placa || 'Sin placa' }}</div>
 
-                <div v-if="searchScope === 'completados' && selectedDate === getLocalDateString()" class="row justify-end q-mt-sm">
+                <q-slide-transition>
+                  <div v-show="!$q.screen.lt.md || isExpanded(`all-out-${row.id}`)">
+                    <div class="q-mt-sm text-body2 text-grey-8">Nombre: {{ row.nombre || 'Sin nombre' }}</div>
+                    <div class="q-mt-sm">
+                      <div class="text-caption text-grey-6">Detalle</div>
+                      <div class="text-body2 text-grey-8">{{ row.detalle || 'Sin detalle' }}</div>
+                    </div>
+                    <div class="q-mt-xs text-caption text-grey-6">Fecha: {{ row.fecha || 'Sin fecha' }}</div>
+                    <div class="text-caption text-grey-6">Colaborador: {{ row.colaboradorIngreso || 'Sin colaborador' }}</div>
+                    <div class="text-caption text-grey-6">Hora salida: {{ row.horaSalida || 'Sin hora' }}</div>
+                    <div class="text-caption text-grey-6">Oficial salida: {{ row.oficialSalida || 'Sin oficial' }}</div>
+                    <div class="text-caption text-grey-6">Placa: {{ row.placa || 'Sin placa' }}</div>
+                  </div>
+                </q-slide-transition>
+
+                <div v-if="searchScope === 'completados'" class="row justify-end q-mt-sm">
                   <q-btn flat round color="primary" icon="edit" size="sm" @click="openEditDialog(row)" />
                 </div>
               </div>
@@ -766,6 +949,16 @@ export default defineComponent({
       { label: 'Outside Guest', value: 'Outside Guest' },
       { label: 'Salida huesped', value: 'Salida huesped' }
     ]
+
+    const expandedRows = ref(new Set())
+    const toggleExpand = (id) => {
+      if (expandedRows.value.has(id)) {
+        expandedRows.value.delete(id)
+      } else {
+        expandedRows.value.add(id)
+      }
+    }
+    const isExpanded = (id) => expandedRows.value.has(id)
 
     function createEmptyManualMovementForm () {
       return {
@@ -1216,17 +1409,13 @@ export default defineComponent({
       })
     })
 
-    const activeOperationsCount = computed(() => {
-      return activeTab.value === 'completados'
-        ? completedOperations.value.length
-        : pendingOperations.value.length
-    })
-
     const currentBoardItems = computed(() => {
       if (searchScope.value === 'pendientes') return pendingOperations.value
       if (completadosDateMode.value === 'todos') return filteredAllPuesto.value
       return completedOperations.value
     })
+
+    const activeOperationsCount = computed(() => currentBoardItems.value.length)
 
     const scopeLabel = computed(() => {
       if (searchScope.value === 'pendientes') return 'Pendientes activos'
@@ -2262,7 +2451,6 @@ export default defineComponent({
 
     return {
       authStore,
-      $q,
       router,
       loading,
       saving,
@@ -2312,6 +2500,7 @@ export default defineComponent({
       showCheckOutDetailField,
       activeInlineFormTitle,
       activeInlineFormCaption,
+      openEditDialog,
       openCheckInDialog,
       openGroupCheckIn,
       openGroupCheckOut,
@@ -2333,7 +2522,10 @@ export default defineComponent({
       saveCheckOut,
       saveManualMovement,
       getLocalDateString,
-      openEditDialog
+      openCheckOutDialog,
+      toggleExpand,
+      isExpanded,
+      expandedRows
     }
   }
 })
@@ -2342,8 +2534,8 @@ export default defineComponent({
 <style scoped>
 .puesto01-page {
   background:
-    radial-gradient(circle at top left, rgba(0, 0, 0, 0.08), transparent 30%),
-    linear-gradient(180deg, #f1f0eb 0%, #ffffff 24%, #f6f5f1 100%);
+    radial-gradient(circle at top, rgba(0, 0, 0, 0.06), transparent 32%),
+    linear-gradient(180deg, #ece9e0 0%, #ffffff 22%, #f3f1ea 100%);
   color: var(--uber-black);
   font-family: var(--uber-font-body);
   min-height: 100vh;
@@ -2352,24 +2544,29 @@ export default defineComponent({
 .puesto01-shell {
   max-width: 1440px;
   margin: 0 auto;
+  padding: 14px 14px 28px;
 }
 
-.puesto01-hero {
+.puesto01-appbar {
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0)),
-    #0b0b0b;
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0)),
+    #0a0a0a;
   color: var(--uber-white);
   border-radius: 28px;
-  padding: 16px 18px;
-  box-shadow: var(--uber-shadow-medium);
+  padding: 14px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.puesto01-hero__topbar {
+.puesto01-appbar__row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: 12px;
+}
+
+.puesto01-appbar__copy {
+  min-width: 0;
+  flex: 1;
 }
 
 .puesto01-back-btn {
@@ -2377,10 +2574,9 @@ export default defineComponent({
   color: var(--uber-white);
 }
 
-.puesto01-hero__eyebrow,
-.puesto01-hero__kicker,
+.puesto01-appbar__eyebrow,
 .puesto01-command-card__eyebrow,
-.puesto01-stat-card__label,
+.puesto01-summary-card__label,
 .puesto01-panel-tag {
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -2388,13 +2584,24 @@ export default defineComponent({
   font-weight: 700;
 }
 
-.puesto01-hero__eyebrow,
-.puesto01-hero__kicker {
+.puesto01-appbar__eyebrow {
   color: rgba(255, 255, 255, 0.62);
 }
 
-.puesto01-hero__count {
-  margin-left: auto;
+.puesto01-appbar__title,
+.puesto01-command-card__title,
+.column-title {
+  font-family: var(--uber-font-display);
+}
+
+.puesto01-appbar__title {
+  margin: 3px 0 0;
+  font-size: clamp(1.6rem, 6vw, 2.5rem);
+  line-height: 0.95;
+  letter-spacing: -0.05em;
+}
+
+.puesto01-appbar__count {
   min-width: 48px;
   padding: 6px 12px;
   border-radius: var(--uber-radius-pill);
@@ -2406,37 +2613,38 @@ export default defineComponent({
   text-align: center;
 }
 
-.puesto01-hero__content {
+.puesto01-appbar__meta {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.95fr);
-  gap: 18px;
+  gap: 10px;
+  margin-top: 16px;
 }
 
-.puesto01-hero__title,
-.puesto01-command-card__title,
-.column-title {
-  font-family: var(--uber-font-display);
+.puesto01-appbar__scope {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: var(--uber-radius-pill);
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--uber-white);
+  font-size: 12px;
+  font-weight: 700;
 }
 
-.puesto01-hero__title {
-  margin: 8px 0 0;
-  font-size: clamp(1.95rem, 3.2vw, 3.1rem);
-  line-height: 0.96;
-}
-
-.puesto01-hero__description {
-  max-width: 52ch;
-  margin: 12px 0 0;
+.puesto01-appbar__description {
+  max-width: 48ch;
+  margin: 0;
   color: rgba(255, 255, 255, 0.68);
-  font-size: 0.94rem;
-  line-height: 1.65;
+  font-size: 0.92rem;
+  line-height: 1.55;
 }
 
-.puesto01-hero__actions {
+.puesto01-appbar__actions {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 18px;
+  margin-top: 16px;
 }
 
 .puesto01-primary-btn,
@@ -2452,23 +2660,25 @@ export default defineComponent({
   font-weight: 700;
 }
 
-.puesto01-hero__stats {
+.puesto01-summary-strip {
   display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
+  margin-top: 16px;
 }
 
-.puesto01-stat-card {
+.puesto01-summary-card {
   background: rgba(255, 255, 255, 0.06);
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 14px;
 }
 
-.puesto01-stat-card__label {
+.puesto01-summary-card__label {
   color: rgba(255, 255, 255, 0.58);
 }
 
-.puesto01-stat-card__value {
+.puesto01-summary-card__value {
   margin-top: 8px;
   font-family: var(--uber-font-display);
   font-size: clamp(1.7rem, 3vw, 2.35rem);
@@ -2476,7 +2686,7 @@ export default defineComponent({
   line-height: 1;
 }
 
-.puesto01-stat-card__meta {
+.puesto01-summary-card__meta {
   margin-top: 8px;
   color: rgba(255, 255, 255, 0.62);
   font-size: 12px;
@@ -2495,7 +2705,11 @@ export default defineComponent({
   display: flex;
   justify-content: space-between;
   align-items: start;
-  gap: 12px;
+  gap: 16px;
+}
+
+.puesto01-command-card__copy {
+  min-width: 0;
 }
 
 .puesto01-command-card__eyebrow {
@@ -2506,6 +2720,13 @@ export default defineComponent({
 .puesto01-command-card__title {
   font-size: 1.35rem;
   line-height: 1.08;
+}
+
+.puesto01-command-card__description {
+  margin-top: 8px;
+  color: #5d5d5d;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .puesto01-panel-tag {
@@ -2577,12 +2798,36 @@ export default defineComponent({
 .column-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
   padding: 16px 18px;
   border-radius: 18px;
   margin-bottom: 16px;
   background: var(--uber-black);
   color: var(--uber-white);
+}
+
+.column-header__main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.column-header__count {
+  flex-shrink: 0;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--uber-white);
+  font-family: var(--uber-font-display);
+  font-size: 15px;
+  font-weight: 700;
 }
 
 .column-title {
@@ -2674,7 +2919,6 @@ export default defineComponent({
 }
 
 @media (max-width: 1023px) {
-  .puesto01-hero__content,
   .operations-grid {
     grid-template-columns: 1fr;
   }
@@ -2687,7 +2931,11 @@ export default defineComponent({
 }
 
 @media (max-width: 599px) {
-  .puesto01-hero,
+  .puesto01-shell {
+    padding: 12px 12px 24px;
+  }
+
+  .puesto01-appbar,
   .puesto01-command-card,
   .movement-form-card,
   .operations-column,
@@ -2695,24 +2943,30 @@ export default defineComponent({
     border-radius: 24px;
   }
 
-  .puesto01-hero {
-    padding: 12px 14px;
+  .puesto01-appbar,
+  .puesto01-command-card,
+  .operations-column {
+    padding: 12px;
   }
 
-  .puesto01-hero__topbar {
-    margin-bottom: 12px;
+  .puesto01-appbar__title {
+    font-size: 1.92rem;
   }
 
-  .puesto01-hero__title {
-    font-size: 2rem;
+  .puesto01-appbar__description {
+    font-size: 0.86rem;
   }
 
-  .puesto01-hero__description {
-    margin-top: 10px;
-    font-size: 0.88rem;
+  .puesto01-appbar__actions {
+    flex-direction: column;
   }
 
-  .puesto01-hero__stats {
+  .puesto01-appbar__actions :deep(.q-btn) {
+    width: 100%;
+    min-height: 48px;
+  }
+
+  .puesto01-summary-strip {
     display: flex;
     overflow-x: auto;
     gap: 8px;
@@ -2720,17 +2974,35 @@ export default defineComponent({
     scrollbar-width: none;
   }
 
-  .puesto01-hero__stats::-webkit-scrollbar {
+  .puesto01-summary-strip::-webkit-scrollbar {
     display: none;
   }
 
-  .puesto01-stat-card {
+  .puesto01-summary-card {
     min-width: 148px;
     padding: 12px;
   }
 
   .puesto01-command-card__header {
     flex-direction: column;
+  }
+
+  .puesto01-panel-tag {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .column-header {
+    padding: 14px;
+  }
+
+  .column-title {
+    font-size: 1rem;
+  }
+
+  .operation-card :deep(.q-btn:not(.q-btn--round)) {
+    width: 100%;
+    min-height: 46px;
   }
 }
 </style>

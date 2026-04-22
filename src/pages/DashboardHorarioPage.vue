@@ -43,13 +43,115 @@
       <template v-if="!loading">
         <!-- VISTA MÓVIL (Normal) -->
         <div v-if="!$q.screen.gt.md">
-          <turno-cards
-            :turno-diurno="turnoDiurno"
-            :turno-partida="turnoPartida"
-            :turno-mixto="turnoMixto"
-            :turno-nocturno="turnoNocturno"
-            :turno-otros="turnoOtros"
-          />
+          <div class="q-mb-md">
+            <q-card flat bordered>
+              <q-card-section class="row items-center justify-between bg-red-6 text-white q-py-sm">
+                <div class="text-subtitle1 text-weight-bold">Diurno</div>
+                <q-badge color="white" text-color="red-8" :label="turnoDiurno.length" />
+              </q-card-section>
+              <q-list separator class="q-py-none">
+                <q-item v-for="emp in turnoDiurno" :key="emp.id" class="q-px-md">
+                  <q-item-section>
+                    <q-item-label class="text-weight-medium">{{ emp.empleado }}</q-item-label>
+                  </q-item-section>
+                  <q-item-section side>
+                    <q-badge outline color="red-8" :label="emp.turno" class="text-bold" />
+                  </q-item-section>
+                </q-item>
+                <q-item v-if="turnoDiurno.length === 0">
+                  <q-item-section class="text-grey text-caption text-center q-py-md">Sin personal</q-item-section>
+                </q-item>
+              </q-list>
+            </q-card>
+          </div>
+
+          <div class="q-mb-md">
+            <q-card flat bordered>
+              <q-card-section class="row items-center justify-between bg-orange-7 text-white q-py-sm">
+                <div class="text-subtitle1 text-weight-bold">Partida</div>
+                <q-badge color="white" text-color="orange-9" :label="turnoPartida.length" />
+              </q-card-section>
+              <q-list separator class="q-py-none">
+                <q-item v-for="emp in turnoPartida" :key="emp.id" class="q-px-md">
+                  <q-item-section>
+                    <q-item-label class="text-weight-medium">{{ emp.empleado }}</q-item-label>
+                  </q-item-section>
+                  <q-item-section side>
+                    <q-badge outline color="orange-8" :label="emp.turno" class="text-bold" />
+                  </q-item-section>
+                </q-item>
+                <q-item v-if="turnoPartida.length === 0">
+                  <q-item-section class="text-grey text-caption text-center q-py-md">Sin personal</q-item-section>
+                </q-item>
+              </q-list>
+            </q-card>
+          </div>
+
+          <div class="q-mb-md">
+            <q-card flat bordered>
+              <q-card-section class="row items-center justify-between bg-green-6 text-white q-py-sm">
+                <div class="text-subtitle1 text-weight-bold">Mixto</div>
+                <q-badge color="white" text-color="green-8" :label="turnoMixto.length" />
+              </q-card-section>
+              <q-list separator class="q-py-none">
+                <q-item v-for="emp in turnoMixto" :key="emp.id" class="q-px-md">
+                  <q-item-section>
+                    <q-item-label class="text-weight-medium">{{ emp.empleado }}</q-item-label>
+                  </q-item-section>
+                  <q-item-section side>
+                    <q-badge outline color="green-8" :label="emp.turno" class="text-bold" />
+                  </q-item-section>
+                </q-item>
+                <q-item v-if="turnoMixto.length === 0">
+                  <q-item-section class="text-grey text-caption text-center q-py-md">Sin personal</q-item-section>
+                </q-item>
+              </q-list>
+            </q-card>
+          </div>
+
+          <div class="q-mb-md">
+            <q-card flat bordered>
+              <q-card-section class="row items-center justify-between bg-blue-8 text-white q-py-sm">
+                <div class="text-subtitle1 text-weight-bold">Nocturno</div>
+                <q-badge color="white" text-color="blue-8" :label="turnoNocturno.length" />
+              </q-card-section>
+              <q-list separator class="q-py-none">
+                <q-item v-for="emp in turnoNocturno" :key="emp.id" class="q-px-md">
+                  <q-item-section>
+                    <q-item-label class="text-weight-medium">{{ emp.empleado }}</q-item-label>
+                  </q-item-section>
+                  <q-item-section side>
+                    <q-badge outline color="blue-8" :label="emp.turno" class="text-bold" />
+                  </q-item-section>
+                </q-item>
+                <q-item v-if="turnoNocturno.length === 0">
+                  <q-item-section class="text-grey text-caption text-center q-py-md">Sin personal</q-item-section>
+                </q-item>
+              </q-list>
+            </q-card>
+          </div>
+
+          <div class="q-mb-md">
+            <q-card flat bordered>
+              <q-card-section class="row items-center justify-between bg-yellow-6 text-black q-py-sm">
+                <div class="text-subtitle1 text-weight-bold">Otros</div>
+                <q-badge color="white" text-color="yellow-10" :label="turnoOtros.length" />
+              </q-card-section>
+              <q-list separator class="q-py-none">
+                <q-item v-for="emp in turnoOtros" :key="emp.id" class="q-px-md">
+                  <q-item-section>
+                    <q-item-label class="text-weight-medium">{{ emp.empleado }}</q-item-label>
+                  </q-item-section>
+                  <q-item-section side>
+                    <q-badge outline color="yellow-9" :label="emp.turno" class="text-bold" />
+                  </q-item-section>
+                </q-item>
+                <q-item v-if="turnoOtros.length === 0">
+                  <q-item-section class="text-grey text-caption text-center q-py-md">Sin personal</q-item-section>
+                </q-item>
+              </q-list>
+            </q-card>
+          </div>
         </div>
 
         <!-- VISTA PC (3 días en filas) -->

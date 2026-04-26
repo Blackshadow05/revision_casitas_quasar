@@ -205,7 +205,7 @@
         <div class="records-badge">Mostrando {{ visibleRecordsCount }} registros</div>
       </div>
 
-      <q-pull-to-refresh @refresh="refresh" class="full-width">
+      <div class="full-width">
         <!-- Initial Loading State -->
         <div v-if="firstSyncPending || (loading && casas.length === 0)" class="flex flex-center q-my-xl">
           <q-spinner-dots color="primary" size="40px" />
@@ -396,7 +396,7 @@
             </q-table>
           </div>
         </div>
-      </q-pull-to-refresh>
+      </div>
     </div>
 
     <!-- Filter Modal -->
@@ -707,12 +707,6 @@ export default defineComponent({
       clearInterval(checkSessionInterval)
     })
 
-    const refresh = async (done) => {
-      infiniteScroll.value?.reset()
-      await store.resyncCasas()
-      done()
-    }
-
     onMounted(async () => {
       if (isLoggedIn.value) {
         await initData()
@@ -810,7 +804,6 @@ export default defineComponent({
       loading,
       addNew,
       formatFullDate,
-      refresh,
       loadData,
       onLoad,
       infiniteScroll,

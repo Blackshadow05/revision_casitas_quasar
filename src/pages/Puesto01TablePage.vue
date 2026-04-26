@@ -1269,7 +1269,9 @@ export default defineComponent({
       filteredOperations.value.forEach((operation) => {
         const normalizedType = normalizeType(operation.tipo)
         const normalizedSalidaLlegada = normalizeSalidaLlegada(operation.salida_llegada)
-        const groupKey = `${normalizedType}::${normalizedSalidaLlegada}`
+        const groupKey = isExperienceType(operation.tipo)
+          ? `${normalizedType}::${operation.id}`
+          : `${normalizedType}::${normalizedSalidaLlegada}`
 
         if (!groups.has(groupKey)) {
           groups.set(groupKey, {

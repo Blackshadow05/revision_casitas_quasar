@@ -18,17 +18,37 @@
 
     <!-- ==================== TAB HORARIOS ==================== -->
     <div v-show="activeTab === 'horarios'">
-      <!-- Date picker -->
-      <div v-if="!$q.screen.gt.md" class="row items-center q-mb-md q-gutter-sm">
-        <q-icon name="event" size="sm" color="primary" />
-        <q-input
-          v-model="selectedDate"
-          type="date"
-          dense
-          outlined
-          style="max-width: 200px"
-          @update:model-value="fetchHorarios"
-        />
+      <!-- Date picker and 7 days selector -->
+      <div v-if="!$q.screen.gt.md" class="column q-mb-md q-gutter-y-sm">
+        <div class="row items-center q-gutter-sm">
+          <q-icon name="event" size="sm" color="primary" />
+          <q-input
+            v-model="selectedDate"
+            type="date"
+            dense
+            outlined
+            style="max-width: 200px"
+            @update:model-value="fetchHorarios"
+          />
+        </div>
+
+        <div class="row q-gutter-xs no-wrap scroll q-pb-xs">
+          <q-btn
+            v-for="day in next7Days"
+            :key="day.fecha"
+            padding="xs sm"
+            :color="selectedDate === day.fecha ? 'primary' : 'grey-2'"
+            :text-color="selectedDate === day.fecha ? 'white' : 'grey-9'"
+            unelevated
+            class="text-bold"
+            @click="selectQuickDate(day.fecha)"
+          >
+            <div class="column items-center">
+              <span class="text-caption" style="font-size: 0.65rem; line-height: 1">{{ day.labelDia }}</span>
+              <span class="text-subtitle1">{{ day.labelNum }}</span>
+            </div>
+          </q-btn>
+        </div>
       </div>
 
       <q-inner-loading :showing="loading">
@@ -909,6 +929,25 @@ export default defineComponent({
 
     const selectedDate = ref(getLocalDateString());
 
+    const next7Days = computed(() => {
+      const days = [];
+      const base = new Date();
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(base);
+        d.setDate(base.getDate() + i);
+        const fecha = formatDate(d);
+        const labelNum = String(d.getDate()).padStart(2, '0');
+        const labelDia = diasSemana[d.getDay()];
+        days.push({ fecha, labelNum, labelDia });
+      }
+      return days;
+    });
+
+    function selectQuickDate(fecha) {
+      selectedDate.value = fecha;
+      fetchHorarios();
+    }
+
     // --- Quincena helpers ---
     function getQuincenaRange() {
       const today = new Date();
@@ -1447,6 +1486,8 @@ export default defineComponent({
       guardarPeriodo,
       loading,
       selectedDate,
+      next7Days,
+      selectQuickDate,
       errorMsg,
       turnoDiurno,
       turnoPartida,

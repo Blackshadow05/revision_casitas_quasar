@@ -2,7 +2,9 @@ import { configure } from 'quasar/wrappers'
 
 export default configure((ctx) => {
   return {
-    boot: [],
+    boot: [
+      'rxdb'
+    ],
     css: [
       'app.css'
     ],
@@ -82,6 +84,8 @@ export default configure((ctx) => {
         ]
       },
       workboxOptions: {
+        skipWaiting: true,
+        clientsClaim: true,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,

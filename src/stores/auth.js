@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { supabase } from '../supabase'
+import { useCasasStore } from './casas'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -50,9 +51,9 @@ export const useAuthStore = defineStore('auth', {
   },
   
   actions: {
-    checkSessionExpiry() {
+    async checkSessionExpiry() {
       if (this.sessionExpiry && new Date() > this.sessionExpiry) {
-        this.logout()
+        await this.logout()
         return false
       }
       return true
@@ -96,11 +97,19 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
-    logout() {
+    async logout() {
+      const casasStore = useCasasStore()
+
       this.user = null
       this.sessionExpiry = null
       localStorage.removeItem('user')
       localStorage.removeItem('sessionExpiry')
+
+      try {
+        await casasStore.clearHomeSessionState()
+      } catch (error) {
+        console.error('Logout cleanup error:', error)
+      }
     }
   }
 })

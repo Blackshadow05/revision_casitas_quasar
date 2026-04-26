@@ -93,6 +93,15 @@
           </div>
         </div>
 
+        <div class="row q-col-gutter-sm q-mt-sm" v-if="searchScope === 'completados' && completadosDateMode === 'todos'">
+          <div class="col-12 q-gutter-xs">
+            <q-checkbox v-model="filterAllTypes" label="CHECK-IN" val="CHECK-IN" dense class="text-caption" />
+            <q-checkbox v-model="filterAllTypes" label="CHECK-OUT" val="CHECK-OUT" dense class="text-caption" />
+            <q-checkbox v-model="filterAllTypes" label="EXPERIENCIA" val="EXPERIENCIA" dense class="text-caption" />
+            <q-checkbox v-model="filterAllTypes" label="Outside Guest" val="Outside Guest" dense class="text-caption" />
+          </div>
+        </div>
+
         <div class="row q-col-gutter-sm q-mt-sm">
           <div v-if="searchScope === 'completados' && completadosDateMode === 'fecha'" class="col-12 col-md-4">
             <q-input
@@ -167,7 +176,7 @@
             </div>
 
             <template v-if="manualMovementForm.tipo">
-              <q-input v-model="manualMovementForm.nombre" label="Nombre cliente *" outlined rounded class="q-mb-md" />
+              <q-input v-model="manualMovementForm.nombre" label="Nombre cliente" outlined rounded class="q-mb-md" />
 
               <q-input
                 v-if="isEditMode || manualRequiresColaborador"
@@ -198,7 +207,9 @@
                 outlined
                 rounded
                 class="q-mb-md"
-                placeholder="Ej: 14:30"
+                placeholder="00:00"
+                mask="##:##"
+                fill-mask
               />
 
               <q-input
@@ -217,7 +228,9 @@
                 outlined
                 rounded
                 class="q-mb-md"
-                placeholder="Ej: 14:30"
+                placeholder="00:00"
+                mask="##:##"
+                fill-mask
               />
 
               <q-input
@@ -233,14 +246,14 @@
           <q-card-section v-else-if="showCheckInDialog" class="q-pt-md">
             <div class="row q-col-gutter-md q-mb-sm">
               <div v-if="!isOutsideGuestType(checkInForm.tipo)" class="col-12 col-md-6">
-                <q-input v-model="checkInForm.casita" label="Casita" outlined rounded readonly />
+                <q-input v-model="checkInForm.casita" label="Casita" outlined rounded />
               </div>
               <div :class="isOutsideGuestType(checkInForm.tipo) ? 'col-12' : 'col-12 col-md-6'">
                 <q-input v-model="checkInForm.tipo" label="Tipo" outlined rounded readonly />
               </div>
             </div>
 
-            <q-input v-model="checkInForm.nombre" label="Nombre cliente *" outlined rounded class="q-mb-md" />
+            <q-input v-model="checkInForm.nombre" label="Nombre cliente" outlined rounded class="q-mb-md" />
             <q-input v-if="!isOutsideGuestType(checkInForm.tipo)" v-model="checkInForm.colaborador" label="Colaborador" outlined rounded class="q-mb-md" />
             <q-input v-model="checkInForm.placa" label="Placa" outlined rounded class="q-mb-md" />
             <q-input
@@ -253,25 +266,25 @@
               autogrow
               class="q-mb-md"
             />
-            <q-input v-model="checkInForm.horaIngreso" label="Hora de ingreso *" outlined rounded class="q-mb-md" placeholder="Ej: 14:30" />
+            <q-input v-model="checkInForm.horaIngreso" label="Hora de ingreso *" outlined rounded class="q-mb-md" placeholder="00:00" mask="##:##" fill-mask />
             <q-input v-model="checkInForm.oficial" label="Oficial *" outlined rounded />
           </q-card-section>
 
           <q-card-section v-else-if="showCheckOutDialog" class="q-pt-md">
             <div class="row q-col-gutter-md q-mb-sm">
               <div v-if="!isOutsideGuestType(checkOutForm.tipo)" class="col-12 col-md-6">
-                <q-input v-model="checkOutForm.casita" label="Casita" outlined rounded readonly />
+                <q-input v-model="checkOutForm.casita" label="Casita" outlined rounded />
               </div>
               <div :class="isOutsideGuestType(checkOutForm.tipo) ? 'col-12' : 'col-12 col-md-6'">
                 <q-input v-model="checkOutForm.tipo" label="Tipo" outlined rounded readonly />
               </div>
             </div>
 
-            <q-input v-model="checkOutForm.nombre" label="Nombre cliente *" outlined rounded class="q-mb-md" />
+            <q-input v-model="checkOutForm.nombre" label="Nombre cliente" outlined rounded class="q-mb-md" />
             <q-input v-model="checkOutForm.colaborador" label="Colaborador" outlined rounded class="q-mb-md" />
             <q-input v-model="checkOutForm.placa" label="Placa" outlined rounded class="q-mb-md" />
             <q-input v-if="showCheckOutDetailField" v-model="checkOutForm.detalle" label="Detalle" outlined rounded type="textarea" autogrow class="q-mb-md" />
-            <q-input v-model="checkOutForm.horaSalida" label="Hora de salida *" outlined rounded class="q-mb-md" placeholder="Ej: 14:30" />
+            <q-input v-model="checkOutForm.horaSalida" label="Hora de salida *" outlined rounded class="q-mb-md" placeholder="00:00" mask="##:##" fill-mask />
             <q-input v-model="checkOutForm.oficial" label="Oficial *" outlined rounded />
           </q-card-section>
 
@@ -330,7 +343,12 @@
             <div class="column-header__count">{{ filteredByType('EXPERIENCIA', pendingOperations).length }}</div>
           </div>
           <div class="column-cards">
-            <div v-for="operation in filteredByType('EXPERIENCIA', pendingOperations)" :key="operation.groupKey" class="operation-card native-card">
+            <div
+              v-for="operation in filteredByType('EXPERIENCIA', pendingOperations)"
+              :key="operation.groupKey"
+              class="operation-card native-card"
+              :class="{ 'operation-card--pending-ingreso': isPendingExperienceIngreso(operation) }"
+            >
               <div class="operation-card-inner q-pa-md">
                 <div 
                   class="row items-center justify-between q-col-gutter-sm cursor-pointer"
@@ -931,6 +949,7 @@ export default defineComponent({
     const activeTab = ref('pendientes')
     const searchScope = ref('pendientes')
     const completadosDateMode = ref('fecha')
+    const filterAllTypes = ref(['CHECK-IN', 'CHECK-OUT', 'EXPERIENCIA', 'Outside Guest'])
     const allPuestoRows = ref([])
     const loadingAll = ref(false)
     const showManualMovementForm = ref(false)
@@ -1390,23 +1409,29 @@ export default defineComponent({
     })
 
     const completedOperations = computed(() => {
-      return combinedOperations.value.filter((operation) => {
-        if (operation.isManualPuesto) {
-          // Un Outside Guest está completado si YA entró y YA salió
-          if (isOutsideGuestType(operation.tipo)) {
-            return hasRealValue(operation.linkedPuestoRow?.horaIngreso) && hasRealValue(operation.linkedPuestoRow?.horaSalida)
+      return combinedOperations.value
+        .filter((operation) => {
+          if (operation.isManualPuesto) {
+            // Un Outside Guest está completado si YA entró y YA salió
+            if (isOutsideGuestType(operation.tipo)) {
+              return hasRealValue(operation.linkedPuestoRow?.horaIngreso) && hasRealValue(operation.linkedPuestoRow?.horaSalida)
+            }
+            // Un Tour/Experiencia está completado si YA re-ingresó
+            if (isTourType(operation.tipo) || isSalidaHuespedType(operation.tipo)) {
+              return hasRealValue(operation.linkedPuestoRow?.horaIngreso)
+            }
+            return true
           }
-          // Un Tour/Experiencia está completado si YA re-ingresó
-          if (isTourType(operation.tipo) || isSalidaHuespedType(operation.tipo)) {
-            return hasRealValue(operation.linkedPuestoRow?.horaIngreso)
-          }
-          return true
-        }
 
-        if (operation.isHiddenByPuesto) return true
-        if (isTourType(operation.tipo) && operation.hasTourIngreso) return true
-        return false
-      })
+          if (operation.isHiddenByPuesto) return true
+          if (isTourType(operation.tipo) && operation.hasTourIngreso) return true
+          return false
+        })
+        .sort((a, b) => {
+          const dateA = new Date(a.fecha_update || a.fechaUpdate || 0)
+          const dateB = new Date(b.fecha_update || b.fechaUpdate || 0)
+          return dateB - dateA
+        })
     })
 
     const currentBoardItems = computed(() => {
@@ -1455,21 +1480,39 @@ export default defineComponent({
       return list.filter((operation) => getDisplayColumnType(operation) === targetColumn)
     }
 
+    const isPendingExperienceIngreso = (operation) => {
+      return getDisplayColumnType(operation) === 'EXPERIENCIA' && operation?.hasTourSalida && !operation?.hasTourIngreso
+    }
+
     const filteredAllPuesto = computed(() => {
       const term = searchTerm.value.trim().toLowerCase()
-      const rows = allPuestoRows.value
-      if (!term) return rows
-      return rows.filter((row) =>
-        [row.nombre, row.casita, row.tipo, row.placa, row.colaboradorIngreso, row.fecha]
-          .some((v) => String(v || '').toLowerCase().includes(term))
-      )
+      const allowedTypes = filterAllTypes.value.map(t => t.toUpperCase())
+
+      let filtered = allPuestoRows.value.filter(row => {
+        const rowType = normalizeType(row.tipo)
+        // Adjust for Outside Guest which might be stored as 'Outside Guest' or similar
+        const displayColType = getDisplayColumnType(row)
+        return allowedTypes.includes(displayColType)
+      })
+
+      if (term) {
+        filtered = filtered.filter((row) =>
+          [row.nombre, row.casita, row.tipo, row.placa, row.colaboradorIngreso, row.fecha]
+            .some((v) => String(v || '').toLowerCase().includes(term))
+        )
+      }
+
+      return [...filtered].sort((a, b) => {
+        const dateA = new Date(a.fechaUpdate || a.fecha_update || 0)
+        const dateB = new Date(b.fechaUpdate || b.fecha_update || 0)
+        return dateB - dateA
+      })
     })
 
     const canSubmitCheckIn = computed(() => {
       const form = checkInForm.value
       const requiresCasita = !isOutsideGuestType(form.tipo)
       return Boolean(
-        form.nombre.trim() &&
         form.horaIngreso.trim() &&
         form.oficial.trim() &&
         (!requiresCasita || form.casita.trim()) &&
@@ -1481,7 +1524,6 @@ export default defineComponent({
       const form = checkOutForm.value
       const isOutsideGuest = isOutsideGuestType(form.tipo)
       return Boolean(
-        form.nombre.trim() &&
         form.horaSalida.trim() &&
         form.oficial.trim() &&
         (isOutsideGuest || form.casita.trim()) &&
@@ -1515,12 +1557,11 @@ export default defineComponent({
       if (isEditMode.value) {
         return Boolean(
           form.tipo &&
-          form.nombre.trim() &&
           (isOutsideGuestType(form.tipo) || form.casita.trim())
         )
       }
 
-      if (!form.tipo || !form.nombre.trim()) return false
+      if (!form.tipo) return false
       if (form.tipo !== 'Outside Guest' && !form.casita.trim()) return false
 
       if (manualRequiresHoraIngreso.value && form.tipo !== 'EXPERIENCIA' && (!form.horaIngreso.trim() || !form.oficialIngreso.trim())) return false
@@ -2005,6 +2046,7 @@ export default defineComponent({
 
       const payload = {
         Tipo: isOutsideGuest ? 'Outside Guest' : form.tipo.trim(),
+        Casita: isOutsideGuest ? '' : form.casita.trim(),
         Hora_ingreso: form.horaIngreso.trim(),
         Oficial_ingreso: form.oficial.trim(),
         fecha_update: getLocalFullDateTimeString()
@@ -2030,6 +2072,7 @@ export default defineComponent({
  
       const payload = {
         tipo: isOutsideGuest ? 'Outside Guest' : form.tipo.trim(),
+        casita: isOutsideGuest ? '' : form.casita.trim(),
         hora_ingreso: form.horaIngreso.trim(),
         oficial_ingreso: form.oficial.trim(),
         fecha_update: getLocalFullDateTimeString()
@@ -2072,8 +2115,11 @@ export default defineComponent({
 
     const buildCheckOutUpdatePayload = () => {
       const form = checkOutForm.value
+      const isOutsideGuest = isOutsideGuestType(form.tipo)
 
       const payload = {
+        Tipo: form.tipo.trim(),
+        Casita: isOutsideGuest ? '' : form.casita.trim(),
         Hora_salida: form.horaSalida.trim(),
         Oficial_salida: form.oficial.trim(),
         fecha_update: getLocalFullDateTimeString()
@@ -2117,8 +2163,11 @@ export default defineComponent({
 
     const buildCheckOutLowercaseUpdatePayload = () => {
       const form = checkOutForm.value
+      const isOutsideGuest = isOutsideGuestType(form.tipo)
 
       const payload = {
+        tipo: form.tipo.trim(),
+        casita: isOutsideGuest ? '' : form.casita.trim(),
         hora_salida: form.horaSalida.trim(),
         oficial_salida: form.oficial.trim(),
         fecha_update: getLocalFullDateTimeString()
@@ -2461,6 +2510,7 @@ export default defineComponent({
       scopeLabel,
       heroStats,
       filteredAllPuesto,
+      filterAllTypes,
       loadingAll,
       activeOperationsCount,
       searchTerm,
@@ -2469,6 +2519,7 @@ export default defineComponent({
       pendingOperations,
       completedOperations,
       filteredByType,
+      isPendingExperienceIngreso,
       getTypeColor,
       isCheckIn,
       isExperience,
@@ -2849,6 +2900,12 @@ export default defineComponent({
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.07);
   transition: transform 0.18s ease, box-shadow 0.18s ease;
   border: 1px solid rgba(15, 15, 15, 0.08);
+}
+
+.operation-card--pending-ingreso {
+  background: #fff3b0;
+  border-color: rgba(214, 158, 46, 0.45);
+  box-shadow: 0 12px 28px rgba(214, 158, 46, 0.2);
 }
 
 .operation-card:hover {

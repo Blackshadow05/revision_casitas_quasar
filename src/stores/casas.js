@@ -1,67 +1,388 @@
 import { defineStore } from 'pinia'
 import { supabase } from '../supabase'
+import {
+  awaitFirstHomeSync,
+  clearHomeDatabase,
+  ensureHomeDatabase,
+  ensureHomeReplication,
+  getHomeCollection,
+  getHomeSyncState,
+  resyncHomeReplication,
+  subscribeHomeRealtime,
+  subscribeHomeSyncState
+} from '../services/homeSync'
 
-const PAGE_SIZE = 300
+const PAGE_SIZE = 100
+const SEARCH_BATCH_SIZE = 1000
+const REMOTE_SEARCH_CACHE_KEY = 'remoteSearchResults'
+const homeRealtimeListeners = new Set()
+
+const getLocalDeviceDateTime = () => {
+  const now = new Date()
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 19).replace('T', ' ')
+}
+
+const normalizeTimestamp = (value, fallback = '') => {
+  if (!value) {
+    return fallback
+  }
+
+  return String(value)
+    .replace('T', ' ')
+    .replace(/([+-]\d{2}:\d{2}|Z)$/i, '')
+    .slice(0, 19)
+}
+
+const normalizeRecord = (record = {}) => {
+  const createdAt = normalizeTimestamp(record.created_at, getLocalDeviceDateTime())
+  const updateAt = normalizeTimestamp(record.update_at, createdAt)
+
+  return {
+    ...record,
+    id: record.id ? String(record.id) : '',
+    created_at: createdAt,
+    update_at: updateAt
+  }
+}
+
+const getCreatedAtTimestamp = (record = {}) => {
+  return normalizeTimestamp(record.created_at)
+}
+
+const compareByMostRecentDesc = (left, right) => {
+  const timeL = getCreatedAtTimestamp(left)
+  const timeR = getCreatedAtTimestamp(right)
+
+  if (timeL !== timeR) {
+    return timeL < timeR ? 1 : -1
+  }
+
+  const idL = String(left.id || '')
+  const idR = String(right.id || '')
+  
+  return idL < idR ? 1 : (idL > idR ? -1 : 0)
+}
+
+const normalizeComparableValue = (value) => String(value || '').trim().replace(/^0+/, '') || '0'
+
+const mergeUniqueRowsById = (...rowSets) => {
+  const uniqueRows = new Map()
+
+  rowSets.flat().forEach((record) => {
+    if (record?.id) {
+      uniqueRows.set(String(record.id), record)
+    }
+  })
+
+  return Array.from(uniqueRows.values()).sort(compareByMostRecentDesc)
+}
+
+const loadRemoteSearchCache = () => {
+  if (typeof sessionStorage === 'undefined') {
+    return { term: '', rows: [] }
+  }
+
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(REMOTE_SEARCH_CACHE_KEY) || 'null')
+
+    if (!cached?.term || !Array.isArray(cached.rows)) {
+      return { term: '', rows: [] }
+    }
+
+    return {
+      term: String(cached.term),
+      rows: cached.rows.map((record) => normalizeRecord(record)).sort(compareByMostRecentDesc)
+    }
+  } catch (_error) {
+    return { term: '', rows: [] }
+  }
+}
+
+const saveRemoteSearchCache = (term, rows) => {
+  if (typeof sessionStorage === 'undefined') {
+    return
+  }
+
+  try {
+    if (!term || !rows.length) {
+      sessionStorage.removeItem(REMOTE_SEARCH_CACHE_KEY)
+      return
+    }
+
+    sessionStorage.setItem(REMOTE_SEARCH_CACHE_KEY, JSON.stringify({ term, rows }))
+  } catch (_error) {
+    // sessionStorage can fail in private mode or when storage quota is exceeded.
+  }
+}
+
+const clearRemoteSearchCache = () => {
+  if (typeof sessionStorage === 'undefined') {
+    return
+  }
+
+  try {
+    sessionStorage.removeItem(REMOTE_SEARCH_CACHE_KEY)
+  } catch (_error) {
+    // Ignore storage cleanup errors.
+  }
+}
+
+const remoteSearchCache = loadRemoteSearchCache()
 
 export const useCasasStore = defineStore('casas', {
   state: () => ({
+    allCasas: [],
     casas: [],
+    matchedCasas: [],
     loading: false,
-    realtimeChannel: null,
+    localReady: false,
+    quickLoadReady: false,
+    notificationsReady: false,
+    homeQuerySubscription: null,
+    homeSyncUnsubscribe: null,
+    homeRealtimeUnsubscribe: null,
+    homeSyncState: getHomeSyncState(),
     search: localStorage.getItem('searchQuery') || '',
     selectedCasa: JSON.parse(localStorage.getItem('selectedCasa')) || null,
     page: 0,
     hasMore: true,
-    allLoaded: false, // Indica si ya se cargaron todos los registros
-    // Filtros avanzados
-    activeFilter: null, // { field: 'trapo_binoculares', value: 'Si', label: 'Con trapo binocular' }
-    filteredByLatest: [], // Resultados filtrados por última revisión
+    allLoaded: false,
+    activeFilter: null,
+    filteredByLatest: [],
+    searchRequestId: 0,
+    remoteSearchTerm: remoteSearchCache.term,
+    remoteSearchRows: remoteSearchCache.rows
   }),
   getters: {
-    filteredCasas: (state) => {
-      // Si hay un filtro activo, usar los resultados filtrados
-      const source = state.activeFilter ? state.filteredByLatest : state.casas
-      
-      if (!state.search || !state.search.trim()) {
-        return source
-      }
-
-      const searchTerm = state.search.trim().toLowerCase()
-
-      return source.filter(c => {
-        // Búsqueda por número de casita (exacta)
-        if (/^\d+$/.test(searchTerm)) {
-          return c.casita && c.casita.toString() === searchTerm
-        }
-
-        // Búsqueda parcial por texto en otros campos
-        // Buscar en quien_revisa
-        if (c.quien_revisa && c.quien_revisa.toLowerCase().includes(searchTerm)) return true
-        // Buscar en notas
-        if (c.notas && c.notas.toLowerCase().includes(searchTerm)) return true
-        // Buscar en nota_extra
-        if (c.nota_extra && c.nota_extra.toLowerCase().includes(searchTerm)) return true
-        return false
-      })
-    }
+    filteredCasas: (state) => state.casas
   },
   actions: {
-    async fetchCasas() {
-      this.loading = true
-      this.page = 0
-      this.hasMore = true
+    applySearch(records) {
+      if (!this.search || !this.search.trim()) {
+        return records
+      }
+
+      const searchTerm = this.search.trim().toLowerCase()
+
+      return records.filter((record) => {
+        if (/^\d+$/.test(searchTerm)) {
+          return String(record.casita || '') === searchTerm
+        }
+
+        return [record.quien_revisa, record.notas, record.nota_extra]
+          .some((value) => String(value || '').toLowerCase().includes(searchTerm))
+      })
+    },
+    getLatestByCasita(records) {
+      const latestByCasita = new Map()
+
+      records
+        .slice()
+        .sort(compareByMostRecentDesc)
+        .forEach((record) => {
+          const casitaKey = String(record.casita || '')
+
+          if (!latestByCasita.has(casitaKey)) {
+            latestByCasita.set(casitaKey, record)
+          }
+        })
+
+      return Array.from(latestByCasita.values())
+    },
+    buildAdvancedFilter(records, filter) {
+      const sortedRecords = records.slice().sort(compareByMostRecentDesc)
+
+      if (filter?.hasNotes) {
+        return sortedRecords.filter((record) => {
+          return String(record.notas || '').trim() || String(record.nota_extra || '').trim()
+        })
+      }
+
+      if (filter?.isToday) {
+        return this.buildAdvancedFilter(records, {
+          date: getLocalDeviceDateTime().slice(0, 10),
+          label: 'Hoy'
+        })
+      }
+
+      if (filter?.date) {
+        const startDate = `${filter.date} 00:00:00`
+        const endDate = `${filter.date} 23:59:59`
+        const sameDayRecords = sortedRecords.filter((record) => {
+          const createdAt = normalizeTimestamp(record.created_at)
+          return createdAt >= startDate && createdAt <= endDate
+        })
+
+        return this.getLatestByCasita(sameDayRecords)
+      }
+
+      const latestRecords = this.getLatestByCasita(sortedRecords)
+      const field = filter?.field
+      const value = String(filter?.value || '').trim()
+
+      if (!field) {
+        return latestRecords
+      }
+
+      if (filter?.isArray) {
+        const allowedValues = value.split(',').map((item) => normalizeComparableValue(item))
+        return latestRecords.filter((record) => {
+          return allowedValues.includes(normalizeComparableValue(record[field]))
+        })
+      }
+
+      return latestRecords.filter((record) => String(record[field] || '').trim() === value)
+    },
+    recomputeVisibleCasas(resetPage = false) {
+      const searchTerm = String(this.search || '').trim()
+      const hasRemoteSearchRows = (
+        searchTerm &&
+        !this.activeFilter &&
+        this.remoteSearchTerm === searchTerm &&
+        this.remoteSearchRows.length > 0
+      )
+      const baseRecords = hasRemoteSearchRows
+        ? this.remoteSearchRows
+        : (this.activeFilter ? this.filteredByLatest : this.allCasas)
+      const searchedRecords = hasRemoteSearchRows ? baseRecords : this.applySearch(baseRecords)
+      this.matchedCasas = searchedRecords
+
+      if (resetPage || this.page < 1) {
+        this.page = 1
+      }
+
+      const visibleCount = this.page * PAGE_SIZE
+
+      this.casas = searchedRecords.slice(0, visibleCount)
+      this.hasMore = searchedRecords.length > visibleCount
+      this.allLoaded = !this.hasMore
+    },
+    notifyHomeRealtime(change) {
+      homeRealtimeListeners.forEach((listener) => listener(change))
+    },
+    updateSelectedCasa(rows) {
+      if (!this.selectedCasa?.id) {
+        return
+      }
+
+      const updatedRecord = rows.find((record) => record.id === this.selectedCasa.id)
+
+      if (!updatedRecord) {
+        return
+      }
+
+      this.selectedCasa = updatedRecord
+      localStorage.setItem('selectedCasa', JSON.stringify(updatedRecord))
+    },
+    handleLocalRowsChanged(rows) {
+      // While the initial sync is still in progress and we already have quick-loaded
+      // recent data, merge partial RxDB batches instead of replacing the visible cache.
+      if (
+        this.quickLoadReady &&
+        !this.homeSyncState.firstSyncCompleted &&
+        this.allCasas.length > 0 &&
+        rows.length > 0
+      ) {
+        this.allCasas = mergeUniqueRowsById(this.allCasas, rows)
+        this.updateSelectedCasa(this.allCasas)
+
+        if (this.activeFilter) {
+          this.filteredByLatest = this.buildAdvancedFilter(this.allCasas, this.activeFilter)
+        }
+
+        this.recomputeVisibleCasas()
+        return
+      }
+
+      this.allCasas = rows
+      this.updateSelectedCasa(rows)
+
+      if (this.activeFilter) {
+        this.filteredByLatest = this.buildAdvancedFilter(rows, this.activeFilter)
+      }
+
+      this.recomputeVisibleCasas()
+    },
+    bindHomeSyncState() {
+      if (this.homeSyncUnsubscribe) {
+        return
+      }
+
+      this.homeSyncUnsubscribe = subscribeHomeSyncState((nextState) => {
+        const wasFirstSyncPending = this.homeSyncState.firstSyncPending
+        this.homeSyncState = nextState
+        if (wasFirstSyncPending && !nextState.firstSyncPending) {
+          this.recomputeVisibleCasas(true)
+        }
+      })
+    },
+    async bindHomeQuery() {
+      if (this.homeQuerySubscription) {
+        return
+      }
+
+      const collection = await getHomeCollection()
+
+      this.homeQuerySubscription = collection.find().$.subscribe((documents) => {
+        const rows = documents
+          .map((document) => normalizeRecord(document.toJSON()))
+          .sort(compareByMostRecentDesc)
+
+        this.handleLocalRowsChanged(rows)
+      })
+    },
+    async ensureLocalReady() {
+      if (this.localReady) {
+        return
+      }
+
+      await ensureHomeDatabase()
+      this.bindHomeSyncState()
+      if (!this.homeRealtimeUnsubscribe) {
+        this.homeRealtimeUnsubscribe = subscribeHomeRealtime((change) => {
+          this.notifyHomeRealtime(change)
+        })
+      }
+      await this.bindHomeQuery()
+      await ensureHomeReplication()
+      this.notificationsReady = true
+      this.localReady = true
+    },
+    async quickLoadRecentCasas() {
       try {
         const { data, error } = await supabase
           .from('revisiones_casitas')
           .select('*')
           .order('created_at', { ascending: false })
-          .range(0, PAGE_SIZE - 1)
+          .limit(200)
 
         if (error) throw error
-        this.casas = data
-        this.page = 1
-        this.hasMore = data.length === PAGE_SIZE
-        this.allLoaded = !this.hasMore
+
+        const rows = (data || [])
+          .map((record) => normalizeRecord(record))
+          .sort(compareByMostRecentDesc)
+
+        if (rows.length > 0) {
+          this.allCasas = rows
+          this.quickLoadReady = true
+          this.recomputeVisibleCasas(true)
+        }
+      } catch (error) {
+        console.error('[CasasStore] Error en quickLoad:', error.message)
+      }
+    },
+    async fetchCasas() {
+      this.loading = true
+      try {
+        // 1. Fetch the most recent records immediately so the user sees them right away.
+        await this.quickLoadRecentCasas()
+
+        // 2. Start full RxDB background sync without blocking the UI.
+        this.ensureLocalReady().catch((error) => {
+          console.error('[CasasStore] Error en background sync:', error.message)
+        })
+
+        this.notificationsReady = true
       } catch (error) {
         console.error('Error fetching casas:', error.message)
       } finally {
@@ -72,47 +393,77 @@ export const useCasasStore = defineStore('casas', {
       if (this.loading || !this.hasMore) return
       this.loading = true
       try {
-        const { data, error } = await supabase
-          .from('revisiones_casitas')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .range(this.page * PAGE_SIZE, (this.page + 1) * PAGE_SIZE - 1)
-
-        if (error) throw error
-        if (data.length > 0) {
-          this.casas = [...this.casas, ...data]
-          this.page += 1
-        }
-        this.hasMore = data.length === PAGE_SIZE
-        this.allLoaded = !this.hasMore
+        this.page += 1
+        this.recomputeVisibleCasas()
       } catch (error) {
         console.error('Error fetching more casas:', error.message)
       } finally {
         this.loading = false
       }
     },
+    async fetchRemoteSearchResults(searchTerm) {
+      const trimmedSearch = String(searchTerm || '').trim()
+
+      if (!trimmedSearch || this.activeFilter) {
+        return null
+      }
+
+      const fetchQueryBatch = async (buildQuery) => {
+        const rows = []
+        let from = 0
+
+        while (true) {
+          const to = from + SEARCH_BATCH_SIZE - 1
+          const { data, error } = await buildQuery()
+            .order('created_at', { ascending: false })
+            .range(from, to)
+
+          if (error) {
+            throw error
+          }
+
+          const batch = data || []
+          rows.push(...batch)
+
+          if (batch.length < SEARCH_BATCH_SIZE) {
+            break
+          }
+
+          from += SEARCH_BATCH_SIZE
+        }
+
+        return rows
+      }
+
+      const searches = /^\d+$/.test(trimmedSearch)
+        ? [
+            () => supabase.from('revisiones_casitas').select('*').eq('casita', trimmedSearch)
+          ]
+        : [
+            () => supabase.from('revisiones_casitas').select('*').ilike('quien_revisa', `%${trimmedSearch}%`),
+            () => supabase.from('revisiones_casitas').select('*').ilike('notas', `%${trimmedSearch}%`),
+            () => supabase.from('revisiones_casitas').select('*').ilike('nota_extra', `%${trimmedSearch}%`)
+          ]
+
+      const batches = await Promise.all(searches.map((buildQuery) => fetchQueryBatch(buildQuery)))
+      return mergeUniqueRowsById(...batches.map((batch) => batch.map((record) => normalizeRecord(record))))
+    },
     async addCasa(newCasa) {
       try {
-        console.log('[CasasStore] Iniciando addCasa con datos:', newCasa)
+        const payload = {
+          ...newCasa,
+          update_at: newCasa.update_at || getLocalDeviceDateTime()
+        }
+
+        console.log('[CasasStore] Iniciando addCasa con datos:', payload)
         
         const { data, error } = await supabase
           .from('revisiones_casitas')
-          .insert([newCasa])
+          .insert([payload])
           .select()
 
         if (error) {
-          console.error('[CasasStore] Error de Supabase:', error)
-          console.error('[CasasStore] Detalles del error:', error.message, error.details, error.hint)
           throw error
-        }
-        
-        console.log('[CasasStore] Respuesta de Supabase - data:', data)
-        
-        if (data && data.length > 0) {
-          console.log('[CasasStore] Casa agregada exitosamente:', data[0])
-          this.casas.unshift(data[0])
-        } else {
-          console.warn('[CasasStore] No se recibieron datos de la inserción')
         }
         
         return { success: true, data }
@@ -121,126 +472,33 @@ export const useCasasStore = defineStore('casas', {
         return { success: false, error }
       }
     },
+    async resyncCasas() {
+      this.loading = true
+      try {
+        await this.ensureLocalReady()
+        await resyncHomeReplication()
+        this.notificationsReady = true
+        this.recomputeVisibleCasas()
+      } catch (error) {
+        console.error('Error resyncing casas:', error.message)
+      } finally {
+        this.loading = false
+      }
+    },
     async applyAdvancedFilter(filter) {
-      // filter: { field: string, value: string, label: string, valueAlt?: string, hasNotes?: boolean, isToday?: boolean, date?: string } o null para limpiar
       if (!filter) {
         this.activeFilter = null
         this.filteredByLatest = []
+        this.recomputeVisibleCasas(true)
         return
       }
 
       this.loading = true
       this.activeFilter = filter
       try {
-        let data, error
-
-        // Si es filtro de notas, usar la función que trae TODOS los registros con notas
-        if (filter.hasNotes) {
-          const result = await supabase.rpc('filter_all_with_notes')
-          data = result.data
-          error = result.error
-        } else if (filter.isToday) {
-          // Filtro de registros del día actual
-          const result = await supabase.rpc('filter_today')
-          data = result.data
-          error = result.error
-        } else if (filter.date) {
-          // Filtro por fecha específica - obtener solo la última revisión por casita de esa fecha
-          console.log('=== FILTRO FECHA ===')
-          console.log('Fecha recibida:', filter.date)
-          console.log('Tipo de fecha:', typeof filter.date)
-          
-          // Usar rango de fechas para manejar correctamente zonas horarias
-          const startDate = filter.date + 'T00:00:00'
-          const endDate = filter.date + 'T23:59:59'
-          
-          console.log('Rango:', startDate, 'a', endDate)
-          
-          const { data: queryData, error: queryError } = await supabase
-            .from('revisiones_casitas')
-            .select('*', { count: 'exact' })
-            .gte('created_at', startDate)
-            .lte('created_at', endDate)
-            .order('created_at', { ascending: false })
-            .limit(10000)
-          
-          // Agrupar por casita y obtener solo la última revisión de cada una
-          const latestByCasa = {}
-          for (const casa of queryData) {
-            if (!latestByCasa[casa.casita]) {
-              latestByCasa[casa.casita] = casa
-            }
-          }
-          
-          data = Object.values(latestByCasa)
-          console.log('Resultados finales:', data.length)
-        } else {
-          // Obtener TODAS las revisiones y filtrar localmente para obtener solo la última por casita
-          // luego mostrar solo las que tienen el campo = value en su última revisión
-          const { data: allData, error: allError } = await supabase
-            .from('revisiones_casitas')
-            .select('*')
-            .order('created_at', { ascending: false })
-          
-          if (allError) throw allError
-          
-          // Agrupar por casita y obtener solo la última revisión de cada una
-          const latestByCasa = {}
-          for (const casa of allData) {
-            if (!latestByCasa[casa.casita]) {
-              latestByCasa[casa.casita] = casa
-            }
-          }
-          
-          console.log('=== FILTRO DEBUG ===')
-          console.log('Filter:', filter)
-          console.log('Total de casas agrupadas:', Object.keys(latestByCasa).length)
-          console.log('Casitas únicas:', Object.keys(latestByCasa))
-          
-          // Mostrar valores de bolso_yute para cada casa
-          console.log('Valores de bolso_yute en últimas revisiones:')
-          Object.values(latestByCasa).forEach(casa => {
-            console.log(`  Casita ${casa.casita}: bolso_yute = "${casa.bolso_yute}" (tipo: ${typeof casa.bolso_yute})`)
-          })
-          
-          // Filtrar: mostrar solo las casas donde la última revisión tiene el campo igual al valor especificado
-          // O si es un array de valores (como para Yute)
-          const field = filter.field
-          const value = filter.value
-          const isArrayFilter = filter.isArray
-          
-          console.log('Field:', field)
-          console.log('Value:', value)
-          console.log('IsArray:', isArrayFilter)
-          
-          if (isArrayFilter) {
-            const allowedValues = value.split(',')
-            console.log('Allowed values:', allowedValues)
-            
-            // Comparar valores permitiendo variaciones con ceros a la izquierda
-            data = Object.values(latestByCasa).filter(casa => {
-              const fieldValue = String(casa[field]).trim()
-              // Verificar si el valor está en la lista (incluye variaciones con ceros a la izquierda)
-              const matches = allowedValues.some(av => 
-                av === fieldValue || 
-                av.replace(/^0+/, '') === fieldValue.replace(/^0+/, '')
-              )
-              if (matches) {
-                console.log(`  MATCH: Casita ${casa.casita} - fieldValue: "${fieldValue}"`)
-              }
-              return matches
-            })
-            console.log('Resultados encontrados:', data.length)
-            console.log('=== FIN FILTRO ===')
-          } else {
-            data = Object.values(latestByCasa).filter(casa => casa[field] === value)
-          }
-        }
-
-        if (error) throw error
-        this.filteredByLatest = data || []
-        console.log('filteredByLatest guardado:', this.filteredByLatest.length, 'registros')
-        console.log('activeFilter:', this.activeFilter)
+        await this.ensureLocalReady()
+        this.filteredByLatest = this.buildAdvancedFilter(this.allCasas, filter)
+        this.recomputeVisibleCasas(true)
       } catch (error) {
         console.error('Error applying advanced filter:', error.message)
         this.filteredByLatest = []
@@ -251,15 +509,27 @@ export const useCasasStore = defineStore('casas', {
     clearAdvancedFilter() {
       this.activeFilter = null
       this.filteredByLatest = []
+      this.recomputeVisibleCasas(true)
     },
     setSelectedCasa(casa) {
       this.selectedCasa = casa
       localStorage.setItem('selectedCasa', JSON.stringify(casa))
-      console.log('[CasasStore] Casa seleccionada y persistida:', casa.id)
     },
     async fetchCasaById(id) {
       this.loading = true
       try {
+        await this.ensureLocalReady()
+
+        const collection = await getHomeCollection()
+        const localDocument = await collection.findOne(id).exec()
+
+        if (localDocument) {
+          const localCasa = normalizeRecord(localDocument.toJSON())
+          this.selectedCasa = localCasa
+          localStorage.setItem('selectedCasa', JSON.stringify(localCasa))
+          return localCasa
+        }
+
         const { data, error } = await supabase
           .from('revisiones_casitas')
           .select('*')
@@ -267,54 +537,67 @@ export const useCasasStore = defineStore('casas', {
           .single()
 
         if (error) throw error
-        this.selectedCasa = data
-        localStorage.setItem('selectedCasa', JSON.stringify(data))
-        console.log('[CasasStore] Casa cargada por ID y persistida:', id)
+        const remoteCasa = normalizeRecord(data)
+        this.selectedCasa = remoteCasa
+        localStorage.setItem('selectedCasa', JSON.stringify(remoteCasa))
+        return remoteCasa
       } catch (error) {
         console.error('Error fetching casa by id:', error.message)
+        return null
       } finally {
         this.loading = false
       }
     },
-    subscribeToRealtime(onInsert) {
-      if (this.realtimeChannel) return // ya suscrito
-
-      this.realtimeChannel = supabase
-        .channel('revisiones_casitas_realtime')
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'revisiones_casitas' },
-          (payload) => {
-            // Evitar duplicado si el INSERT ya fue agregado localmente por addCasa
-            const exists = this.casas.some(c => c.id === payload.new.id)
-            if (!exists) {
-              this.casas.unshift(payload.new)
-            }
-            if (typeof onInsert === 'function') onInsert(payload.new)
-          }
-        )
-        .on(
-          'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'revisiones_casitas' },
-          (payload) => {
-            const idx = this.casas.findIndex(c => c.id === payload.new.id)
-            if (idx !== -1) this.casas[idx] = { ...payload.new }
-          }
-        )
-        .on(
-          'postgres_changes',
-          { event: 'DELETE', schema: 'public', table: 'revisiones_casitas' },
-          (payload) => {
-            this.casas = this.casas.filter(c => c.id !== payload.old.id)
-          }
-        )
-        .subscribe()
-    },
-    unsubscribeFromRealtime() {
-      if (this.realtimeChannel) {
-        supabase.removeChannel(this.realtimeChannel)
-        this.realtimeChannel = null
+    subscribeToHomeUpdates(onChange) {
+      if (typeof onChange !== 'function') {
+        return () => {}
       }
+
+      homeRealtimeListeners.add(onChange)
+
+      return () => {
+        homeRealtimeListeners.delete(onChange)
+      }
+    },
+    async clearHomeSessionState() {
+      if (this.homeQuerySubscription) {
+        this.homeQuerySubscription.unsubscribe()
+        this.homeQuerySubscription = null
+      }
+
+      if (this.homeSyncUnsubscribe) {
+        this.homeSyncUnsubscribe()
+        this.homeSyncUnsubscribe = null
+      }
+
+      if (this.homeRealtimeUnsubscribe) {
+        this.homeRealtimeUnsubscribe()
+        this.homeRealtimeUnsubscribe = null
+      }
+
+      this.allCasas = []
+      this.casas = []
+      this.matchedCasas = []
+      this.filteredByLatest = []
+      this.remoteSearchTerm = ''
+      this.remoteSearchRows = []
+      this.activeFilter = null
+      this.localReady = false
+      this.quickLoadReady = false
+      this.notificationsReady = false
+      this.page = 0
+      this.hasMore = true
+      this.allLoaded = false
+      this.search = ''
+      this.selectedCasa = null
+      this.homeSyncState = getHomeSyncState()
+
+      localStorage.removeItem('searchQuery')
+      localStorage.removeItem('selectedCasa')
+      clearRemoteSearchCache()
+
+      await clearHomeDatabase()
+      this.homeSyncState = getHomeSyncState()
     },
     setSearch(value) {
       this.search = value
@@ -322,16 +605,48 @@ export const useCasasStore = defineStore('casas', {
         localStorage.setItem('searchQuery', value)
       } else {
         localStorage.removeItem('searchQuery')
+        this.remoteSearchTerm = ''
+        this.remoteSearchRows = []
+        clearRemoteSearchCache()
       }
+
+      this.recomputeVisibleCasas(true)
+
+      const searchTerm = String(value || '').trim()
+      const requestId = ++this.searchRequestId
+
+      if (!searchTerm || this.activeFilter) {
+        return
+      }
+
+      this.loading = true
+      this.fetchRemoteSearchResults(searchTerm)
+        .then((remoteRows) => {
+          if (requestId !== this.searchRequestId || this.search.trim() !== searchTerm || !remoteRows) {
+            return
+          }
+
+          this.remoteSearchTerm = searchTerm
+          this.remoteSearchRows = remoteRows
+          saveRemoteSearchCache(searchTerm, remoteRows)
+          this.recomputeVisibleCasas(true)
+        })
+        .catch((error) => {
+          console.error('[CasasStore] Error en busqueda remota:', error.message)
+        })
+        .finally(() => {
+          if (requestId === this.searchRequestId) {
+            this.loading = false
+          }
+        })
     },
     async loadSavedSearch() {
       const savedSearch = localStorage.getItem('searchQuery')
-      if (savedSearch && savedSearch.trim()) {
-        this.search = savedSearch
-        // Si aún no hay datos cargados, cargarlos
-        if (!this.allLoaded) {
-          await this.fetchCasas()
-        }
+      this.search = savedSearch && savedSearch.trim() ? savedSearch : ''
+      this.recomputeVisibleCasas(true)
+
+      if (this.search && this.remoteSearchTerm !== this.search.trim()) {
+        this.setSearch(this.search)
       }
     }
   }

@@ -662,6 +662,7 @@ import { useCasasStore } from '../stores/casas'
 import { useAuthStore } from '../stores/auth'
 import { supabase } from '../supabase'
 import { CLOUDINARY_CONFIG } from '../cloudinary'
+import { playSound } from '../utils/sounds'
 
 export default defineComponent({
   name: 'NewRevisionPage',
@@ -1395,7 +1396,8 @@ export default defineComponent({
           evidencia_02: evidencia02Url,
           evidencia_03: evidencia03Url,
           notas: form.value.notas,
-          created_at: localTime
+          created_at: localTime,
+          update_at: localTime
         }
         
         console.log('[NewRevisionPage] Datos a enviar a Supabase:', newRevision)
@@ -1405,6 +1407,7 @@ export default defineComponent({
         console.log('[NewRevisionPage] Resultado de addCasa:', result)
         
         if (result.success) {
+          playSound('send')
           console.log('[NewRevisionPage] Revisión guardada exitosamente')
           
           // Check if there are evidence images to share

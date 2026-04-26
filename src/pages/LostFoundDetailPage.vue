@@ -555,7 +555,7 @@ export default defineComponent({
         if (!apiKey) throw new Error('API Key no encontrada')
 
         const genAI = new GoogleGenerativeAI(apiKey)
-        const model = genAI.getGenerativeModel({ model: 'gemini-flash-lite-latest' })
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' })
 
         const imagePart = await fileToGenerativePart(fileToScan)
         const prompt = `
@@ -574,19 +574,26 @@ export default defineComponent({
         `
         const result = await model.generateContent([prompt, imagePart])
         const text = result.response.text()
-        const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim()
+        const cleanJson = text
+          .replace(/```json/g, '')
+          .replace(/```/g, '')
+          .trim()
+          .match(/\{[\s\S]*\}/)?.[0]
         
+        if (!cleanJson) throw new Error('Gemini no devolvio JSON')
         const extracted = JSON.parse(cleanJson)
-        if (extracted.item_name) {
-          form.value.item_name = extracted.item_name
-        }
-        if (extracted.description) {
-          form.value.description = extracted.description
-        }
+        if (!extracted.item_name && !extracted.description) throw new Error('Gemini no detecto datos del objeto')
+        if (extracted.item_name) form.value.item_name = extracted.item_name
+        if (extracted.description) form.value.description = extracted.description
         $q.notify({ type: 'positive', message: 'Objeto identificado' })
       } catch (error) {
         console.error('Scan Error:', error)
-        $q.notify({ type: 'warning', message: 'No se pudo identificar el objeto', timeout: 3000 })
+        $q.notify({
+          type: 'warning',
+          message: 'No se pudo identificar el objeto',
+          caption: error?.message || 'Revisa la consola del navegador para mas detalle',
+          timeout: 4500
+        })
       } finally {
         scanningImage.value = false
       }

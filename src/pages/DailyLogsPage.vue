@@ -162,51 +162,63 @@
             
           </q-timeline-entry>
 
-          <q-timeline-entry
-            v-for="log in filteredLogs"
-            :key="log.id"
-            :icon="getEventIcon(log.event_type)"
-            :color="getEventColor(log.event_type).replace('-7', '')"
-            class="cursor-pointer log-timeline-entry"
-            @click="openDetail(log)"
-          >
-            <template v-slot:title>
-              <div class="log-entry-title row items-center no-wrap">
-                <span class="log-entry-event">{{ log.event_type }}</span>
-                <q-chip
-                  v-if="log.event_type === 'Entrega de turno'"
-                  :class="['log-entry-status', { 'log-entry-status--ok': log.firma, 'log-entry-status--warning': !log.firma }]"
-                  dense
-                  rounded
-                  size="10px"
-                  class="q-ml-sm q-my-none text-weight-bold"
-                >
-                  <q-icon :name="log.firma ? 'check_circle' : 'pending'" size="12px" class="q-mr-xs" />
-                  {{ log.firma ? 'Firmado' : 'Pendiente' }}
-                </q-chip>
+          <template v-for="(log, index) in filteredLogs" :key="log.id">
+            <q-timeline-entry
+              v-if="shouldShowDayDivider(log, index)"
+              heading
+              class="logs-day-divider-entry"
+            >
+              <div class="logs-day-divider">
+                <span class="logs-day-divider__line"></span>
+                <span class="logs-day-divider__date">{{ formatDayDividerDate(log.hora_bitacora || log.created_at) }}</span>
+                <span class="logs-day-divider__line"></span>
               </div>
-            </template>
-            
-            <template v-slot:subtitle>
-              <div class="log-entry-time">
-                {{ formatDateTime(log.hora_bitacora || log.created_at) }}
-              </div>
-            </template>
+            </q-timeline-entry>
 
-            <div class="timeline-content-card q-mt-xs" :style="{ '--log-accent': `var(--q-${getEventColor(log.event_type).replace('-7', '')})` }">
-              <div class="timeline-content-card__top">
-                <div>
-                  <div class="timeline-content-card__guard">{{ log.colaborador || log.guard_id || 'Sin oficial' }}</div>
-                  <div v-if="log.oficial_recibe" class="timeline-content-card__receiver">Recibe {{ log.oficial_recibe }}</div>
+            <q-timeline-entry
+              :icon="getEventIcon(log.event_type)"
+              :color="getEventColor(log.event_type).replace('-7', '')"
+              class="cursor-pointer log-timeline-entry"
+              @click="openDetail(log)"
+            >
+              <template v-slot:title>
+                <div class="log-entry-title row items-center no-wrap">
+                  <span class="log-entry-event">{{ log.event_type }}</span>
+                  <q-chip
+                    v-if="log.event_type === 'Entrega de turno'"
+                    :class="['log-entry-status', { 'log-entry-status--ok': log.firma, 'log-entry-status--warning': !log.firma }]"
+                    dense
+                    rounded
+                    size="10px"
+                    class="q-ml-sm q-my-none text-weight-bold"
+                  >
+                    <q-icon :name="log.firma ? 'check_circle' : 'pending'" size="12px" class="q-mr-xs" />
+                    {{ log.firma ? 'Firmado' : 'Pendiente' }}
+                  </q-chip>
                 </div>
-                <div class="timeline-content-card__bitacora">{{ log.nombre_bitacora || 'Sin bitácora' }}</div>
-              </div>
+              </template>
+              
+              <template v-slot:subtitle>
+                <div class="log-entry-time">
+                  {{ formatDateTime(log.hora_bitacora || log.created_at) }}
+                </div>
+              </template>
 
-              <div class="timeline-content-card__body">
-                {{ log.description || 'Sin novedad reportada.' }}
+              <div class="timeline-content-card q-mt-xs" :style="{ '--log-accent': `var(--q-${getEventColor(log.event_type).replace('-7', '')})` }">
+                <div class="timeline-content-card__top">
+                  <div>
+                    <div class="timeline-content-card__guard">{{ log.colaborador || log.guard_id || 'Sin oficial' }}</div>
+                    <div v-if="log.oficial_recibe" class="timeline-content-card__receiver">Recibe {{ log.oficial_recibe }}</div>
+                  </div>
+                  <div class="timeline-content-card__bitacora">{{ log.nombre_bitacora || 'Sin bitácora' }}</div>
+                </div>
+
+                <div class="timeline-content-card__body">
+                  {{ log.description || 'Sin novedad reportada.' }}
+                </div>
               </div>
-            </div>
-          </q-timeline-entry>
+            </q-timeline-entry>
+          </template>
         </q-timeline>
       </div>
 
@@ -919,6 +931,37 @@ export default defineComponent({
       return `${day}/${month}/${year} · ${hours}:${minutes}`
     }
 
+    const formatDateKey = (dateString) => {
+      const date = parseDateValue(dateString)
+      if (!date) return ''
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    }
+
+    const formatDayDividerDate = (dateString) => {
+      const date = parseDateValue(dateString)
+      if (!date) return 'Sin fecha'
+
+      return date.toLocaleDateString('es-CR', {
+        weekday: 'long',
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric'
+      })
+    }
+
+    const shouldShowDayDivider = (log, index) => {
+      if (index === 0) return true
+
+      const currentDate = formatDateKey(log.hora_bitacora || log.created_at)
+      const previousLog = filteredLogs.value[index - 1]
+      const previousDate = formatDateKey(previousLog?.hora_bitacora || previousLog?.created_at)
+
+      return currentDate !== previousDate
+    }
+
     const formatCompactDateTime = (dateString) => {
       const date = parseDateValue(dateString)
       if (!date) return 'Sin fecha'
@@ -1313,6 +1356,8 @@ export default defineComponent({
       getEventColor,
       formatTime,
       formatDateTime,
+      formatDayDividerDate,
+      shouldShowDayDivider,
       formatCompactDateTime,
       buildDesktopLogText,
       filterUsers,
@@ -1560,6 +1605,42 @@ export default defineComponent({
 .logs-timeline-heading {
   font-size: 1.8rem;
   color: var(--uber-black);
+}
+
+.logs-day-divider-entry {
+  margin: 18px 0 14px;
+}
+
+.logs-day-divider {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 14px;
+  color: #c10015;
+}
+
+.logs-day-divider__line {
+  flex: 1 1 auto;
+  min-width: 24px;
+  height: 3px;
+  border-radius: 999px;
+  background: #c10015;
+  box-shadow: 0 2px 8px rgba(193, 0, 21, 0.22);
+}
+
+.logs-day-divider__date {
+  flex: 0 1 auto;
+  max-width: min(66vw, 420px);
+  padding: 7px 14px;
+  border-radius: var(--uber-radius-pill);
+  background: #c10015;
+  color: var(--uber-white);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  text-align: center;
+  white-space: normal;
+  line-height: 1.2;
 }
 
 .log-timeline-entry {

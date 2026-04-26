@@ -403,6 +403,73 @@
             />
           </div>
 
+          <!-- Evidencias: solo permite agregar en espacios vacios -->
+          <div v-if="editableEvidenceFields.length > 0 && !['Si', 'No'].includes(editForm.caja_fuerte)" class="section-container">
+            <div class="category-header edit-category" style="background: #f1f8e9; color: #33691e;">
+              <q-icon name="photo_camera" />
+              <span class="category-title">Evidencia Fotográfica</span>
+            </div>
+
+            <div class="row q-col-gutter-md">
+              <div
+                v-for="field in editableEvidenceFields"
+                :key="field.key"
+                class="col-12 col-sm-4"
+              >
+                <div class="section-label q-mb-xs">{{ field.label }}</div>
+                <q-btn
+                  v-if="!editForm[field.key]"
+                  label="Agregar Foto"
+                  icon="add_a_photo"
+                  unelevated
+                  class="full-width photo-btn"
+                  @click="openPhotoSheet(field.key)"
+                />
+                <div v-else>
+                  <div class="photo-preview-container">
+                    <img
+                      :src="getPreviewUrl(editForm[field.key])"
+                      class="photo-preview"
+                      @click="openImageModal(getPreviewUrl(editForm[field.key]))"
+                    />
+                    <q-btn
+                      icon="delete"
+                      round
+                      size="sm"
+                      color="negative"
+                      class="delete-photo-btn"
+                      @click="removePhoto(field.key)"
+                    />
+                  </div>
+                  <div v-if="compressionInfoEdit[field.key]" class="compression-info q-mt-sm">
+                    <div class="compression-row">
+                      <span class="text-grey-7">Original:</span>
+                      <span class="text-negative">{{ compressionInfoEdit[field.key].originalSize }}</span>
+                      <q-icon name="arrow_forward" size="12px" color="grey-5" />
+                      <span class="text-positive">{{ compressionInfoEdit[field.key].compressedSize }}</span>
+                      <span class="text-primary">({{ compressionInfoEdit[field.key].reduction }}%)</span>
+                    </div>
+                    <div class="compression-row">
+                      <span class="text-grey-7">Formato: {{ compressionInfoEdit[field.key].format }}</span>
+                      <span class="text-grey-5 q-ml-xs">{{ compressionInfoEdit[field.key].originalDimensions }} -> {{ compressionInfoEdit[field.key].compressedDimensions }}</span>
+                    </div>
+                  </div>
+                </div>
+                <q-file
+                  :ref="el => setEvidenceFileRef(field.key, el)"
+                  v-model="editForm[field.key]"
+                  label=""
+                  outlined
+                  dense
+                  bg-color="white"
+                  class="input-styled q-mt-xs"
+                  accept="image/*"
+                  style="display: none;"
+                />
+              </div>
+            </div>
+          </div>
+
           <!-- Guardado Cancel buttons -->
           <div class="row q-gutter-sm q-mt-xl q-pb-xl">
             <div class="col">
@@ -450,10 +517,10 @@
           <div style="font-size: 15px; color: rgba(0,0,0,0.48); margin-bottom: 14px; letter-spacing: -0.2px;">Revisión completa</div>
 
           <!-- Indicador de Nota Extra -->
-          <div v-if="casa.nota_extra" class="row items-center q-mb-md">
+          <div v-if="notasExtra.length > 0" class="row items-center q-mb-md">
             <div class="nota-extra-badge row items-center no-wrap">
               <q-icon name="sticky_note_2" size="16px" class="q-mr-xs" />
-              <span class="text-weight-bold">Hay una nota extra</span>
+              <span class="text-weight-bold">{{ notasExtra.length }} nota{{ notasExtra.length === 1 ? '' : 's' }} extra</span>
             </div>
           </div>
 
@@ -583,7 +650,7 @@
         </div>
 
         <!-- Nota Extra Button -->
-        <div v-if="canAdd && !showNotaExtra && (!casa.nota_extra)" class="q-mt-lg q-mb-xl">
+        <div v-if="canAdd && !showNotaExtra" class="q-mt-lg q-mb-xl">
           <q-btn
             label="Agregar nota extra"
             icon="note_add"
@@ -596,29 +663,29 @@
         </div>
 
         <!-- Display existing nota extra -->
-        <div v-if="casa.nota_extra" class="section-card shadow-1 q-mt-lg">
+        <div v-for="nota in notasExtra" :key="nota.id" class="section-card shadow-1 q-mt-lg">
           <div class="row items-center q-mb-md">
             <q-icon name="sticky_note_2" color="orange-7" size="20px" class="q-mr-sm" />
             <div class="text-weight-bold text-grey-8">Nota Extra</div>
           </div>
           <div class="text-body2 text-grey-7 bg-orange-1 q-pa-md rounded-12 q-mb-md">
-            {{ casa.nota_extra }}
+            {{ nota.nota }}
           </div>
           <div class="row items-center q-gutter-x-md text-caption text-grey-6">
             <div class="row items-center">
               <q-icon name="person" size="14px" class="q-mr-xs" />
-              {{ casa.usuario_nota }}
+              {{ nota.usuario || 'Anónimo' }}
             </div>
             <div class="row items-center">
               <q-icon name="schedule" size="14px" class="q-mr-xs" />
-              {{ formatDate(casa.hora_nota) }}
+              {{ formatNotaDate(nota.hora) }}
             </div>
           </div>
-          <div v-if="casa.imagen_nota" class="q-mt-md">
+          <div v-if="nota.imagen" class="q-mt-md">
             <img 
-              :src="getImageUrl(casa.imagen_nota)" 
+              :src="getImageUrl(nota.imagen)" 
               class="nota-extra-image"
-              @click="openNoteImage"
+              @click="openNoteImage(nota.imagen)"
             />
           </div>
         </div>
@@ -679,7 +746,7 @@
               icon="add_a_photo"
               unelevated
               class="full-width photo-btn"
-              @click="openPhotoSheet"
+              @click="openPhotoSheet()"
             />
             <div v-else>
               <div class="photo-preview-container">
@@ -690,7 +757,7 @@
                   size="sm"
                   color="negative"
                   class="delete-photo-btn"
-                  @click="removePhoto"
+                  @click="removePhoto()"
                 />
               </div>
               <div v-if="compressionInfoNota" class="compression-info q-mt-sm">
@@ -966,6 +1033,7 @@ export default defineComponent({
     
     // Nota extra fields
     const showNotaExtra = ref(false)
+    const notasExtra = ref([])
     const notaExtraForm = ref({
       nota_extra: '',
       usuario_nota: '',
@@ -999,10 +1067,33 @@ export default defineComponent({
       sombrero: '',
       bolso_yute: '',
       camas_ordenadas: '',
+      evidencia_01: null,
+      evidencia_02: null,
+      evidencia_03: null,
       notas: ''
     })
 
     const logs = ref([])
+    const evidenceFields = [
+      { key: 'evidencia_01', label: 'Evidencia 1' },
+      { key: 'evidencia_02', label: 'Evidencia 2' },
+      { key: 'evidencia_03', label: 'Evidencia 3' }
+    ]
+    const evidenceLabelMap = evidenceFields.reduce((acc, field) => {
+      acc[field.key] = field.label
+      return acc
+    }, {})
+    const evidenceFileRefs = ref({})
+    const currentPhotoField = ref('imagen_nota')
+    const compressionInfoEdit = ref({
+      evidencia_01: null,
+      evidencia_02: null,
+      evidencia_03: null
+    })
+    const editableEvidenceFields = computed(() => {
+      if (!casa.value) return []
+      return evidenceFields.filter(field => !casa.value[field.key])
+    })
 
     const fetchLogs = async () => {
       if (!casa.value || !casa.value.id) return
@@ -1026,7 +1117,13 @@ export default defineComponent({
     const formatLogData = (str) => {
       if (!str) return ''
       // Elimina la parte del UUID [uuid] para que sea más legible
-      return str.replace(/\[.*?\]\s*/, '')
+      const clean = str.replace(/\[.*?\]\s*/, '')
+      const evidenceMatch = clean.match(/^(evidencia_0[1-3]|Evidencia [1-3])/)
+      if (evidenceMatch) {
+        const key = evidenceMatch[1]
+        return evidenceLabelMap[key] || key
+      }
+      return clean
     }
 
     // Options for edit form
@@ -1053,6 +1150,30 @@ export default defineComponent({
         users.value = data.map(user => user.Usuario) || []
       } catch (error) {
         console.error('Error loading users:', error)
+      }
+    }
+
+    const fetchNotasExtra = async () => {
+      if (!casa.value?.id) {
+        notasExtra.value = []
+        return
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('notas_revisiones_casitas')
+          .select('*')
+          .eq('revision_id', casa.value.id)
+          .order('hora', { ascending: false })
+
+        if (error) {
+          console.error('Error cargando notas extra:', error)
+          return
+        }
+
+        notasExtra.value = data || []
+      } catch (error) {
+        console.error('Error cargando notas extra:', error)
       }
     }
     const photoSheetOpen = ref(false)
@@ -1187,7 +1308,7 @@ export default defineComponent({
       }
     }
 
-    const compressImage = async (file) => {
+    const compressImage = async (file, field = null) => {
       const config = getCompressionConfig()
       const originalSize = file.size
       
@@ -1288,6 +1409,8 @@ export default defineComponent({
 
           let quality = config.maxQuality
           let attempts = 0
+          const finalMime = field ? `image/${config.format}` : 'image/jpeg'
+          const finalFormat = field ? config.format.toUpperCase() : 'JPEG'
 
           const generateBlob = () => {
             finalCanvas.toBlob((blob) => {
@@ -1298,15 +1421,20 @@ export default defineComponent({
 
               const sizeKB = blob.size / 1024
               if (sizeKB <= config.targetSizeKB || attempts >= config.maxAttempts || quality <= config.minQuality) {
-                const finalFile = new File([blob], `nota_${Date.now()}.jpg`, { type: 'image/jpeg' })
+                const finalFile = new File([blob], `${field || 'nota'}_${Date.now()}.${field ? config.format : 'jpg'}`, { type: finalMime })
                 
-                compressionInfoNota.value = {
+                const info = {
                   originalSize: formatBytes(originalSize),
                   compressedSize: formatBytes(finalFile.size),
                   reduction: Math.round(((originalSize - finalFile.size) / originalSize) * 100),
-                  format: 'JPEG',
+                  format: finalFormat,
                   originalDimensions: `${img.width}x${img.height}`,
                   compressedDimensions: `${targetW}x${targetH}`
+                }
+                if (field && compressionInfoEdit.value[field] !== undefined) {
+                  compressionInfoEdit.value[field] = info
+                } else {
+                  compressionInfoNota.value = info
                 }
                 
                 finalCanvas.width = 0
@@ -1317,7 +1445,7 @@ export default defineComponent({
                 attempts++
                 generateBlob()
               }
-            }, 'image/jpeg', quality)
+            }, finalMime, quality)
           }
 
           generateBlob()
@@ -1337,14 +1465,16 @@ export default defineComponent({
       return `${months[now.getMonth()]} ${now.getFullYear()}`
     }
 
-    const uploadImageToCloudinary = async (file) => {
+    const uploadImageToCloudinary = async (file, field = 'nota') => {
       if (!file) return null
 
       try {
         const monthFolder = getMonthFolder()
         const timestamp = Date.now()
-        const publicId = `nota_${timestamp}`
-        const folderPath = `Notas/${monthFolder}`
+        const isEvidence = field.startsWith('evidencia_')
+        const n = isEvidence ? field.split('_')[1] : null
+        const publicId = isEvidence ? `evidencia_${n}_${timestamp}` : `nota_${timestamp}`
+        const folderPath = isEvidence ? `Evidencias/${monthFolder}` : `Notas/${monthFolder}`
 
         const formData = new FormData()
         formData.append('file', file)
@@ -1372,15 +1502,25 @@ export default defineComponent({
       }
     }
 
-    const openPhotoSheet = () => {
+    const setEvidenceFileRef = (field, el) => {
+      if (el) evidenceFileRefs.value[field] = el
+    }
+
+    const openPhotoSheet = (field = 'imagen_nota') => {
+      currentPhotoField.value = field
       photoSheetOpen.value = true
     }
 
     const selectPhotoSource = (source) => {
       photoSheetOpen.value = false
       setTimeout(() => {
-        if (fileNotaExtra.value && fileNotaExtra.value.$el) {
-          const fileInput = fileNotaExtra.value.$el.querySelector('input[type="file"]')
+        const field = currentPhotoField.value
+        const fileInputRef = field === 'imagen_nota'
+          ? fileNotaExtra.value
+          : evidenceFileRefs.value[field]
+
+        if (fileInputRef && fileInputRef.$el) {
+          const fileInput = fileInputRef.$el.querySelector('input[type="file"]')
           if (fileInput) {
             if (source === 'camera') {
               fileInput.setAttribute('capture', 'environment')
@@ -1404,7 +1544,12 @@ export default defineComponent({
       imageModalOpen.value = true
     }
 
-    const removePhoto = () => {
+    const removePhoto = (field = 'imagen_nota') => {
+      if (field && evidenceLabelMap[field] && !casa.value?.[field]) {
+        editForm.value[field] = null
+        compressionInfoEdit.value[field] = null
+        return
+      }
       notaExtraForm.value.imagen_nota = null
       compressionInfoNota.value = null
     }
@@ -1426,25 +1571,35 @@ export default defineComponent({
           imagenUrl = await uploadImageToCloudinary(notaExtraForm.value.imagen_nota)
         }
 
-        const updateData = {
-          nota_extra: notaExtraForm.value.nota_extra,
-          usuario_nota: notaExtraForm.value.usuario_nota,
-          hora_nota: notaExtraForm.value.hora_nota,
-          imagen_nota: imagenUrl
+        const localTime = getLocalTime()
+
+        const nuevaNota = {
+          revision_id: casa.value.id,
+          nota: notaExtraForm.value.nota_extra,
+          usuario: notaExtraForm.value.usuario_nota,
+          hora: notaExtraForm.value.hora_nota || localTime,
+          imagen: imagenUrl
         }
 
-        const { error } = await supabase
-          .from('revisiones_casitas')
-          .update(updateData)
-          .eq('id', casa.value.id)
+        const { data, error } = await supabase
+          .from('notas_revisiones_casitas')
+          .insert(nuevaNota)
+          .select()
+          .single()
 
         if (error) throw error
 
-        // Update local state
-        casa.value.nota_extra = updateData.nota_extra
-        casa.value.usuario_nota = updateData.usuario_nota
-        casa.value.hora_nota = updateData.hora_nota
-        casa.value.imagen_nota = updateData.imagen_nota
+        const { error: updateError } = await supabase
+          .from('revisiones_casitas')
+          .update({ update_at: localTime })
+          .eq('id', casa.value.id)
+
+        if (updateError) {
+          console.error('Error actualizando fecha de revision:', updateError)
+        }
+
+        notasExtra.value = data ? [data, ...notasExtra.value] : [{ ...nuevaNota, id: `local-${Date.now()}`, created_at: localTime }, ...notasExtra.value]
+        casa.value.update_at = localTime
 
         $q.dialog({
           title: 'Éxito',
@@ -1487,14 +1642,35 @@ export default defineComponent({
       }
     })
 
-    onMounted(() => {
+    evidenceFields.forEach(({ key }) => {
+      watch(() => editForm.value[key], async (newFile) => {
+        if (newFile && typeof newFile !== 'string' && !newFile._isCompressed) {
+          try {
+            const compressed = await compressImage(newFile, key)
+            if (compressed) {
+              compressed._isCompressed = true
+              editForm.value[key] = compressed
+            }
+          } catch (e) {
+            console.error(`[Watcher] Compression failed for ${key}:`, e)
+          }
+        }
+      })
+    })
+
+    onMounted(async () => {
       const stored = localStorage.getItem('selectedCasa')
-      console.log('[DetailsPage] localStorage inicial:', stored ? 'Contiene datos' : 'Vacío')
-      console.log('[DetailsPage] Montado. Casa en store:', store.selectedCasa ? store.selectedCasa.id : 'Ninguna')
-      
+
       if (!store.selectedCasa && stored) {
-        console.log('[DetailsPage] Reintentando cargar desde localStorage...')
-        store.selectedCasa = JSON.parse(stored)
+        try {
+          store.selectedCasa = JSON.parse(stored)
+        } catch (error) {
+          console.error('[DetailsPage] No se pudo leer selectedCasa guardada:', error)
+        }
+      }
+
+      if (store.selectedCasa?.id) {
+        await store.fetchCasaById(store.selectedCasa.id)
       }
 
       if (!store.selectedCasa) {
@@ -1506,6 +1682,9 @@ export default defineComponent({
 
       // Load edition history
       fetchLogs()
+
+      // Load multiple extra notes
+      fetchNotasExtra()
     })
 
     const formatDate = (val) => {
@@ -1513,6 +1692,19 @@ export default defineComponent({
       return date.formatDate(val, 'DD MMMM YYYY - HH:mm', {
         months: ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
       })
+    }
+
+    const formatNotaDate = (val) => {
+      if (!val) return '--'
+      const match = String(val).match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})/)
+      if (!match) return String(val)
+
+      const months = [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+      ]
+      const [, year, month, day, hour, minute] = match
+      return `${Number(day)} De ${months[Number(month) - 1] || month} ${year} ${hour}:${minute}`
     }
 
     const getImageUrl = (path) => {
@@ -1543,9 +1735,9 @@ export default defineComponent({
       }
     }
 
-    const openNoteImage = () => {
-      if (!casa.value?.imagen_nota) return
-      const noteImageUrl = getImageUrl(casa.value.imagen_nota)
+    const openNoteImage = (imagePath) => {
+      if (!imagePath) return
+      const noteImageUrl = getImageUrl(imagePath)
       const index = images.value.indexOf(noteImageUrl)
       if (index >= 0) {
         onOpenImage(index)
@@ -1579,7 +1771,15 @@ export default defineComponent({
         sombrero: casa.value.sombrero || '',
         bolso_yute: casa.value.bolso_yute || '',
         camas_ordenadas: casa.value.camas_ordenadas || '',
+        evidencia_01: null,
+        evidencia_02: null,
+        evidencia_03: null,
         notas: casa.value.notas || ''
+      }
+      compressionInfoEdit.value = {
+        evidencia_01: null,
+        evidencia_02: null,
+        evidencia_03: null
       }
       
       isEditing.value = true
@@ -1601,6 +1801,20 @@ export default defineComponent({
 
       savingEdit.value = true
       try {
+        const localTime = getLocalTime()
+        const uploadedEvidence = {}
+
+        for (const { key } of evidenceFields) {
+          const selectedFile = editForm.value[key]
+          if (!casa.value[key] && selectedFile && typeof selectedFile !== 'string') {
+            const uploadedUrl = await uploadImageToCloudinary(selectedFile, key)
+            if (!uploadedUrl) {
+              throw new Error(`No se pudo subir ${evidenceLabelMap[key]}`)
+            }
+            uploadedEvidence[key] = uploadedUrl
+          }
+        }
+
         const updateData = {
           casita: editForm.value.casita,
           caja_fuerte: editForm.value.caja_fuerte,
@@ -1622,12 +1836,12 @@ export default defineComponent({
           sombrero: editForm.value.sombrero,
           bolso_yute: editForm.value.bolso_yute,
           camas_ordenadas: editForm.value.camas_ordenadas,
-          notas: editForm.value.notas
+          notas: editForm.value.notas,
+          ...uploadedEvidence
         }
 
         // Registrar cambios en Registro_ediciones
         const changes = []
-        const localTime = getLocalTime()
         const currentUser = authStore.user?.Usuario || 'Desconocido'
 
         for (const field in updateData) {
@@ -1636,11 +1850,12 @@ export default defineComponent({
 
           // Solo registrar si el valor realmente cambió
           if (String(oldValue || '') !== String(newValue || '')) {
+            const isEvidenceField = !!evidenceLabelMap[field]
             changes.push({
               created_at: localTime,
               'Usuario que Edito': currentUser,
-              Dato_anterior: `[${casa.value.id}] ${field}: ${oldValue || ''}`,
-              Dato_nuevo: `[${casa.value.id}] ${field}: ${newValue || ''}`
+              Dato_anterior: `[${casa.value.id}] ${isEvidenceField ? evidenceLabelMap[field] : `${field}: ${oldValue || ''}`}`,
+              Dato_nuevo: `[${casa.value.id}] ${isEvidenceField ? evidenceLabelMap[field] : `${field}: ${newValue || ''}`}`
             })
           }
         }
@@ -1655,6 +1870,8 @@ export default defineComponent({
             console.error('Error al registrar ediciones:', logError)
           }
         }
+
+        updateData.update_at = localTime
 
         const { error } = await supabase
           .from('revisiones_casitas')
@@ -1798,10 +2015,11 @@ export default defineComponent({
           found.push(getImageUrl(val))
         }
       })
-      // Agregar imagen de la nota extra si existe
-      if (casa.value.imagen_nota && typeof casa.value.imagen_nota === 'string' && casa.value.imagen_nota.length > 5) {
-        found.push(getImageUrl(casa.value.imagen_nota))
-      }
+      notasExtra.value.forEach(nota => {
+        if (nota.imagen && typeof nota.imagen === 'string' && nota.imagen.length > 5) {
+          found.push(getImageUrl(nota.imagen))
+        }
+      })
       return found
     })
 
@@ -1870,6 +2088,7 @@ export default defineComponent({
       images,
       slide,
       formatDate,
+      formatNotaDate,
       electronicItems,
       otherItems,
       themeClass,
@@ -1892,16 +2111,21 @@ export default defineComponent({
       downloadImage,
       // Nota extra
       showNotaExtra,
+      notasExtra,
       notaExtraForm,
       savingNota,
       photoSheetOpen,
+      currentPhotoField,
       compressionInfoNota,
+      compressionInfoEdit,
       fileNotaExtra,
+      editableEvidenceFields,
       imageModalOpen,
       modalImageUrl,
       enableNotaExtra,
       openPhotoSheet,
       selectPhotoSource,
+      setEvidenceFileRef,
       getPreviewUrl,
       openImageModal,
       removePhoto,

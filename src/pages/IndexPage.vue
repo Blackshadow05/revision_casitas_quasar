@@ -172,19 +172,47 @@
         </div>
       </div>
 
+      <q-banner v-if="syncError" rounded class="bg-red-1 text-negative q-mb-md">
+        <template v-slot:avatar>
+          <q-icon name="sync_problem" />
+        </template>
+        {{ syncError }}
+      </q-banner>
+
+      <div v-if="firstSyncPending || isSyncing || lastSyncAt" class="sync-status-card q-mb-md">
+        <div class="row items-center justify-between no-wrap q-col-gutter-sm">
+          <div class="row items-center no-wrap col">
+            <q-icon
+              :name="firstSyncPending ? 'cloud_download' : (isSyncing ? 'sync' : 'check_circle')"
+              size="22px"
+              color="primary"
+              class="q-mr-sm"
+              :class="{ 'rotate-sync': isSyncing }"
+            />
+            <div>
+              <div v-if="syncTitle" class="text-weight-bold text-grey-9">
+                {{ syncTitle }}
+              </div>
+              <div class="text-caption text-grey-7">{{ syncStatusText }}</div>
+            </div>
+          </div>
+          <q-spinner-dots v-if="firstSyncPending || isSyncing" color="primary" size="26px" />
+        </div>
+      </div>
+
       <!-- Mostrando registros badge -->
-      <div v-if="casas.length > 0" class="flex justify-center q-mb-md">
-        <div class="records-badge">Mostrando {{ casas.length }} registros</div>
+      <div v-if="visibleRecordsCount > 0" class="flex justify-center q-mb-md">
+        <div class="records-badge">Mostrando {{ visibleRecordsCount }} registros</div>
       </div>
 
       <q-pull-to-refresh @refresh="refresh" class="full-width">
         <!-- Initial Loading State -->
-        <div v-if="loading && casas.length === 0" class="flex flex-center q-my-xl">
+        <div v-if="firstSyncPending || (loading && casas.length === 0)" class="flex flex-center q-my-xl">
           <q-spinner-dots color="primary" size="40px" />
         </div>
 
         <!-- Empty State if no results -->
-        <div v-if="!loading && casas.length === 0" class="flex flex-center q-mt-xl text-center">
+        <div v-if="!firstSyncPending && !loading && casas.length === 0" class="flex flex-center q-mt-xl text-center">
           <div>
             <q-icon name="search_off" size="64px" color="grey-4" />
             <div class="text-h6 text-grey-5 q-mt-md">No encontramos nada</div>
@@ -194,7 +222,7 @@
 
         <!-- Cards List with Infinite Scroll (disabled when filter is active) - MOBILE/TABLET ONLY -->
         <q-infinite-scroll
-          v-if="isLoggedIn && !$q.screen.gt.md"
+          v-if="isLoggedIn && !$q.screen.gt.md && !firstSyncPending"
           @load="onLoad"
           :offset="250"
           ref="infiniteScroll"
@@ -242,16 +270,10 @@
         </q-infinite-scroll>
 
         <!-- Table View - DESKTOP ONLY -->
-        <q-infinite-scroll
-          v-if="isLoggedIn && $q.screen.gt.md"
-          @load="onLoad"
-          :offset="250"
-          ref="infiniteScroll"
-          :disable="!!store.activeFilter || loading || casas.length === 0"
-        >
+        <div v-if="isLoggedIn && $q.screen.gt.md && !firstSyncPending">
           <div class="table-container">
             <q-table
-              :rows="casas"
+              :rows="desktopCasas"
               :columns="tableColumns"
               row-key="id"
               flat
@@ -373,12 +395,7 @@
               </template>
             </q-table>
           </div>
-          <template v-slot:loading>
-            <div v-if="casas.length > 0" class="row justify-center q-my-md">
-              <q-spinner-dots color="primary" size="40px" />
-            </div>
-          </template>
-        </q-infinite-scroll>
+        </div>
       </q-pull-to-refresh>
     </div>
 
@@ -586,7 +603,6 @@ export default defineComponent({
       const result = await authStore.login(loginData.username, loginData.password)
       if (result.success) {
         showLoginModal.value = false
-        // Refresh data after login
         await loadData()
       } else {
         $q.notify({
@@ -597,8 +613,8 @@ export default defineComponent({
       }
     }
 
-    const handleLogout = () => {
-      authStore.logout()
+    const handleLogout = async () => {
+      await authStore.logout()
       showLoginModal.value = true
     }
     
@@ -608,11 +624,52 @@ export default defineComponent({
     })
 
     const casas = computed(() => store.filteredCasas)
+    const desktopCasas = computed(() => store.matchedCasas)
     const loading = computed(() => store.loading)
+    const syncState = computed(() => store.homeSyncState)
+    // firstSyncPending blocks the UI only when we have no quick-loaded data yet.
+    // Once quickLoadReady=true the user can see the most-recent records immediately
+    // while the full RxDB sync continues in background.
+    const firstSyncPending = computed(() => syncState.value.firstSyncPending && !store.quickLoadReady)
+    const isSyncing = computed(() => syncState.value.syncing)
+    const syncError = computed(() => syncState.value.error)
+    const lastSyncAt = computed(() => syncState.value.lastSyncAt)
+    const syncTitle = computed(() => {
+      if (firstSyncPending.value || isSyncing.value) {
+        return 'Sincronizando'
+      }
 
-    // Load data on mount (works for both mobile and desktop)
+      return ''
+    })
+
+    const syncStatusText = computed(() => {
+      if (firstSyncPending.value) {
+        if (syncState.value.initialSyncPulled > 0) {
+          return `${syncState.value.initialSyncPulled} registros descargados para uso offline`
+        }
+
+        return 'Preparando el cache local del inicio...'
+      }
+
+      if (isSyncing.value) {
+        return 'Buscando cambios recientes en Supabase...'
+      }
+
+      if (lastSyncAt.value) {
+        return `Última sincronización: ${formatFullDate(lastSyncAt.value)}`
+      }
+
+      return ''
+    })
+
+    const visibleRecordsCount = computed(() => {
+      return isLoggedIn.value && $q.screen.gt.md
+        ? desktopCasas.value.length
+        : casas.value.length
+    })
+
     const initData = async () => {
-      if (store.casas.length === 0 && !store.loading) {
+      if (!store.loading) {
         await store.fetchCasas()
       }
     }
@@ -636,22 +693,12 @@ export default defineComponent({
       done(!store.hasMore)
     }
 
-    let searchTimeout = null
-
-    watch(() => store.search, (newVal) => {
+    watch(() => store.search, () => {
       infiniteScroll.value?.reset()
-      // Si no hay datos cargados aún, cargarlos
-      if (!store.allLoaded && !store.loading) {
-        clearTimeout(searchTimeout)
-        searchTimeout = setTimeout(async () => {
-          await loadData()
-        }, 300)
-      }
-      // El getter filteredCasas se encarga del filtrado local automáticamente
     })
 
-    const checkSessionInterval = setInterval(() => {
-      if (isLoggedIn.value && !authStore.checkSessionExpiry()) {
+    const checkSessionInterval = setInterval(async () => {
+      if (isLoggedIn.value && !(await authStore.checkSessionExpiry())) {
         showLoginModal.value = true
       }
     }, 60000)
@@ -662,17 +709,13 @@ export default defineComponent({
 
     const refresh = async (done) => {
       infiniteScroll.value?.reset()
-      await loadData()
+      await store.resyncCasas()
       done()
     }
 
-    onMounted(() => {
+    onMounted(async () => {
       if (isLoggedIn.value) {
-        store.loadSavedSearch().finally(async () => {
-          if (store.casas.length === 0 && !store.loading) {
-            await initData()
-          }
-        })
+        await initData()
       }
     })
 
@@ -762,6 +805,7 @@ export default defineComponent({
       store,
       search,
       casas,
+      desktopCasas,
       canAdd,
       loading,
       addNew,
@@ -792,6 +836,13 @@ export default defineComponent({
       daysRemaining,
       handleLogin,
       handleLogout,
+      firstSyncPending,
+      isSyncing,
+      syncError,
+      lastSyncAt,
+      syncTitle,
+      syncStatusText,
+      visibleRecordsCount,
       // Table
       tableColumns,
       getStatusColor
@@ -813,6 +864,27 @@ export default defineComponent({
   font-size: 11px;
   font-weight: 500;
   box-shadow: 0 4px 10px rgba(49, 168, 255, 0.3);
+}
+
+.sync-status-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.94) 0%, rgba(227, 242, 253, 0.98) 100%);
+  border: 1px solid rgba(25, 118, 210, 0.12);
+  border-radius: 18px;
+  padding: 14px 16px;
+  box-shadow: 0 8px 18px rgba(25, 118, 210, 0.08);
+}
+
+.rotate-sync {
+  animation: spin-sync 1.2s linear infinite;
+}
+
+@keyframes spin-sync {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .modern-card {

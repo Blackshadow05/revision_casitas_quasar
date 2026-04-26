@@ -8,6 +8,7 @@ import { defineComponent, onMounted } from 'vue'
 import DailyNotice from './components/DailyNotice.vue'
 import { supabase } from './supabase'
 import { useQuasar } from 'quasar'
+import { playSound } from './utils/sounds'
 
 export default defineComponent({
   name: 'App',
@@ -35,6 +36,7 @@ export default defineComponent({
               message = `Nuevo registro: ${nombre} (${casita})`
               icon = 'add_circle'
               color = 'positive'
+              playSound('receive')
             } else if (payload.eventType === 'UPDATE') {
               message = `Actualización: ${nombre} (${casita})`
               icon = 'update'

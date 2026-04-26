@@ -55,7 +55,7 @@
                 </q-item-section>
               </q-item>
 
-              <q-item v-if="authStore.isSuperAdmin" clickable v-close-popup @click="goToSeguridad">
+              <q-item v-if="authStore.isLoggedIn" clickable v-close-popup @click="goToSeguridad">
                 <q-item-section avatar>
                   <q-icon name="security" color="primary" />
                 </q-item-section>
@@ -88,7 +88,7 @@
             class="appbar-nav-btn text-white q-mr-md"
             @click="goTo('/dashboard-horario')"
           />
-          <template v-if="authStore.user?.Rol === 'admin' || authStore.isSuperAdmin">
+          <template v-if="authStore.isLoggedIn">
             <q-btn
               v-for="item in desktopSecurityLinks"
               :key="item.path"
@@ -119,7 +119,7 @@
       >
         <q-tab name="home" icon="home" label="Inicio" @click="goToHome" />
         <q-tab name="menus" icon="restaurant" label="Menús" @click="goToMenus" />
-        <q-tab v-if="authStore.isSuperAdmin" name="security" icon="security" label="Seguridad" @click="goToSeguridad" />
+        <q-tab v-if="authStore.isLoggedIn" name="security" icon="security" label="Seguridad" @click="goToSeguridad" />
         <q-tab name="forms" icon="assignment" label="Forms" @click="goToForms" />
       </q-tabs>
     </q-footer>
@@ -136,6 +136,7 @@ import InstallPrompt from "../components/InstallPrompt.vue";
 import { useCasasStore } from "../stores/casas";
 import { useAuthStore } from "../stores/auth";
 import { desktopSecurityLinks } from "../services/securityNavigation";
+import { playSound } from "../utils/sounds";
 
 export default defineComponent({
   name: "MainLayout",
@@ -149,6 +150,14 @@ export default defineComponent({
     const route = useRoute();
     const casasStore = useCasasStore();
     const authStore = useAuthStore();
+    let stopHomeUpdates = null;
+
+    const detachHomeUpdates = () => {
+      if (typeof stopHomeUpdates === 'function') {
+        stopHomeUpdates();
+        stopHomeUpdates = null;
+      }
+    };
 
     // Sincronizar tab con la ruta actual
     watch(() => route.path, (path) => {
@@ -160,29 +169,47 @@ export default defineComponent({
     }, { immediate: true });
 
     // Iniciar/detener suscripción realtime según estado de sesión
-    watch(() => authStore.isLoggedIn, (loggedIn) => {
+    watch(() => authStore.isLoggedIn, async (loggedIn) => {
+      detachHomeUpdates();
+
       if (loggedIn) {
-        casasStore.subscribeToRealtime((newRecord) => {
-          // Solo notificar si el usuario NO está en la pantalla de inicio (ya la ve en tiempo real)
-          if (route.path !== '/') {
-            q.notify({
-              type: 'positive',
-              message: `Nueva revisión: Casita ${newRecord.casita || '--'} por ${newRecord.quien_revisa || 'Anónimo'}`,
-              caption: 'Toca para ir al inicio',
-              position: 'top',
-              timeout: 6000,
-              icon: 'add_circle',
-              actions: [{ label: 'Ver', color: 'white', handler: () => router.push('/') }]
-            })
+        await casasStore.ensureLocalReady();
+        stopHomeUpdates = casasStore.subscribeToHomeUpdates((change) => {
+          const record = change?.record || {}
+          const eventType = change?.eventType || 'INSERT'
+          const casita = record.casita || '--'
+          const usuario = record.quien_revisa || 'Anónimo'
+
+          let type = 'positive'
+          let icon = 'add_circle'
+          let caption = 'Nueva revisión recibida'
+
+          if (eventType === 'UPDATE') {
+            type = 'info'
+            icon = 'update'
+            caption = 'Revisión actualizada'
+          } else if (eventType === 'DELETE') {
+            type = 'warning'
+            icon = 'delete'
+            caption = 'Revisión eliminada'
           }
+
+          playSound('receive')
+          q.notify({
+            type,
+            message: `Revisión casita ${casita} por ${usuario}`,
+            caption,
+            position: 'top',
+            timeout: 6000,
+            icon,
+            actions: [{ label: 'Ver', color: 'white', handler: () => router.push('/') }]
+          })
         })
-      } else {
-        casasStore.unsubscribeFromRealtime()
       }
     }, { immediate: true });
 
     onUnmounted(() => {
-      casasStore.unsubscribeFromRealtime()
+      detachHomeUpdates()
     });
 
     const goToHome = () => {

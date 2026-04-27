@@ -35,21 +35,21 @@
           </div>
         </div>
 
-        <div v-else class="preview-section">
-          <div class="relative-position">
-            <q-img :src="imagePreview" class="rounded-lg shadow-1" />
+        <div v-else class="preview-section column items-center">
+          <div class="preview-card">
+            <q-img :src="imagePreview" class="preview-image" fit="contain" />
             <q-btn
               fab
               color="negative"
               icon="close"
-              class="absolute-top-right q-ma-sm"
+              class="preview-remove-btn"
               size="sm"
               @click="clearImage"
               :disabled="loading"
             />
           </div>
 
-          <div class="q-mt-lg">
+          <div class="scan-action q-mt-lg">
             <q-btn
               color="primary"
               label="Escanear"
@@ -247,7 +247,7 @@ export default defineComponent({
       if (!selectedImage.value) return
       
       loading.value = true
-      loadingStatus.value = 'Gemini está analizando la imagen...'
+      loadingStatus.value = 'Analizando imagen...'
       menusDiarios.value = []
 
       try {
@@ -255,7 +255,7 @@ export default defineComponent({
         if (!apiKey) throw new Error('API Key no encontrada')
 
         const genAI = new GoogleGenerativeAI(apiKey)
-        const model = genAI.getGenerativeModel({ model: 'gemini-flash-lite-latest' })
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' })
 
         const imagePart = await fileToGenerativePart(selectedImage.value)
         const prompt = `
@@ -475,15 +475,48 @@ export default defineComponent({
 .py-md { padding-top: 16px; padding-bottom: 16px; }
 
 /* Limitar tamaño de la imagen de vista previa */
-.preview-section .q-img {
-  max-width: 100%;
-  max-height: 400px;
-  object-fit: contain;
+.preview-section {
+  width: 100%;
+}
+
+.preview-card {
+  position: relative;
+  width: min(100%, 520px);
+  height: clamp(220px, 46vh, 420px);
+  padding: 12px;
+  border: 1px solid #e8e8e8;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #fafafa 0%, #f1f4f7 100%);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08);
+}
+
+.preview-image {
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.preview-remove-btn {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+}
+
+.scan-action {
+  width: min(100%, 520px);
 }
 
 @media (max-width: 600px) {
-  .preview-section .q-img {
-    max-height: 300px;
+  .scan-container {
+    padding: 16px;
+  }
+
+  .preview-card {
+    height: 260px;
+    padding: 10px;
+    border-radius: 16px;
   }
 }
 </style>

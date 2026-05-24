@@ -57,11 +57,13 @@ const securityNavigationItems = [
   }
 ]
 
-export const desktopSecurityLinks = securityNavigationItems.map(({ path, icon, label }) => ({
-  path,
-  icon,
-  label
-}))
+export const desktopSecurityLinks = securityNavigationItems
+  .filter(item => !item.path.startsWith('/seguridad'))
+  .map(({ path, icon, label }) => ({
+    path,
+    icon,
+    label
+  }))
 
 export const buildSecurityMenuItems = (counts) => securityNavigationItems.map((item) => ({
   ...item,

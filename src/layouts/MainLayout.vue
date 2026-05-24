@@ -14,7 +14,7 @@
 
         <q-space />
 
-        <q-btn flat round dense icon="menu" class="menu-button text-white" aria-label="Abrir navegación">
+        <q-btn flat round dense icon="menu" class="menu-button text-white gt-xs" aria-label="Abrir navegación">
           <q-menu anchor="bottom right" self="top right" class="menu-dropdown">
             <q-list style="min-width: 220px">
               <q-item clickable v-close-popup @click="goToHome">
@@ -55,7 +55,7 @@
                 </q-item-section>
               </q-item>
 
-              <q-item v-if="authStore.isLoggedIn" clickable v-close-popup @click="goToSeguridad">
+              <q-item v-if="false" clickable v-close-popup @click="goToSeguridad">
                 <q-item-section avatar>
                   <q-icon name="security" color="primary" />
                 </q-item-section>
@@ -119,7 +119,7 @@
       >
         <q-tab name="home" icon="home" label="Inicio" @click="goToHome" />
         <q-tab name="menus" icon="restaurant" label="Menús" @click="goToMenus" />
-        <q-tab v-if="authStore.isLoggedIn" name="security" icon="security" label="Seguridad" @click="goToSeguridad" />
+        <q-tab v-if="false" name="security" icon="security" label="Seguridad" @click="goToSeguridad" />
         <q-tab name="forms" icon="assignment" label="Forms" @click="goToForms" />
       </q-tabs>
     </q-footer>

@@ -111,7 +111,7 @@
       </div>
 
       <!-- ==================== AVISOS DE OPERACIÓN ==================== -->
-      <div v-if="avisos.length" class="avisos-wrapper q-mb-md">
+      <div v-if="avisos.length && !$q.screen.gt.md" class="avisos-wrapper q-mb-md">
         <div class="avisos-header row items-center justify-between no-wrap q-mb-xs">
           <div class="row items-center no-wrap">
             <q-icon name="notifications_active" size="20px" color="orange-9" class="q-mr-xs" />

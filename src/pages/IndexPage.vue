@@ -110,6 +110,42 @@
         </div>
       </div>
 
+      <!-- ==================== AVISOS DE OPERACIÓN ==================== -->
+      <div v-if="avisos.length" class="avisos-wrapper q-mb-md">
+        <div class="avisos-header row items-center justify-between no-wrap q-mb-xs">
+          <div class="row items-center no-wrap">
+            <q-icon name="notifications_active" size="20px" color="orange-9" class="q-mr-xs" />
+            <span class="text-weight-bold text-orange-9">{{ avisosLabel }}</span>
+          </div>
+          <q-btn
+            flat
+            dense
+            no-caps
+            size="sm"
+            color="orange-9"
+            :icon="avisosOcultos ? 'visibility' : 'visibility_off'"
+            :label="avisosOcultos ? 'Mostrar' : 'Ocultar'"
+            @click="avisosOcultos = !avisosOcultos"
+          />
+        </div>
+        <transition-group v-show="!avisosOcultos" name="aviso-fade" tag="div">
+          <q-banner
+            v-for="a in avisos"
+            :key="a.key"
+            rounded
+            dense
+            class="aviso-banner q-mb-sm text-white"
+            :class="a.cssClass"
+          >
+            <template v-slot:avatar>
+              <q-icon :name="a.icon" color="white" />
+            </template>
+            <div class="text-weight-bold">{{ a.text }}</div>
+            <div class="text-caption aviso-restante">{{ a.restante }}</div>
+          </q-banner>
+        </transition-group>
+      </div>
+
       <div class="text-h5 text-weight-bold q-mb-lg" style="color: #4CAF50;">Revisiones de Casitas</div>
 
       <div v-if="!$q.screen.gt.md" class="row q-col-gutter-sm q-mb-lg">
@@ -483,6 +519,64 @@ import { useCasasStore } from '../stores/casas'
 import { useAuthStore } from '../stores/auth'
 import { date, useQuasar } from 'quasar'
 import { useRouter, useRoute } from 'vue-router'
+import { supabase } from '../supabase'
+
+// ===== Helpers para los avisos de operaciones_memo =====
+const MEMO_MONTHS = {
+  january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
+  july: 7, august: 8, september: 9, october: 10, november: 11, december: 12
+}
+
+// Normaliza texto: minúsculas, sin apóstrofes, espacios colapsados.
+function memoNorm (v) {
+  return String(v == null ? '' : v)
+    .toLowerCase()
+    .replace(/[''´`]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+// Extrae { month, day } de un texto como "Thursday, June 04th".
+function memoParseFecha (str) {
+  const s = String(str == null ? '' : str).toLowerCase()
+  let month = null
+  for (const name in MEMO_MONTHS) {
+    if (s.includes(name)) { month = MEMO_MONTHS[name]; break }
+  }
+  const m = s.match(/\d+/)
+  const day = m ? parseInt(m[0], 10) : null
+  return { month, day }
+}
+
+// Parsea horas tipo "11:30hrs", "2:00 PM", "14:00" -> { h, min }
+function memoParseHora (raw) {
+  const s = String(raw == null ? '' : raw).toLowerCase().trim()
+  if (!s) return null
+  const m = s.match(/(\d{1,2}):(\d{2})/)
+  if (!m) return null
+  let h = parseInt(m[1], 10)
+  const min = parseInt(m[2], 10)
+  const isPM = /p\.?\s?m/.test(s)
+  const isAM = /a\.?\s?m/.test(s)
+  if (isPM && h < 12) h += 12
+  if (isAM && h === 12) h = 0
+  if (h > 23 || min > 59) return null
+  return { h, min }
+}
+
+// Convierte una hora del registro en un Date de hoy (base = fecha/hora del dispositivo).
+function memoHoraToToday (raw, base) {
+  const t = memoParseHora(raw)
+  if (!t) return null
+  const d = new Date(base)
+  d.setHours(t.h, t.min, 0, 0)
+  return d
+}
+
+function memoTxt (v) {
+  const s = v == null ? '' : String(v).trim()
+  return s === '' ? '—' : s
+}
 
 export default defineComponent({
   name: 'IndexPage',
@@ -493,6 +587,146 @@ export default defineComponent({
     const route = useRoute()
     const $q = useQuasar()
     const infiniteScroll = ref(null)
+
+    // ===== Avisos de operación (tabla operaciones_memo) =====
+    // Muestra mensajes cuando faltan <= 40 min para la hora del registro y se
+    // mantienen anclados hasta que esa hora llega (luego desaparecen).
+    const VENTANA_AVISO_MIN = 40
+    const AVISOS_OCULTOS_KEY = 'index_avisos_ocultos'
+    const memoRows = ref([])
+    const now = ref(new Date())
+    // Estado oculto/visible persistido durante la sesión.
+    const avisosOcultos = ref(sessionStorage.getItem(AVISOS_OCULTOS_KEY) === '1')
+    watch(avisosOcultos, (val) => {
+      sessionStorage.setItem(AVISOS_OCULTOS_KEY, val ? '1' : '0')
+    })
+    let avisoNowTimer = null
+    let avisoMemoTimer = null
+
+    const cargarMemos = async () => {
+      try {
+        const { data, error } = await supabase.from('operaciones_memo').select('*')
+        if (error) throw error
+        memoRows.value = data || []
+      } catch (e) {
+        // No bloqueamos la pantalla principal si fallan los avisos.
+        console.error('Error al cargar operaciones_memo:', e)
+      }
+    }
+
+    const avisos = computed(() => {
+      const ahora = now.value
+      const hoyMonth = ahora.getMonth() + 1
+      const hoyDay = ahora.getDate()
+      const out = []
+
+      // Estructuras para agrupar por hora
+      const arrivalsMap = {}
+      const departuresMap = {}
+
+      memoRows.value.forEach((r, idx) => {
+        const f = memoParseFecha(r.fecha)
+        if (f.month !== hoyMonth || f.day !== hoyDay) return
+        const tipo = memoNorm(r.tipo)
+
+        // Valida si la hora cae dentro de la ventana [ahora, ahora + 40min].
+        const evaluarHora = (rawHora) => {
+          const target = memoHoraToToday(rawHora, ahora)
+          if (!target) return null
+          const diff = Math.round((target.getTime() - ahora.getTime()) / 60000)
+          if (diff < 0 || diff > VENTANA_AVISO_MIN) return null
+          return { diff, orden: target.getTime() }
+        }
+
+        if (tipo === 'tour') {
+          const resSalida = evaluarHora(r.hora_salida)
+          if (resSalida) {
+            out.push({
+              text: `A las ${memoTxt(r.hora_salida)} sale el tour ${memoTxt(r.detalle_tour)}`,
+              icon: 'directions_bus', cssClass: 'aviso--salida',
+              diff: resSalida.diff, key: idx + '-tour-salida', orden: resSalida.orden
+            })
+          }
+          const resLlegada = evaluarHora(r.hora_llegada)
+          if (resLlegada) {
+            out.push({
+              text: `A las ${memoTxt(r.hora_llegada)} regresa el tour ${memoTxt(r.detalle_tour)}`,
+              icon: 'keyboard_return', cssClass: 'aviso--regreso',
+              diff: resLlegada.diff, key: idx + '-tour-regreso', orden: resLlegada.orden
+            })
+          }
+        } else if (tipo.includes('arrival')) {
+          const rawHora = r.hora_llegada_real
+          const res = evaluarHora(rawHora)
+          if (res) {
+            const horaKey = memoTxt(rawHora)
+            if (!arrivalsMap[horaKey]) {
+              arrivalsMap[horaKey] = {
+                rawHora,
+                casitas: [],
+                diff: res.diff,
+                orden: res.orden,
+                keys: []
+              }
+            }
+            const casitaTxt = memoTxt(r.casita)
+            if (!arrivalsMap[horaKey].casitas.includes(casitaTxt)) {
+              arrivalsMap[horaKey].casitas.push(casitaTxt)
+            }
+            arrivalsMap[horaKey].keys.push(idx)
+          }
+        } else if (tipo.includes('departure')) {
+          const rawHora = r.hora_salida_real
+          const res = evaluarHora(rawHora)
+          if (res) {
+            const horaKey = memoTxt(rawHora)
+            if (!departuresMap[horaKey]) {
+              departuresMap[horaKey] = {
+                rawHora,
+                casitas: [],
+                diff: res.diff,
+                orden: res.orden,
+                keys: []
+              }
+            }
+            const casitaTxt = memoTxt(r.casita)
+            if (!departuresMap[horaKey].casitas.includes(casitaTxt)) {
+              departuresMap[horaKey].casitas.push(casitaTxt)
+            }
+            departuresMap[horaKey].keys.push(idx)
+          }
+        }
+      })
+
+      // Agregar las llegadas agrupadas al arreglo de salida
+      Object.values(arrivalsMap).forEach(grupo => {
+        out.push({
+          text: `A las ${memoTxt(grupo.rawHora)} llega check in ${grupo.casitas.join(', ')}`,
+          icon: 'login', cssClass: 'aviso--checkin',
+          diff: grupo.diff, key: grupo.keys.join('-') + '-arrival', orden: grupo.orden
+        })
+      })
+
+      // Agregar las salidas agrupadas al arreglo de salida
+      Object.values(departuresMap).forEach(grupo => {
+        out.push({
+          text: `A las ${memoTxt(grupo.rawHora)} sale check out ${grupo.casitas.join(', ')}`,
+          icon: 'logout', cssClass: 'aviso--checkout',
+          diff: grupo.diff, key: grupo.keys.join('-') + '-departure', orden: grupo.orden
+        })
+      })
+
+      out.sort((a, b) => a.orden - b.orden)
+      return out.map((a) => ({
+        ...a,
+        restante: a.diff <= 0 ? '¡Es ahora!' : `Faltan ${a.diff} min`
+      }))
+    })
+
+    const avisosLabel = computed(() => {
+      const n = avisos.value.length
+      return `Hay ${n} ${n === 1 ? 'notificación' : 'notificaciones'}`
+    })
 
     // Desktop table columns
     const tableColumns = [
@@ -618,6 +852,7 @@ export default defineComponent({
       if (result.success) {
         showLoginModal.value = false
         await loadData()
+        await cargarMemos()
       } else {
         $q.notify({
           type: 'negative',
@@ -719,12 +954,21 @@ export default defineComponent({
 
     onUnmounted(() => {
       clearInterval(checkSessionInterval)
+      if (avisoNowTimer) clearInterval(avisoNowTimer)
+      if (avisoMemoTimer) clearInterval(avisoMemoTimer)
     })
 
     onMounted(async () => {
       if (isLoggedIn.value) {
         await initData()
+        await cargarMemos()
       }
+      // Reloj para recalcular la ventana de 40 min.
+      avisoNowTimer = setInterval(() => { now.value = new Date() }, 30000)
+      // Refresca los datos de operaciones_memo cada 5 min.
+      avisoMemoTimer = setInterval(() => {
+        if (isLoggedIn.value) cargarMemos()
+      }, 5 * 60 * 1000)
     })
 
     const formatFullDate = (val) => {
@@ -816,6 +1060,9 @@ export default defineComponent({
     return {
       store,
       search,
+      avisos,
+      avisosLabel,
+      avisosOcultos,
       casas,
       desktopCasas,
       canAdd,
@@ -866,6 +1113,51 @@ export default defineComponent({
 <style scoped>
 .gradient-text {
   color: #2e7d32; /* Match the image header color */
+}
+
+/* ===== Avisos de operación ===== */
+.avisos-wrapper {
+  position: sticky;
+  top: 8px;
+  z-index: 200;
+}
+
+.avisos-header {
+  background: #fff8e1;
+  border-radius: 10px;
+  padding: 2px 4px 2px 10px;
+}
+
+.aviso-banner {
+  border-radius: 14px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+
+.aviso-restante {
+  opacity: 0.9;
+}
+
+.aviso--salida {
+  background: linear-gradient(135deg, #1e88e5 0%, #1565c0 100%);
+}
+.aviso--regreso {
+  background: linear-gradient(135deg, #00897b 0%, #00695c 100%);
+}
+.aviso--checkin {
+  background: linear-gradient(135deg, #43a047 0%, #2e7d32 100%);
+}
+.aviso--checkout {
+  background: linear-gradient(135deg, #e53935 0%, #c62828 100%);
+}
+
+.aviso-fade-enter-active,
+.aviso-fade-leave-active {
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+.aviso-fade-enter-from,
+.aviso-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 
 .records-badge {

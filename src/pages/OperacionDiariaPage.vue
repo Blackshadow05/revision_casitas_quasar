@@ -112,15 +112,19 @@
           <q-card-section class="q-pa-md row items-center q-col-gutter-md">
             <div class="col-4 campo">
               <div class="campo-label">Casita</div>
-              <div class="campo-valor text-weight-bold text-h6">{{ valor(c.casita) }}</div>
+              <div class="campo-valor text-weight-bold text-h6">
+                <q-chip v-for="cas in c.casitas" :key="cas" dense color="red-1" text-color="red-9" class="text-weight-bold">
+                  {{ cas }}
+                </q-chip>
+              </div>
             </div>
             <div class="col-4 campo">
               <div class="campo-label">Method</div>
-              <div class="campo-valor">{{ valor(c.method) }}</div>
+              <div class="campo-valor">{{ c.method }}</div>
             </div>
             <div class="col-4 campo">
               <div class="campo-label">ETD</div>
-              <div class="campo-valor">{{ valor(c.etd) }}</div>
+              <div class="campo-valor">{{ c.etd }}</div>
             </div>
           </q-card-section>
         </q-card>
@@ -148,15 +152,19 @@
           <q-card-section class="q-pa-md row items-center q-col-gutter-md">
             <div class="col-4 campo">
               <div class="campo-label">Casita</div>
-              <div class="campo-valor text-weight-bold text-h6">{{ valor(c.casita) }}</div>
+              <div class="campo-valor text-weight-bold text-h6">
+                <q-chip v-for="cas in c.casitas" :key="cas" dense color="green-1" text-color="green-9" class="text-weight-bold">
+                  {{ cas }}
+                </q-chip>
+              </div>
             </div>
             <div class="col-4 campo">
               <div class="campo-label">Method</div>
-              <div class="campo-valor">{{ valor(c.method) }}</div>
+              <div class="campo-valor">{{ c.method }}</div>
             </div>
             <div class="col-4 campo">
               <div class="campo-label">ETA</div>
-              <div class="campo-valor">{{ valor(c.eta) }}</div>
+              <div class="campo-valor">{{ c.eta }}</div>
             </div>
           </q-card-section>
         </q-card>
@@ -327,12 +335,38 @@ export default defineComponent({
         .sort((a, b) => tourPrioridad(a.tipo_tour) - tourPrioridad(b.tipo_tour))
     )
 
-    const checkouts = computed(() =>
+    const checkoutsRaw = computed(() =>
       rowsDelDia.value.filter((r) => norm(r.tipo).includes('departure'))
     )
 
-    const checkins = computed(() =>
+    const checkinsRaw = computed(() =>
       rowsDelDia.value.filter((r) => norm(r.tipo).includes('arrival'))
+    )
+
+    function groupBy (rows, keyFn) {
+      const map = new Map()
+      for (const r of rows) {
+        const key = keyFn(r)
+        if (!map.has(key)) map.set(key, [])
+        map.get(key).push(r)
+      }
+      return [...map.entries()].map(([key, items]) => ({ key, items }))
+    }
+
+    const checkins = computed(() =>
+      groupBy(checkinsRaw.value, (r) => `${norm(r.method)}|${norm(r.eta)}`).map((g) => ({
+        casitas: g.items.map((r) => valor(r.casita)),
+        method: valor(g.items[0].method),
+        eta: valor(g.items[0].eta)
+      }))
+    )
+
+    const checkouts = computed(() =>
+      groupBy(checkoutsRaw.value, (r) => `${norm(r.method)}|${norm(r.etd)}`).map((g) => ({
+        casitas: g.items.map((r) => valor(r.casita)),
+        method: valor(g.items[0].method),
+        etd: valor(g.items[0].etd)
+      }))
     )
 
     const ocupacionNumeros = computed(() => {

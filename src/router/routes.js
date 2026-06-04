@@ -20,6 +20,7 @@ const routes = [
       { path: 'danos-casitas', component: () => import('pages/DanosCasitasListPage.vue') },
       { path: 'danos-casitas/:numero', component: () => import('pages/DanosCasitasDetailPage.vue') },
       { path: 'dashboard-horario', component: () => import('pages/DashboardHorarioPage.vue') },
+      { path: 'operacion-diaria', component: () => import('pages/OperacionDiariaPage.vue') },
       { path: 'snippets', component: () => import('pages/SnippetsPage.vue') },
       { path: 'seguridad', component: () => import('pages/SecurityMenuPage.vue') },
       { path: 'seguridad/bitacora', component: () => import('pages/DailyLogsPage.vue') },

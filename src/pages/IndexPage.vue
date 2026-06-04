@@ -112,17 +112,31 @@
 
       <div class="text-h5 text-weight-bold q-mb-lg" style="color: #4CAF50;">Revisiones de Casitas</div>
 
-      <div v-if="!$q.screen.gt.md" class="row justify-center q-mb-lg">
-        <q-btn
-          color="orange-8"
-          icon="schedule"
-          label="Acceder a Dashboard Horario"
-          no-caps
-          unelevated
-          rounded
-          class="dashboard-horario-btn full-width"
-          @click="goToDashboardHorario"
-        />
+      <div v-if="!$q.screen.gt.md" class="row q-col-gutter-sm q-mb-lg">
+        <div class="col-6">
+          <q-btn
+            color="orange-8"
+            icon="schedule"
+            label="Horario"
+            no-caps
+            unelevated
+            rounded
+            class="dashboard-horario-btn full-width"
+            @click="goToDashboardHorario"
+          />
+        </div>
+        <div class="col-6">
+          <q-btn
+            color="teal-7"
+            icon="today"
+            label="Operación Diaria"
+            no-caps
+            unelevated
+            rounded
+            class="dashboard-horario-btn full-width"
+            @click="goToOperacionDiaria"
+          />
+        </div>
       </div>
 
       <!-- Search Bar -->
@@ -733,6 +747,10 @@ export default defineComponent({
       router.push('/dashboard-horario')
     }
 
+    const goToOperacionDiaria = () => {
+      router.push('/operacion-diaria')
+    }
+
     const goToDetails = (casa) => {
       store.setSelectedCasa(casa)
       router.push('/details')
@@ -812,6 +830,7 @@ export default defineComponent({
       getActionIcon,
       getCardNoteText,
       goToDashboardHorario,
+      goToOperacionDiaria,
       goToDetails,
       showFilterModal,
       applyFilters,

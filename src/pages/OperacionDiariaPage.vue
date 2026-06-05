@@ -95,7 +95,7 @@
         <div class="seccion-header row items-center q-mb-sm">
           <q-icon name="logout" size="22px" color="red-6" class="q-mr-sm" />
           <span class="text-h6 text-weight-bold">Check out</span>
-          <q-badge color="red-6" class="q-ml-sm" :label="checkouts.length" />
+          <q-badge color="red-6" class="q-ml-sm" :label="checkoutsRaw.length" />
         </div>
 
         <div v-if="checkouts.length === 0" class="text-grey-6 text-caption q-pa-md text-center">
@@ -135,15 +135,34 @@
         <div class="seccion-header row items-center q-mb-sm">
           <q-icon name="login" size="22px" color="green-7" class="q-mr-sm" />
           <span class="text-h6 text-weight-bold">Check in</span>
-          <q-badge color="green-7" class="q-ml-sm" :label="checkins.length" />
+          <q-badge color="green-7" class="q-ml-sm" :label="checkinsRaw.length" />
+          <q-space />
+          <q-toggle
+            v-model="filtroPendienteMontaje"
+            label="Pendiente montaje"
+            color="orange-7"
+            dense
+            class="q-mr-sm text-caption"
+          />
         </div>
 
-        <div v-if="checkins.length === 0" class="text-grey-6 text-caption q-pa-md text-center">
-          Sin check in para {{ diaTexto }}.
+        <!-- Botón Confirmar Montaje -->
+        <q-btn
+          no-caps
+          unelevated
+          color="orange-7"
+          icon="build"
+          label="Confirmar Montaje"
+          class="q-mb-sm full-width montaje-btn"
+          @click="abrirMontajeDialog"
+        />
+
+        <div v-if="checkinsFiltrados.length === 0" class="text-grey-6 text-caption q-pa-md text-center">
+          {{ filtroPendienteMontaje ? 'Todos los montajes están confirmados.' : 'Sin check in para ' + diaTexto + '.' }}
         </div>
 
         <q-card
-          v-for="(c, i) in checkins"
+          v-for="(c, i) in checkinsFiltrados"
           :key="'in-' + i"
           flat
           bordered
@@ -153,9 +172,33 @@
             <div class="col-4 campo">
               <div class="campo-label">Casita</div>
               <div class="campo-valor text-weight-bold text-h6">
-                <q-chip v-for="cas in c.casitas" :key="cas" dense color="green-1" text-color="green-9" class="text-weight-bold">
-                  {{ cas }}
-                </q-chip>
+                <template v-for="item in c.items" :key="item.id">
+                  <div class="casita-montaje-row">
+                    <q-chip 
+                      dense 
+                      color="green-1" 
+                      text-color="green-9" 
+                      class="text-weight-bold"
+                      :class="{'btb-shadow': valor(item.casita).toUpperCase().includes('BTB')}"
+                    >
+                      {{ valor(item.casita) }}
+                      <q-icon
+                        v-if="esMontajeHecho(item)"
+                        name="check_circle"
+                        size="16px"
+                        color="green-9"
+                        class="q-ml-xs"
+                      />
+                    </q-chip>
+                  </div>
+                  <div
+                    v-if="dia === 'manana' && casitasOcupadasEnArrivals.has(valor(item.casita))"
+                    class="advertencia-ocupada"
+                  >
+                    <q-icon name="warning" size="14px" class="q-mr-xs" />
+                    Esta casa ya se encuentra ocupada
+                  </div>
+                </template>
               </div>
             </div>
             <div class="col-4 campo">
@@ -169,6 +212,45 @@
           </q-card-section>
         </q-card>
       </div>
+
+      <!-- ==================== DIALOG MONTAJE ==================== -->
+      <q-dialog v-model="montajeDialogOpen" persistent>
+        <q-card style="min-width: 320px; border-radius: 16px;">
+          <q-card-section class="bg-orange-7 text-white">
+            <div class="text-h6 row items-center">
+              <q-icon name="build" class="q-mr-sm" />
+              Confirmar Montaje
+            </div>
+            <div class="text-caption">Marca las casitas cuyo montaje está listo</div>
+          </q-card-section>
+
+          <q-card-section class="q-pt-md">
+            <q-list separator>
+              <q-item v-for="item in montajeItems" :key="item.id" tag="label">
+                <q-item-section side>
+                  <q-checkbox
+                    v-model="item.checked"
+                    color="green-7"
+                    @update:model-value="toggleMontaje(item)"
+                  />
+                </q-item-section>
+                <q-item-section>
+                  <q-item-label class="text-weight-bold">Casita {{ valor(item.casita) }}</q-item-label>
+                </q-item-section>
+                <q-item-section side>
+                  <q-spinner-dots v-if="item.saving" size="20px" color="orange-7" />
+                  <q-icon v-else-if="item.checked" name="check_circle" color="green-7" size="20px" />
+                  <q-icon v-else name="radio_button_unchecked" color="grey-5" size="20px" />
+                </q-item-section>
+              </q-item>
+            </q-list>
+          </q-card-section>
+
+          <q-card-actions align="right" class="q-pa-md">
+            <q-btn flat label="Cerrar" color="grey-7" v-close-popup />
+          </q-card-actions>
+        </q-card>
+      </q-dialog>
 
       <!-- ==================== OCUPACIÓN DEL DÍA ==================== -->
       <div v-if="secciones.ocupacion" class="q-mb-lg">
@@ -262,6 +344,17 @@ function parseFecha (str) {
   return { month, day }
 }
 
+// Extrae { day, month, year } de formato "DD-MM-YYYY" (ej: "05-06-2026").
+function parseFechaIngreso (str) {
+  const parts = String(str == null ? '' : str).split('-')
+  if (parts.length !== 3) return { day: null, month: null, year: null }
+  return {
+    day: parseInt(parts[0], 10),
+    month: parseInt(parts[1], 10),
+    year: parseInt(parts[2], 10)
+  }
+}
+
 // Prioridad de ordenamiento para tipo_tour.
 function tourPrioridad (tipoTour) {
   const t = norm(tipoTour)
@@ -328,6 +421,20 @@ export default defineComponent({
       })
     })
 
+    // Registros del día anterior al seleccionado (para comparar in-house guests)
+    const prevDayParts = computed(() => {
+      const d = new Date(targetDate.value)
+      d.setDate(d.getDate() - 1)
+      return { month: d.getMonth() + 1, day: d.getDate() }
+    })
+    const rowsDelDiaAnterior = computed(() => {
+      const t = prevDayParts.value
+      return rows.value.filter((r) => {
+        const p = parseFecha(r.fecha)
+        return p.month === t.month && p.day === t.day
+      })
+    })
+
     const tours = computed(() =>
       rowsDelDia.value
         .filter((r) => norm(r.tipo) === 'tour')
@@ -355,11 +462,64 @@ export default defineComponent({
 
     const checkins = computed(() =>
       groupBy(checkinsRaw.value, (r) => `${norm(r.method)}|${norm(r.eta)}`).map((g) => ({
+        items: g.items,
         casitas: g.items.map((r) => valor(r.casita)),
         method: valor(g.items[0].method),
         eta: valor(g.items[0].eta)
       }))
     )
+
+    // Filtro pendiente montaje
+    const filtroPendienteMontaje = ref(false)
+
+    const checkinsFiltrados = computed(() => {
+      if (!filtroPendienteMontaje.value) return checkins.value
+      return checkins.value
+        .map((g) => ({
+          ...g,
+          items: g.items.filter((r) => !esMontajeHecho(r))
+        }))
+        .filter((g) => g.items.length > 0)
+    })
+
+    function esMontajeHecho (row) {
+      return norm(row.montaje_hecho).includes('hecho')
+    }
+
+    // Dialog montaje
+    const montajeDialogOpen = ref(false)
+    const montajeItems = ref([])
+
+    function abrirMontajeDialog () {
+      montajeItems.value = checkinsRaw.value.map((r) => ({
+        id: r.id,
+        casita: r.casita,
+        checked: esMontajeHecho(r),
+        saving: false
+      }))
+      montajeDialogOpen.value = true
+    }
+
+    async function toggleMontaje (item) {
+      item.saving = true
+      const nuevoValor = item.checked ? 'hecho' : null
+      try {
+        const { error } = await supabase
+          .from('operaciones_memo')
+          .update({ montaje_hecho: nuevoValor })
+          .eq('id', item.id)
+        if (error) throw error
+        // Actualizar el row local
+        const row = rows.value.find((r) => r.id === item.id)
+        if (row) row.montaje_hecho = nuevoValor
+      } catch (e) {
+        // Revertir en caso de error
+        item.checked = !item.checked
+        errorMsg.value = 'Error al actualizar montaje: ' + (e.message || e)
+      } finally {
+        item.saving = false
+      }
+    }
 
     const checkouts = computed(() =>
       groupBy(checkoutsRaw.value, (r) => `${norm(r.method)}|${norm(r.etd)}`).map((g) => ({
@@ -387,18 +547,133 @@ export default defineComponent({
       }))
     )
 
+    // Set de casitas que están en arrivals Y también en in-house guests del día ANTERIOR (para advertencia)
+    const casitasOcupadasEnArrivals = computed(() => {
+      // Extraer casitas de in-house guests del día anterior como strings normalizados
+      const inHouseSet = new Set(
+        rowsDelDiaAnterior.value
+          .filter((r) => norm(r.tipo).includes('in house'))
+          .map((r) => valor(r.casita))
+          .filter((v) => v !== '—')
+      )
+      // Extraer casitas de arrivals y ver cuáles coinciden con in-house del día anterior
+      const ocupadas = new Set()
+      for (const r of checkinsRaw.value) {
+        const cas = valor(r.casita)
+        if (cas !== '—' && inHouseSet.has(cas)) {
+          ocupadas.add(cas)
+        }
+      }
+      return ocupadas
+    })
+
     function valor (v) {
       const s = v == null ? '' : String(v).trim()
       return s === '' ? '—' : s
+    }
+
+    // Normaliza el valor de casita para comparación (extrae solo el número)
+    function normCasita (v) {
+      const s = String(v == null ? '' : v).trim()
+      const m = s.match(/\d+/)
+      return m ? m[0] : s.toLowerCase()
+    }
+
+    // Sincroniza montaje automáticamente comparando revisiones_casitas con operaciones_memo
+    async function sincronizarMontaje (revisionesData) {
+      console.log('=== SINCRONIZAR MONTAJE ===')
+      console.log('Total revisiones recibidas:', revisionesData.length)
+      console.log('Primeras 3 revisiones (raw):', revisionesData.slice(0, 3))
+
+      const currentYear = new Date().getFullYear()
+
+      // Filtrar revisiones donde caja_fuerte sea "Check in"
+      const revCheckin = revisionesData.filter((r) =>
+        norm(r.caja_fuerte).includes('check in')
+      )
+      console.log('Revisiones con caja_fuerte "Check in":', revCheckin.length)
+      if (revCheckin.length === 0) {
+        console.log('Valores únicos de caja_fuerte:', [...new Set(revisionesData.map(r => r.caja_fuerte))])
+      }
+
+      // Crear un Set de claves "casitaNorm|month|day" desde revisiones_casitas
+      const revKeys = new Set()
+      for (const rev of revCheckin) {
+        const f = parseFechaIngreso(rev.fecha_ingreso_casita)
+        console.log(`  Revisión casita="${rev.casita}" fecha="${rev.fecha_ingreso_casita}" → parsed:`, f, '→ normCasita:', normCasita(rev.casita))
+        if (f.day && f.month) {
+          const key = `${normCasita(rev.casita)}|${f.month}|${f.day}`
+          revKeys.add(key)
+        }
+      }
+      console.log('Claves de revisiones (revKeys):', [...revKeys])
+
+      // Buscar arrivals en operaciones_memo que coincidan y no estén ya marcados
+      const porActualizar = []
+      const arrivals = rows.value.filter(r => norm(r.tipo).includes('arrival'))
+      console.log('Total arrivals en operaciones_memo:', arrivals.length)
+
+      for (const row of arrivals) {
+        if (norm(row.montaje_hecho).includes('hecho')) {
+          console.log(`  Arrival casita="${row.casita}" YA marcado como hecho, skip`)
+          continue
+        }
+
+        const fecha = parseFecha(row.fecha)
+        if (!fecha.month || !fecha.day) {
+          console.log(`  Arrival casita="${row.casita}" fecha="${row.fecha}" → NO se pudo parsear, skip`)
+          continue
+        }
+
+        const key = `${normCasita(row.casita)}|${fecha.month}|${fecha.day}`
+        const match = revKeys.has(key)
+        console.log(`  Arrival casita="${row.casita}" fecha="${row.fecha}" → key="${key}" → match: ${match}`)
+        if (match) {
+          porActualizar.push(row)
+        }
+      }
+
+      console.log('Total por actualizar:', porActualizar.length)
+
+      // Actualizar en lote los que coincidieron
+      for (const row of porActualizar) {
+        try {
+          const { error, data } = await supabase
+            .from('operaciones_memo')
+            .update({ montaje_hecho: 'hecho' })
+            .eq('id', row.id)
+            .select()
+          if (error) {
+            console.error(`  Error actualizando id=${row.id}:`, error)
+          } else {
+            console.log(`  ✓ Actualizado id=${row.id} casita="${row.casita}"`, data)
+            row.montaje_hecho = 'hecho'
+          }
+        } catch (e) {
+          console.error(`  Excepción actualizando id=${row.id}:`, e)
+        }
+      }
+      console.log('=== FIN SINCRONIZAR MONTAJE ===')
     }
 
     async function cargar () {
       loading.value = true
       errorMsg.value = ''
       try {
-        const { data, error } = await supabase.from('operaciones_memo').select('*')
-        if (error) throw error
-        rows.value = data || []
+        // Cargar ambas tablas en paralelo
+        const [opRes, revRes] = await Promise.all([
+          supabase.from('operaciones_memo').select('*'),
+          supabase.from('revisiones_casitas').select('casita, caja_fuerte, fecha_ingreso_casita')
+        ])
+        if (opRes.error) throw opRes.error
+        rows.value = opRes.data || []
+        console.log('operaciones_memo cargadas:', rows.value.length)
+        console.log('revisiones_casitas cargadas:', revRes.data ? revRes.data.length : 'ERROR', revRes.error || '')
+
+        // Sincronizar montaje automáticamente si hay datos de revisiones
+        if (!revRes.error && revRes.data && revRes.data.length > 0) {
+          await sincronizarMontaje(revRes.data)
+        }
       } catch (e) {
         errorMsg.value = e.message || 'Error al cargar los datos'
       } finally {
@@ -417,9 +692,19 @@ export default defineComponent({
       diaTexto,
       tours,
       checkouts,
+      checkoutsRaw,
       checkins,
+      checkinsFiltrados,
+      checkinsRaw,
       ocupacionNumeros,
       ocupacionZonas,
+      casitasOcupadasEnArrivals,
+      filtroPendienteMontaje,
+      montajeDialogOpen,
+      montajeItems,
+      abrirMontajeDialog,
+      toggleMontaje,
+      esMontajeHecho,
       valor
     }
   }
@@ -470,5 +755,41 @@ export default defineComponent({
   font-size: 14px;
   color: #1a1a1a;
   word-break: break-word;
+}
+
+.advertencia-ocupada {
+  display: flex;
+  align-items: center;
+  color: #d32f2f;
+  font-size: 12px;
+  font-weight: 700;
+  background: #ffebee;
+  border: 1px solid #ef9a9a;
+  border-radius: 8px;
+  padding: 4px 8px;
+  margin-top: 4px;
+  margin-bottom: 2px;
+  animation: pulseWarning 1.5s ease-in-out infinite;
+}
+
+@keyframes pulseWarning {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.btb-shadow {
+  box-shadow: 0 2px 8px rgba(229, 57, 53, 0.8) !important;
+  border: 1px solid #ef5350;
+}
+
+.montaje-btn {
+  border-radius: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.casita-montaje-row {
+  display: inline-flex;
+  align-items: center;
 }
 </style>

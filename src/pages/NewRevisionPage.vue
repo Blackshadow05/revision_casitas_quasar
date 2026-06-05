@@ -101,6 +101,29 @@
         />
       </div>
 
+      <!-- Fecha Ingreso de la casita (solo si caja_fuerte es Check in) -->
+      <div v-if="form.caja_fuerte === 'Check in'" class="section-container" :class="{ 'error-section': validationErrors.fecha_ingreso_casita }">
+        <div class="section-label q-mb-md" :class="{ 'error-label': validationErrors.fecha_ingreso_casita }">
+          <q-icon name="event" color="grey-7" class="q-mr-sm" size="20px" />
+          Fecha Ingreso de la casita <span class="required-asterisk">*</span>
+        </div>
+        <div class="button-grid">
+          <q-btn
+            v-for="option in fechaIngresoCasitaOptions"
+            :key="option"
+            :label="option"
+            unelevated
+            class="custom-select-btn option-btn"
+            :class="{ 'selected': form.fecha_ingreso_casita_selection === option }"
+            @click="selectFechaIngresoCasita(option)"
+          />
+        </div>
+        <div v-if="form.fecha_ingreso_casita" class="q-mt-sm text-caption text-grey-7">
+          <q-icon name="calendar_today" size="14px" class="q-mr-xs" />
+          Fecha guardada: {{ form.fecha_ingreso_casita }}
+        </div>
+      </div>
+
       <!-- Electrónicos Category -->
       <div class="category-header">
         <q-icon name="devices" />
@@ -693,6 +716,32 @@ export default defineComponent({
       'Back to Back', 'Show Room', 'Room Move'
     ]
 
+    // Fecha ingreso casita options
+    const fechaIngresoCasitaOptions = ['Check in de hoy', 'Check in de mañana', 'Ninguna']
+
+    // Helper to format date as DD-MM-YYYY
+    const formatDateDDMMYYYY = (date) => {
+      const dd = String(date.getDate()).padStart(2, '0')
+      const mm = String(date.getMonth() + 1).padStart(2, '0')
+      const yyyy = date.getFullYear()
+      return `${dd}-${mm}-${yyyy}`
+    }
+
+    // Handle fecha ingreso casita selection
+    const selectFechaIngresoCasita = (option) => {
+      form.value.fecha_ingreso_casita_selection = option
+      if (option === 'Check in de hoy') {
+        form.value.fecha_ingreso_casita = formatDateDDMMYYYY(new Date())
+      } else if (option === 'Check in de mañana') {
+        const tomorrow = new Date()
+        tomorrow.setDate(tomorrow.getDate() + 1)
+        form.value.fecha_ingreso_casita = formatDateDDMMYYYY(tomorrow)
+      } else {
+        // Ninguna
+        form.value.fecha_ingreso_casita = ''
+      }
+    }
+
     // Form data
     const form = ref({
       casita: '',
@@ -700,6 +749,8 @@ export default defineComponent({
       caja_fuerte: '',
       room_move: '',
       puertas_ventanas: '',
+      fecha_ingreso_casita: '',
+      fecha_ingreso_casita_selection: '',
       chromecast: '',
       binoculares: '',
       trapo_binoculares: '',
@@ -771,6 +822,7 @@ export default defineComponent({
         quien_revisa: false,
         caja_fuerte: false,
         puertas_ventanas: false,
+        fecha_ingreso_casita: false,
         chromecast: false,
         speaker: false,
         usb_speaker: false,
@@ -796,6 +848,8 @@ export default defineComponent({
         errors.quien_revisa = !form.value.quien_revisa
         errors.caja_fuerte = !form.value.caja_fuerte
         errors.puertas_ventanas = !form.value.puertas_ventanas
+        // fecha_ingreso_casita es obligatorio solo si caja_fuerte es Check in
+        errors.fecha_ingreso_casita = form.value.caja_fuerte === 'Check in' && !form.value.fecha_ingreso_casita_selection
         errors.chromecast = !form.value.chromecast
         errors.speaker = !form.value.speaker
         errors.usb_speaker = !form.value.usb_speaker
@@ -842,6 +896,8 @@ export default defineComponent({
       if (!form.value.sombrero) count++
       if (!form.value.bolso_yute) count++
       if (!form.value.camas_ordenadas) count++
+      // fecha_ingreso_casita obligatorio solo si caja_fuerte es Check in
+      if (form.value.caja_fuerte === 'Check in' && !form.value.fecha_ingreso_casita_selection) count++
       if (evidencia1Required.value && !form.value.evidencia_01) count++
       if (evidencia2Required.value && !form.value.evidencia_02) count++
       return count
@@ -1395,6 +1451,7 @@ export default defineComponent({
           evidencia_01: evidencia01Url,
           evidencia_02: evidencia02Url,
           evidencia_03: evidencia03Url,
+          fecha_ingreso_casita: form.value.caja_fuerte === 'Check in' ? form.value.fecha_ingreso_casita : '',
           notas: form.value.notas,
           created_at: localTime,
           update_at: localTime
@@ -1409,6 +1466,74 @@ export default defineComponent({
         if (result.success) {
           playSound('send')
           console.log('[NewRevisionPage] Revisión guardada exitosamente')
+
+          // === Sincronizar montaje_hecho en operaciones_memo ===
+          if (form.value.caja_fuerte === 'Check in' && form.value.fecha_ingreso_casita) {
+            try {
+              // Parsear fecha_ingreso_casita (DD-MM-YYYY)
+              const partes = form.value.fecha_ingreso_casita.split('-')
+              const diaRev = parseInt(partes[0], 10)
+              const mesRev = parseInt(partes[1], 10)
+              const casitaRev = String(form.value.casita).trim()
+
+              // Extraer solo el número de la casita para comparar
+              const numCasitaRev = casitaRev.match(/\d+/)
+              const casitaKey = numCasitaRev ? numCasitaRev[0] : casitaRev.toLowerCase()
+
+              console.log(`[Montaje Sync] Buscando arrivals con casita="${casitaKey}" mes=${mesRev} dia=${diaRev}`)
+
+              // Obtener arrivals de operaciones_memo
+              const { data: arrivals, error: fetchErr } = await supabase
+                .from('operaciones_memo')
+                .select('id, casita, fecha, tipo, montaje_hecho')
+
+              if (!fetchErr && arrivals) {
+                const MONTHS = {
+                  january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
+                  july: 7, august: 8, september: 9, october: 10, november: 11, december: 12
+                }
+
+                for (const row of arrivals) {
+                  // Solo arrivals sin montaje hecho
+                  const tipoNorm = String(row.tipo || '').toLowerCase()
+                  if (!tipoNorm.includes('arrival')) continue
+
+                  const montajeNorm = String(row.montaje_hecho || '').toLowerCase()
+                  if (montajeNorm.includes('hecho')) continue
+
+                  // Parsear fecha en inglés (e.g. "Friday, June 05th")
+                  const fechaStr = String(row.fecha || '').toLowerCase()
+                  let mesOp = null
+                  for (const name in MONTHS) {
+                    if (fechaStr.includes(name)) { mesOp = MONTHS[name]; break }
+                  }
+                  const matchDia = fechaStr.match(/\d+/)
+                  const diaOp = matchDia ? parseInt(matchDia[0], 10) : null
+
+                  // Extraer número de casita de operaciones_memo
+                  const casitaStr = String(row.casita || '').trim()
+                  const numCasitaOp = casitaStr.match(/\d+/)
+                  const casitaOpKey = numCasitaOp ? numCasitaOp[0] : casitaStr.toLowerCase()
+
+                  // Comparar
+                  if (mesOp === mesRev && diaOp === diaRev && casitaOpKey === casitaKey) {
+                    console.log(`[Montaje Sync] ✓ Match encontrado! id=${row.id} casita="${row.casita}" fecha="${row.fecha}"`)
+                    const { error: updateErr } = await supabase
+                      .from('operaciones_memo')
+                      .update({ montaje_hecho: 'hecho' })
+                      .eq('id', row.id)
+                    if (updateErr) {
+                      console.error(`[Montaje Sync] Error actualizando id=${row.id}:`, updateErr)
+                    } else {
+                      console.log(`[Montaje Sync] ✓ montaje_hecho actualizado a "hecho" para id=${row.id}`)
+                    }
+                  }
+                }
+              }
+            } catch (syncErr) {
+              console.error('[Montaje Sync] Error en sincronización:', syncErr)
+            }
+          }
           
           // Check if there are evidence images to share
           const hasEvidencia = evidencia01Url || evidencia02Url || evidencia03Url
@@ -1451,6 +1576,14 @@ export default defineComponent({
     // Load users on mount
     onMounted(() => {
       loadUsers()
+    })
+
+    // Clear fecha_ingreso_casita when caja_fuerte changes away from Check in
+    watch(() => form.value.caja_fuerte, (newVal) => {
+      if (newVal !== 'Check in') {
+        form.value.fecha_ingreso_casita = ''
+        form.value.fecha_ingreso_casita_selection = ''
+      }
     })
 
     // Watchers to compress images when files are selected
@@ -1508,6 +1641,8 @@ export default defineComponent({
       users,
       casitaOptions,
       cajaFuerteOptions,
+      fechaIngresoCasitaOptions,
+      selectFechaIngresoCasita,
       authStore,
       evidencia1Required,
       evidencia2Required,

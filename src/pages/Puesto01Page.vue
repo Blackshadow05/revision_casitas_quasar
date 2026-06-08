@@ -1,272 +1,310 @@
 <template>
-  <q-page class="puesto01-page q-pa-md">
-    <div class="page-shell">
-      <div class="page-header row items-start justify-between q-col-gutter-md">
-        <div class="col-12 col-md">
-          <div class="row items-center q-col-gutter-sm">
-            <div class="col-auto">
-              <q-btn flat round dense icon="arrow_back" to="/google-sheets" />
-            </div>
-            <div class="col">
-              <div class="text-h4 text-weight-bold text-grey-10">Puesto 01</div>
-              <div v-if="reportDateLabel" class="q-mt-sm">
-                <div class="report-date-label text-weight-bold text-primary">
-                  Reporte del {{ reportDateLabel }}
+  <q-page class="puesto01-page">
+    <!-- ===================== HERO ===================== -->
+    <div class="p01-hero" :style="{ background: filtroActual.grad }">
+      <div class="p01-hero__overlay"></div>
+      <div class="p01-hero__content">
+        <q-btn flat round dense icon="arrow_back" class="text-white" @click="$router.push('/')" />
+        <div class="p01-hero__titles">
+          <div class="p01-hero__title">
+            <q-icon name="local_police" size="26px" class="q-mr-sm" />
+            Puesto 01
+          </div>
+          <div class="p01-hero__subtitle">Reporte de hoy · {{ fechaLabel }}</div>
+        </div>
+        <q-space />
+        <q-btn
+          round
+          flat
+          dense
+          icon="refresh"
+          class="text-white"
+          :loading="loading"
+          @click="cargar"
+        >
+          <q-tooltip>Actualizar</q-tooltip>
+        </q-btn>
+      </div>
+    </div>
+
+    <div class="p01-body">
+      <!-- ===================== TABS PENDIENTES / COMPLETADOS ===================== -->
+      <q-card flat bordered class="p01-tabs-card">
+        <q-tabs
+          v-model="estadoTab"
+          no-caps
+          dense
+          class="p01-tabs"
+          active-color="primary"
+          indicator-color="primary"
+          align="justify"
+        >
+          <q-tab name="pendientes" icon="pending_actions" label="Pendientes" />
+          <q-tab name="completados" icon="task_alt" label="Completados" />
+        </q-tabs>
+      </q-card>
+
+      <q-tab-panels v-model="estadoTab" animated class="p01-panels">
+        <!-- ============================================================ -->
+        <!-- PENDIENTES (datos de operaciones_memo)                       -->
+        <!-- ============================================================ -->
+        <q-tab-panel name="pendientes" class="q-pa-none q-pt-md">
+          <!-- Filtros segmentados -->
+          <div class="p01-filtros">
+            <button
+              v-for="f in filtros"
+              :key="f.value"
+              type="button"
+              class="p01-chip"
+              :class="{ 'p01-chip--active': filtro === f.value }"
+              :style="filtro === f.value ? { background: f.grad } : {}"
+              @click="filtro = f.value"
+            >
+              <q-icon :name="f.icon" size="18px" class="q-mr-xs" />
+              <span>{{ f.label }}</span>
+              <span class="p01-chip__count">{{ conteos[f.value] }}</span>
+            </button>
+          </div>
+
+          <!-- Loading -->
+          <div v-if="loading" class="p01-state">
+            <q-spinner-gears size="48px" :color="filtroActual.color" />
+            <div class="q-mt-sm text-grey-7">Cargando reporte…</div>
+          </div>
+
+          <!-- Error -->
+          <q-banner v-else-if="errorMsg" class="bg-negative text-white q-mt-md" rounded>
+            <template #avatar><q-icon name="error" /></template>
+            {{ errorMsg }}
+          </q-banner>
+
+          <template v-else>
+            <!-- ---------- VISTA ESCRITORIO: TABLA EDITABLE ---------- -->
+            <q-table
+              v-if="$q.screen.gt.sm"
+              :rows="filasActivas"
+              :columns="columnasActivas"
+              row-key="id"
+              flat
+              bordered
+              :pagination="{ rowsPerPage: 0 }"
+              hide-pagination
+              class="p01-table"
+              :class="'p01-table--' + filtro"
+            >
+              <template #body="props">
+                <q-tr :props="props" class="p01-row">
+                  <q-td
+                    v-for="col in props.cols"
+                    :key="col.name"
+                    :props="props"
+                    class="p01-td"
+                  >
+                    <!-- CASITA: varias casitas agrupadas, cada chip editable -->
+                    <template v-if="col.name === 'casita'">
+                      <div class="p01-casitas">
+                        <q-chip
+                          v-for="item in props.row.items"
+                          :key="item.id"
+                          dense
+                          square
+                          :color="filtroActual.chipBg"
+                          :text-color="filtroActual.chipText"
+                          class="text-weight-bold p01-casita-chip"
+                        >
+                          {{ valor(item.casita) }}
+                          <q-popup-edit
+                            v-model="item.casita"
+                            title="Editar Casita"
+                            buttons
+                            label-set="Guardar"
+                            label-cancel="Cancelar"
+                            v-slot="scope"
+                            @save="(val) => guardarCampo(item, 'casita', val)"
+                          >
+                            <q-input v-model="scope.value" dense autofocus @keyup.enter="scope.set()" />
+                          </q-popup-edit>
+                        </q-chip>
+                      </div>
+                    </template>
+
+                    <!-- HORA -->
+                    <template v-else-if="col.isHora">
+                      <span class="p01-hora-pill" :style="{ color: filtroActual.hex }">
+                        <q-icon name="schedule" size="14px" class="q-mr-xs" />
+                        {{ valorFormateado(col, props.row.ref) }}
+                      </span>
+                      <q-popup-edit
+                        v-model="props.row.ref[col.field]"
+                        :title="'Editar ' + col.label"
+                        buttons
+                        label-set="Guardar"
+                        label-cancel="Cancelar"
+                        v-slot="scope"
+                        @save="(val) => guardarCampoGrupo(props.row, col.field, val)"
+                      >
+                        <q-input v-model="scope.value" dense autofocus @keyup.enter="scope.set()" />
+                      </q-popup-edit>
+                    </template>
+
+                    <!-- RESTO -->
+                    <template v-else>
+                      <div :class="{ 'p01-preline': col.multiline }">{{ valorFormateado(col, props.row.ref) }}</div>
+                      <q-popup-edit
+                        v-model="props.row.ref[col.field]"
+                        :title="'Editar ' + col.label"
+                        buttons
+                        label-set="Guardar"
+                        label-cancel="Cancelar"
+                        v-slot="scope"
+                        @save="(val) => guardarCampoGrupo(props.row, col.field, val)"
+                      >
+                        <q-input
+                          v-model="scope.value"
+                          dense
+                          autofocus
+                          :type="col.multiline ? 'textarea' : 'text'"
+                          :autogrow="col.multiline"
+                          @keyup.enter="!col.multiline && scope.set()"
+                        />
+                      </q-popup-edit>
+                    </template>
+                  </q-td>
+                </q-tr>
+              </template>
+
+              <template #no-data>
+                <div class="p01-state full-width">
+                  <q-icon :name="filtroActual.icon" size="42px" color="grey-4" />
+                  <div class="q-mt-sm text-grey-6">Sin registros de {{ filtroActual.label }} para hoy.</div>
+                </div>
+              </template>
+            </q-table>
+
+            <!-- ---------- VISTA MÓVIL: CARDS ---------- -->
+            <div v-else class="p01-cards">
+              <div
+                v-if="filasActivas.length === 0"
+                class="p01-state"
+              >
+                <q-icon :name="filtroActual.icon" size="42px" color="grey-4" />
+                <div class="q-mt-sm text-grey-6">Sin registros de {{ filtroActual.label }} para hoy.</div>
+              </div>
+
+              <div
+                v-for="grupo in filasActivas"
+                :key="grupo.id"
+                class="p01-card"
+                :style="{ '--accent': filtroActual.hex }"
+              >
+                <div class="p01-card__bar"></div>
+                <div class="p01-card__main">
+                  <!-- Encabezado: campo principal (o casitas agrupadas) + hora -->
+                  <div class="p01-card__head">
+                    <q-icon :name="filtroActual.icon" size="20px" :style="{ color: filtroActual.hex }" />
+
+                    <!-- Casitas agrupadas (check in / check out) -->
+                    <template v-if="tieneCasita">
+                      <div class="p01-card__casitas">
+                        <q-chip
+                          v-for="item in grupo.items"
+                          :key="item.id"
+                          dense
+                          square
+                          :color="filtroActual.chipBg"
+                          :text-color="filtroActual.chipText"
+                          class="text-weight-bold p01-casita-chip"
+                        >
+                          {{ valor(item.casita) }}
+                          <q-popup-edit
+                            v-model="item.casita"
+                            title="Editar Casita"
+                            buttons
+                            v-slot="scope"
+                            @save="(val) => guardarCampo(item, 'casita', val)"
+                          >
+                            <q-input v-model="scope.value" dense autofocus @keyup.enter="scope.set()" />
+                          </q-popup-edit>
+                        </q-chip>
+                      </div>
+                    </template>
+
+                    <!-- Campo principal de texto (tour) -->
+                    <template v-else>
+                      <div class="p01-card__primary">
+                        {{ valorFormateado(primaryCol, grupo.ref) }}
+                        <q-popup-edit
+                          v-model="grupo.ref[primaryCol.field]"
+                          :title="'Editar ' + primaryCol.label"
+                          buttons
+                          v-slot="scope"
+                          @save="(val) => guardarCampoGrupo(grupo, primaryCol.field, val)"
+                        >
+                          <q-input v-model="scope.value" dense autofocus @keyup.enter="scope.set()" />
+                        </q-popup-edit>
+                      </div>
+                    </template>
+
+                    <span v-if="horaCol" class="p01-hora-pill p01-hora-pill--solid" :style="{ background: filtroActual.hex }">
+                      <q-icon name="schedule" size="14px" class="q-mr-xs" />
+                      {{ valorFormateado(horaCol, grupo.ref) }}
+                      <q-popup-edit
+                        v-model="grupo.ref[horaCol.field]"
+                        :title="'Editar ' + horaCol.label"
+                        buttons
+                        v-slot="scope"
+                        @save="(val) => guardarCampoGrupo(grupo, horaCol.field, val)"
+                      >
+                        <q-input v-model="scope.value" dense autofocus @keyup.enter="scope.set()" />
+                      </q-popup-edit>
+                    </span>
+                  </div>
+
+                  <!-- Campos secundarios -->
+                  <div
+                    v-for="col in secondaryCols"
+                    :key="col.name"
+                    class="p01-card__field"
+                  >
+                    <div class="p01-card__label">{{ col.label }}</div>
+                    <div class="p01-card__value" :class="{ 'p01-preline': col.multiline }">
+                      {{ valorFormateado(col, grupo.ref) }}
+                      <q-popup-edit
+                        v-model="grupo.ref[col.field]"
+                        :title="'Editar ' + col.label"
+                        buttons
+                        v-slot="scope"
+                        @save="(val) => guardarCampoGrupo(grupo, col.field, val)"
+                      >
+                        <q-input
+                          v-model="scope.value"
+                          dense
+                          autofocus
+                          :type="col.multiline ? 'textarea' : 'text'"
+                          :autogrow="col.multiline"
+                        />
+                      </q-popup-edit>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
+          </template>
+        </q-tab-panel>
 
-        <div class="col-12 col-md-auto">
-          <div class="row q-gutter-sm justify-end">
-            <q-btn
-              color="deep-purple-7"
-              icon="sync"
-              label="Sincronizar"
-              unelevated
-              :loading="loading"
-              @click="loadDashboard"
-            />
-          </div>
-        </div>
-      </div>
-
-      <q-banner v-if="!scriptConfigured" class="bg-orange-1 text-orange-10 q-mt-md" rounded>
-        Define la variable VITE_GOOGLE_APPS_SCRIPT_URL_PUESTO01 para conectar esta vista con tu Apps Script publicado.
-      </q-banner>
-
-      <q-banner v-else-if="errorMessage" class="bg-negative text-white q-mt-md" rounded>
-        <template #avatar>
-          <q-icon name="error" />
-        </template>
-        {{ errorMessage }}
-      </q-banner>
-
-      <div class="row q-col-gutter-md q-mt-md">
-        <div class="col-12 col-md-4">
-          <q-card class="summary-card summary-card-info">
-            <q-card-section class="row items-center no-wrap">
-              <q-avatar color="blue-1" text-color="blue-8" icon="assignment" />
-              <div class="q-ml-md">
-                <div class="text-caption text-grey-7">Registros</div>
-                <div class="text-h5 text-weight-bold">{{ dashboard.registros.length }}</div>
-              </div>
-            </q-card-section>
-          </q-card>
-        </div>
-
-        <div class="col-12 col-md-4">
-          <q-card class="summary-card summary-card-completed">
-            <q-card-section class="row items-center no-wrap">
-              <q-avatar color="green-1" text-color="green-8" icon="login" />
-              <div class="q-ml-md">
-                <div class="text-caption text-grey-7">Check in</div>
-                <div class="text-h5 text-weight-bold">{{ checkinCount }}</div>
-              </div>
-            </q-card-section>
-          </q-card>
-        </div>
-
-        <div class="col-12 col-md-4">
-          <q-card class="summary-card summary-card-pending">
-            <q-card-section class="row items-center no-wrap">
-              <q-avatar color="red-1" text-color="red-8" icon="logout" />
-              <div class="q-ml-md">
-                <div class="text-caption text-grey-7">Check out</div>
-                <div class="text-h5 text-weight-bold">{{ checkoutCount }}</div>
-              </div>
-            </q-card-section>
-          </q-card>
-        </div>
-
-        <div class="col-12 col-md-4">
-          <q-card class="summary-card summary-card-pending">
-            <q-card-section class="row items-center no-wrap">
-              <q-avatar color="amber-1" text-color="amber-9" icon="hourglass_empty" />
-              <div class="q-ml-md">
-                <div class="text-caption text-grey-7">Pendientes</div>
-                <div class="text-h5 text-weight-bold">{{ pendingCount }}</div>
-              </div>
-            </q-card-section>
-          </q-card>
-        </div>
-      </div>
-
-      <div class="row q-col-gutter-md q-mt-md">
-        <div class="col-12 col-md-4">
-          <q-card class="summary-card summary-card-completed">
-            <q-card-section class="row items-center no-wrap">
-              <q-avatar color="green-1" text-color="green-8" icon="task_alt" />
-              <div class="q-ml-md">
-                <div class="text-caption text-grey-7">Completados</div>
-                <div class="text-h5 text-weight-bold">{{ completedCount }}</div>
-              </div>
-            </q-card-section>
-          </q-card>
-        </div>
-      </div>
-
-      <!-- Filter Chips -->
-      <q-card class="filter-card q-mt-md">
-        <q-card-section class="q-pa-sm">
-          <div class="text-subtitle2 text-weight-bold text-grey-8 q-mb-sm">Filtrar por estado:</div>
-          <div class="row q-gutter-sm">
-            <q-chip
-              :color="statusFilter === 'all' ? 'deep-purple-7' : 'grey-3'"
-              :text-color="statusFilter === 'all' ? 'white' : 'grey-8'"
-              icon="filter_list"
-              label="Todos"
-              clickable
-              @click="statusFilter = 'all'"
-            />
-            <q-chip
-              :color="statusFilter === 'pending' ? 'amber' : 'grey-3'"
-              :text-color="statusFilter === 'pending' ? 'white' : 'grey-8'"
-              icon="hourglass_empty"
-              :label="`Pendientes (${pendingCount})`"
-              clickable
-              @click="statusFilter = 'pending'"
-            />
-            <q-chip
-              :color="statusFilter === 'checkin' ? 'green-7' : 'grey-3'"
-              :text-color="statusFilter === 'checkin' ? 'white' : 'grey-8'"
-              icon="login"
-              :label="`Check in (${checkinCount})`"
-              clickable
-              @click="statusFilter = 'checkin'"
-            />
-            <q-chip
-              :color="statusFilter === 'checkout' ? 'red-7' : 'grey-3'"
-              :text-color="statusFilter === 'checkout' ? 'white' : 'grey-8'"
-              icon="logout"
-              :label="`Check out (${checkoutCount})`"
-              clickable
-              @click="statusFilter = 'checkout'"
-            />
-          </div>
-        </q-card-section>
-      </q-card>
-
-      <q-inner-loading :showing="loading">
-        <q-spinner-gears size="48px" color="deep-purple-7" />
-      </q-inner-loading>
-
-      <div v-if="hasData" class="q-mt-lg">
-        <!-- Desktop Table View -->
-        <q-card class="data-card gt-sm">
-          <q-card-section class="section-header section-header-info">
-            <div class="text-subtitle1 text-weight-bold">Registros de Puesto 01</div>
-            <div v-if="statusFilter !== 'all'" class="text-caption">
-              Filtro: {{ statusFilter === 'pending' ? 'Pendientes' : statusFilter === 'checkin' ? 'Check in' : 'Check out' }}
+        <!-- ============================================================ -->
+        <!-- COMPLETADOS (Fase 2 — tabla Puesto_01)                       -->
+        <!-- ============================================================ -->
+        <q-tab-panel name="completados" class="q-pa-none q-pt-md">
+          <div class="p01-fase2">
+            <q-icon name="construction" size="56px" color="grey-4" />
+            <div class="text-h6 text-grey-7 q-mt-md">Próximamente · Fase 2</div>
+            <div class="text-body2 text-grey-6 q-mt-xs">
+              Aquí se mostrarán los registros completados desde la tabla <b>Puesto_01</b>.
             </div>
-          </q-card-section>
-          <q-table
-            :rows="filteredRegistros"
-            :columns="tableColumns"
-            row-key="id"
-            :pagination="{ rowsPerPage: 15 }"
-            flat
-            bordered
-          >
-            <template v-slot:body-cell-nombre="props">
-              <q-td :props="props">
-                <div class="text-weight-bold text-green-8">{{ props.row.ingreso.nombre || props.row.salida.nombre || 'Sin nombre' }}</div>
-                <div class="text-caption text-orange-8">Casita: {{ props.row.ingreso.casita || props.row.salida.casita || '-' }}</div>
-              </q-td>
-            </template>
-            <template v-slot:body-cell-status="props">
-              <q-td :props="props">
-                <q-badge :color="props.row.status.color" :label="props.row.status.label" rounded class="text-weight-bold" />
-              </q-td>
-            </template>
-            <template v-slot:body-cell-ingreso="props">
-              <q-td :props="props">
-                <div class="text-green-7"><span class="text-weight-bold">Hora:</span> {{ props.row.ingreso.hora || 'Pendiente' }}</div>
-                <div class="text-green-7"><span class="text-weight-bold">Placa:</span> {{ props.row.ingreso.placa || 'Sin placa' }}</div>
-                <div class="text-green-7"><span class="text-weight-bold">Oficial:</span> {{ props.row.ingreso.oficial || 'Pendiente' }}</div>
-              </q-td>
-            </template>
-            <template v-slot:body-cell-salida="props">
-              <q-td :props="props">
-                <div class="text-red-7"><span class="text-weight-bold">Hora:</span> {{ props.row.salida.hora || 'Pendiente' }}</div>
-                <div class="text-red-7"><span class="text-weight-bold">Colaborador:</span> {{ props.row.salida.colaborador || 'Pendiente' }}</div>
-                <div class="text-red-7"><span class="text-weight-bold">Motivo:</span> {{ props.row.salida.motivo || 'Pendiente' }}</div>
-                <div class="text-red-7"><span class="text-weight-bold">Oficial:</span> {{ props.row.salida.oficial || 'Pendiente' }}</div>
-                <div class="text-red-7"><span class="text-weight-bold">Placa:</span> {{ props.row.salida.placa || 'Sin placa' }}</div>
-              </q-td>
-            </template>
-          </q-table>
-        </q-card>
-
-        <!-- Mobile List View -->
-        <q-card class="data-card lt-md">
-          <q-card-section class="section-header section-header-info">
-            <div class="text-subtitle1 text-weight-bold">Registros de Puesto 01</div>
-            <div v-if="statusFilter !== 'all'" class="text-caption">
-              Filtro: {{ statusFilter === 'pending' ? 'Pendientes' : statusFilter === 'checkin' ? 'Check in' : 'Check out' }}
-            </div>
-          </q-card-section>
-          <q-list separator>
-            <q-item v-for="(item, index) in filteredRegistros" :key="`p01-registro-${item.id}-${index}`">
-              <q-item-section>
-                <div class="row items-center justify-between q-col-gutter-sm">
-                  <div class="col">
-                    <q-item-label class="text-weight-bold text-subtitle1 text-green-8">
-                      {{ item.ingreso.nombre || item.salida.nombre || 'Sin nombre' }}
-                    </q-item-label>
-                    <q-item-label caption class="puesto01-casita">
-                      Casita: {{ item.ingreso.casita || item.salida.casita || '-' }}
-                    </q-item-label>
-                  </div>
-                  <div class="col-auto">
-                    <q-badge :color="item.status.color" :label="item.status.label" rounded class="text-weight-bold" />
-                  </div>
-                </div>
-
-                    <div class="puesto01-data-group puesto01-data-group-ingreso q-mt-sm">
-                      <div class="puesto01-data-title text-green-8">Ingreso</div>
-                      <div class="puesto01-data-line text-green-7">
-                        Hora: {{ item.ingreso.hora || 'Pendiente' }}
-                      </div>
-                      <div class="puesto01-data-line text-green-7">
-                        Placa: {{ item.ingreso.placa || 'Sin placa' }}
-                      </div>
-                      <div class="puesto01-data-line text-green-7">
-                        Oficial: {{ item.ingreso.oficial || 'Pendiente' }}
-                      </div>
-                    </div>
-
-                    <div class="puesto01-data-group puesto01-data-group-salida q-mt-sm">
-                      <div class="puesto01-data-title text-red-8">Salida</div>
-                      <div class="puesto01-data-line text-red-7">
-                        Hora: {{ item.salida.hora || 'Pendiente' }}
-                      </div>
-                      <div class="puesto01-data-line text-red-7">
-                        Colaborador: {{ item.salida.colaborador || 'Pendiente' }}
-                      </div>
-                      <div class="puesto01-data-line text-red-7">
-                        Motivo: {{ item.salida.motivo || 'Pendiente' }}
-                      </div>
-                      <div class="puesto01-data-line text-red-7">
-                        Oficial salida: {{ item.salida.oficial || 'Pendiente' }}
-                      </div>
-                      <div class="puesto01-data-line text-red-7">
-                        Placa salida: {{ item.salida.placa || 'Sin placa' }}
-                      </div>
-                    </div>
-              </q-item-section>
-            </q-item>
-          </q-list>
-        </q-card>
-      </div>
-
-      <q-card v-else-if="scriptConfigured && !loading && !errorMessage" class="empty-state q-mt-lg">
-        <q-card-section class="text-center q-py-xl">
-          <q-icon name="store" size="72px" color="grey-4" />
-          <div class="text-h6 text-grey-7 q-mt-md">No hay registros para Puesto 01</div>
-        </q-card-section>
-      </q-card>
+          </div>
+        </q-tab-panel>
+      </q-tab-panels>
     </div>
   </q-page>
 </template>
@@ -274,110 +312,232 @@
 <script>
 import { computed, defineComponent, onMounted, ref } from 'vue'
 import { useQuasar } from 'quasar'
-import { fetchPuesto01Dashboard } from '../services/googleSheets'
+import { supabase } from '../supabase'
+
+const MONTHS = {
+  january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
+  july: 7, august: 8, september: 9, october: 10, november: 11, december: 12
+}
+
+// Normaliza texto: minúsculas, sin apóstrofes (', ´, `), espacios colapsados.
+function norm (v) {
+  return String(v == null ? '' : v)
+    .toLowerCase()
+    .replace(/[''´`]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+// Extrae { month, day } de un texto como "Friday, June 05th".
+function parseFecha (str) {
+  const s = String(str == null ? '' : str).toLowerCase()
+  let month = null
+  for (const name in MONTHS) {
+    if (s.includes(name)) { month = MONTHS[name]; break }
+  }
+  const m = s.match(/\d+/)
+  const day = m ? parseInt(m[0], 10) : null
+  return { month, day }
+}
+
+// "07:30:00" / "11:30hrs" / "9:00 hrs" -> "07:30". Devuelve "—" si vacío.
+function formatHora (v) {
+  const s = String(v == null ? '' : v).trim()
+  if (s === '') return '—'
+  const m = s.match(/(\d{1,2}):(\d{2})/)
+  if (!m) return s
+  return `${m[1].padStart(2, '0')}:${m[2]}`
+}
+
+function valor (v) {
+  const s = v == null ? '' : String(v).trim()
+  return s === '' ? '—' : s
+}
+
+// Definición de columnas por filtro. El orden importa para la vista móvil:
+// [0] = campo principal, último = hora, intermedios = secundarios.
+const COLUMNAS = {
+  tour: [
+    { name: 'tipo_tour', label: 'Proveedor', field: 'tipo_tour', align: 'left', format: valor },
+    { name: 'detalle_tour', label: 'Detalle Tour', field: 'detalle_tour', align: 'left', format: valor, multiline: true },
+    { name: 'hora_salida', label: 'Hora Salida', field: 'hora_salida', align: 'left', format: formatHora, isHora: true }
+  ],
+  checkin: [
+    { name: 'casita', label: 'Casita', field: 'casita', align: 'left', format: valor },
+    { name: 'method', label: 'Método', field: 'method', align: 'left', format: valor, multiline: true },
+    { name: 'hora_llegada_real', label: 'Hora llegada', field: 'hora_llegada_real', align: 'left', format: formatHora, isHora: true }
+  ],
+  checkout: [
+    { name: 'casita', label: 'Casita', field: 'casita', align: 'left', format: valor },
+    { name: 'method', label: 'Método', field: 'method', align: 'left', format: valor, multiline: true },
+    { name: 'hora_salida_real', label: 'Hora Salida', field: 'hora_salida_real', align: 'left', format: formatHora, isHora: true }
+  ]
+}
+
+const FILTROS = [
+  { value: 'tour', label: 'Tour', icon: 'tour', color: 'teal-7', hex: '#0f9b8e', chipBg: 'teal-1', chipText: 'teal-9', grad: 'linear-gradient(135deg, #0f9b8e 0%, #16c2a3 100%)' },
+  { value: 'checkin', label: 'Check in', icon: 'login', color: 'green-7', hex: '#2e9e4f', chipBg: 'green-1', chipText: 'green-9', grad: 'linear-gradient(135deg, #2e7d32 0%, #66bb6a 100%)' },
+  { value: 'checkout', label: 'Check out', icon: 'logout', color: 'red-6', hex: '#e53935', chipBg: 'red-1', chipText: 'red-9', grad: 'linear-gradient(135deg, #e53935 0%, #ef5350 100%)' }
+]
+
+// Predicado de pertenencia al filtro según el campo `tipo`.
+function matchFiltro (tipo, filtro) {
+  const t = norm(tipo)
+  if (filtro === 'tour') return t.includes('tour')
+  if (filtro === 'checkin') return t.includes('arrival')   // Today's Arrivals
+  if (filtro === 'checkout') return t.includes('departure') // Today´s Departure
+  return false
+}
 
 export default defineComponent({
   name: 'Puesto01Page',
-  setup() {
+  setup () {
     const $q = useQuasar()
-    const loading = ref(false)
-    const errorMessage = ref('')
-    const dashboard = ref({ registros: [], fecha: null })
-    const statusFilter = ref('all')
+    const rows = ref([])
+    const loading = ref(true)
+    const errorMsg = ref('')
+    const estadoTab = ref('pendientes')
+    const filtro = ref('tour')
 
-    const scriptConfigured = computed(() => Boolean(import.meta.env.VITE_GOOGLE_APPS_SCRIPT_URL_PUESTO01))
+    const filtros = FILTROS
+    const filtroActual = computed(() => FILTROS.find((f) => f.value === filtro.value) || FILTROS[0])
 
-    const tableColumns = [
-      { name: 'nombre', label: 'Nombre / Casita', field: (row) => row.ingreso.nombre || row.salida.nombre || 'Sin nombre', align: 'left' },
-      { name: 'status', label: 'Estado', field: (row) => row.status.label, align: 'center' },
-      { name: 'ingreso', label: 'Ingreso', field: (row) => row.ingreso.hora || 'Pendiente', align: 'left' },
-      { name: 'salida', label: 'Salida', field: (row) => row.salida.hora || 'Pendiente', align: 'left' }
-    ]
+    // Fecha de hoy (dispositivo)
+    const hoy = new Date()
+    const fechaLabel = computed(() => {
+      const dd = String(hoy.getDate()).padStart(2, '0')
+      const mm = String(hoy.getMonth() + 1).padStart(2, '0')
+      return `${dd}/${mm}/${hoy.getFullYear()}`
+    })
+    const targetParts = { month: hoy.getMonth() + 1, day: hoy.getDate() }
 
-    const filteredRegistros = computed(() => {
-      if (statusFilter.value === 'all') {
-        return dashboard.value.registros
+    // Solo registros de hoy (la tabla contiene varios días).
+    const rowsHoy = computed(() =>
+      rows.value.filter((r) => {
+        const p = parseFecha(r.fecha)
+        return p.month === targetParts.month && p.day === targetParts.day
+      })
+    )
+
+    const conteos = computed(() => ({
+      tour: rowsHoy.value.filter((r) => matchFiltro(r.tipo, 'tour')).length,
+      checkin: rowsHoy.value.filter((r) => matchFiltro(r.tipo, 'checkin')).length,
+      checkout: rowsHoy.value.filter((r) => matchFiltro(r.tipo, 'checkout')).length
+    }))
+
+    const columnasActivas = computed(() => COLUMNAS[filtro.value])
+    const primaryCol = computed(() => columnasActivas.value[0])
+    const horaCol = computed(() => columnasActivas.value.find((c) => c.isHora) || null)
+    const secondaryCols = computed(() =>
+      columnasActivas.value.filter((c) => c !== primaryCol.value && !c.isHora)
+    )
+    // Los filtros con columna "casita" (check in / check out) se agrupan.
+    const tieneCasita = computed(() => columnasActivas.value.some((c) => c.name === 'casita'))
+
+    // Filas a mostrar, normalizadas a { id, ref, items }:
+    //  - ref: registro representativo (para campos compartidos: method, hora…).
+    //  - items: registros de Supabase incluidos (1 para tour; N agrupados en check in/out).
+    // En check in / check out se agrupan en una sola card/fila las casitas que comparten
+    // el MISMO method y la MISMA hora (llegada o salida). Tour no se agrupa.
+    const filasActivas = computed(() => {
+      const base = rowsHoy.value.filter((r) => matchFiltro(r.tipo, filtro.value))
+      if (!tieneCasita.value) {
+        return base.map((r) => ({ id: r.id, ref: r, items: [r] }))
       }
-      return dashboard.value.registros.filter((item) => item.status.key === statusFilter.value)
+      const hf = horaCol.value ? horaCol.value.field : null
+      const map = new Map()
+      for (const r of base) {
+        const key = norm(r.method) + '|' + (hf ? norm(r[hf]) : '')
+        if (!map.has(key)) map.set(key, [])
+        map.get(key).push(r)
+      }
+      return [...map.values()].map((items) => ({
+        id: items.map((i) => i.id).join('_'),
+        ref: items[0],
+        items
+      }))
     })
 
-    const hasData = computed(() => filteredRegistros.value.length > 0)
+    function valorFormateado (col, row) {
+      if (!col) return '—'
+      const raw = row[col.field]
+      return col.format ? col.format(raw) : valor(raw)
+    }
 
-    const checkinCount = computed(() => (
-      dashboard.value.registros.filter((item) => item.status.key === 'checkin').length
-    ))
-
-    const pendingCount = computed(() => (
-      dashboard.value.registros.filter((item) => item.status.key === 'pending').length
-    ))
-
-    const checkoutCount = computed(() => (
-      dashboard.value.registros.filter((item) => item.status.key === 'checkout').length
-    ))
-
-    const completedCount = computed(() => (
-      dashboard.value.registros.filter((item) => item.status.key === 'completed').length
-    ))
-
-    const reportDateLabel = computed(() => {
-      if (!dashboard.value.fecha) return ''
-
-      const parsedDate = new Date(dashboard.value.fecha)
-      if (Number.isNaN(parsedDate.getTime())) {
-        return String(dashboard.value.fecha)
-      }
-
-      return new Intl.DateTimeFormat('es-MX', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      }).format(parsedDate)
-    })
-
-    const loadDashboard = async () => {
-      if (!scriptConfigured.value) {
-        errorMessage.value = 'Falta configurar VITE_GOOGLE_APPS_SCRIPT_URL_PUESTO01'
-        return
-      }
-
+    async function cargar () {
       loading.value = true
-      errorMessage.value = ''
-
+      errorMsg.value = ''
       try {
-        dashboard.value = await fetchPuesto01Dashboard()
-      } catch (error) {
-        errorMessage.value = error.message || 'No se pudieron cargar los datos de Puesto 01'
-        $q.notify({
-          type: 'negative',
-          message: errorMessage.value
-        })
+        const { data, error } = await supabase.from('operaciones_memo').select('*')
+        if (error) throw error
+        rows.value = data || []
+      } catch (e) {
+        errorMsg.value = e.message || 'Error al cargar los datos'
       } finally {
         loading.value = false
       }
     }
 
-    onMounted(() => {
-      loadDashboard()
-    })
+    // Persiste un campo editado en Supabase.
+    // Nota: el Google Apps Script refresca operaciones_memo con DELETE+INSERT,
+    // por lo que estas ediciones directas pueden ser sobreescritas en el próximo
+    // refresh. La edición se deja cableada para uso futuro (según requerimiento).
+    async function guardarCampo (row, field, val) {
+      const valorLimpio = val === '' ? null : val
+      try {
+        const { error } = await supabase
+          .from('operaciones_memo')
+          .update({ [field]: valorLimpio })
+          .eq('id', row.id)
+        if (error) throw error
+        row[field] = valorLimpio
+        $q.notify({ type: 'positive', message: 'Cambio guardado', position: 'top', timeout: 1500 })
+      } catch (e) {
+        $q.notify({ type: 'negative', message: 'No se pudo guardar: ' + (e.message || e), position: 'top' })
+        cargar()
+      }
+    }
+
+    // Guarda un campo compartido (method, hora…) en TODOS los registros del grupo.
+    async function guardarCampoGrupo (grupo, field, val) {
+      const valorLimpio = val === '' ? null : val
+      const ids = grupo.items.map((i) => i.id)
+      try {
+        const { error } = await supabase
+          .from('operaciones_memo')
+          .update({ [field]: valorLimpio })
+          .in('id', ids)
+        if (error) throw error
+        grupo.items.forEach((i) => { i[field] = valorLimpio })
+        $q.notify({ type: 'positive', message: 'Cambio guardado', position: 'top', timeout: 1500 })
+      } catch (e) {
+        $q.notify({ type: 'negative', message: 'No se pudo guardar: ' + (e.message || e), position: 'top' })
+        cargar()
+      }
+    }
+
+    onMounted(cargar)
 
     return {
-      completedCount,
-      dashboard,
-      errorMessage,
-      hasData,
       loading,
-      loadDashboard,
-      checkinCount,
-      checkoutCount,
-      pendingCount,
-      reportDateLabel,
-      scriptConfigured,
-      tableColumns,
-      statusFilter,
-      filteredRegistros
+      errorMsg,
+      estadoTab,
+      filtro,
+      filtros,
+      filtroActual,
+      fechaLabel,
+      conteos,
+      filasActivas,
+      columnasActivas,
+      primaryCol,
+      horaCol,
+      secondaryCols,
+      tieneCasita,
+      valor,
+      valorFormateado,
+      cargar,
+      guardarCampo,
+      guardarCampoGrupo
     }
   }
 })
@@ -385,184 +545,289 @@ export default defineComponent({
 
 <style scoped>
 .puesto01-page {
-  background: linear-gradient(180deg, #f4f8fc 0%, #eef4f8 100%);
+  background: #f4f6f8;
   min-height: 100vh;
 }
 
-.page-shell {
-  max-width: 1080px;
-  margin: 0 auto;
-}
-
-.page-header {
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(24, 71, 120, 0.08);
-  border-radius: 24px;
-  padding: 20px;
-  box-shadow: 0 12px 32px rgba(22, 61, 107, 0.08);
-}
-
-.report-date-label {
-  font-size: 1.15rem;
-  line-height: 1.3;
-  color: #4527a0;
-  background: linear-gradient(90deg, #ede7f6 0%, #fff3cd 100%);
-  display: inline-block;
-  padding: 8px 14px;
-  border-radius: 14px;
-  border: 1px solid rgba(69, 39, 160, 0.14);
-  box-shadow: 0 6px 16px rgba(69, 39, 160, 0.12);
-}
-
-.summary-card,
-.data-card,
-.empty-state {
-  border-radius: 24px;
-  box-shadow: 0 10px 28px rgba(31, 53, 82, 0.08);
-}
-
-.summary-card {
-  border: 1px solid rgba(0, 0, 0, 0.04);
-}
-
-.summary-card-info {
-  background: linear-gradient(135deg, #f2f8ff 0%, #ffffff 100%);
-}
-
-.summary-card-pending {
-  background: linear-gradient(135deg, #fff7e8 0%, #ffffff 100%);
-}
-
-.summary-card-completed {
-  background: linear-gradient(135deg, #f2fff7 0%, #ffffff 100%);
-}
-
-.filter-card {
-  border-radius: 24px;
-  box-shadow: 0 10px 28px rgba(31, 53, 82, 0.08);
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(0, 0, 0, 0.04);
-}
-
-.filter-card :deep(.q-chip) {
-  transition: all 0.2s ease;
-  font-weight: 600;
-}
-
-.filter-card :deep(.q-chip:hover) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.puesto01-casita {
-  color: #ef6c00;
-  font-size: 1.05rem;
-  font-weight: 700;
-}
-
-.text-green-7,
-.text-green-8 {
-  color: #2e7d32 !important;
-}
-
-.text-red-7 {
-  color: #c62828 !important;
-}
-
-.puesto01-data-group {
-  padding: 12px 14px;
-  border-radius: 16px;
-}
-
-.puesto01-data-group-ingreso {
-  background: rgba(46, 125, 50, 0.08);
-}
-
-.puesto01-data-group-salida {
-  background: rgba(198, 40, 40, 0.08);
-}
-
-.puesto01-data-title {
-  font-size: 1rem;
-  font-weight: 800;
-  margin-bottom: 4px;
-}
-
-.puesto01-data-line {
-  font-size: 0.95rem;
-  line-height: 1.4;
-}
-
-@media (max-width: 599px) {
-  .puesto01-page .q-item__label,
-  .puesto01-page .q-item__label--caption {
-    font-size: 0.98rem;
-    line-height: 1.45;
-  }
-
-  .puesto01-page .text-subtitle1 {
-    font-size: 1.1rem;
-    line-height: 1.35;
-  }
-
-  .puesto01-page .text-h5 {
-    font-size: 1.35rem;
-    line-height: 1.25;
-  }
-
-  .puesto01-page .puesto01-casita {
-    font-size: 1.1rem;
-  }
-}
-
-.section-header {
-  color: white;
-}
-
-.section-header-info {
-  background: linear-gradient(135deg, #5e35b1 0%, #3949ab 100%);
-}
-
-.data-card {
+/* ===================== HERO ===================== */
+.p01-hero {
+  position: relative;
+  padding: 14px 16px 22px;
+  border-bottom-left-radius: 22px;
+  border-bottom-right-radius: 22px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  transition: background 0.4s ease;
   overflow: hidden;
 }
 
-.data-card :deep(.q-table__container) {
-  border-radius: 0 0 24px 24px;
+.p01-hero__overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 85% -20%, rgba(255, 255, 255, 0.25), transparent 45%),
+    radial-gradient(circle at 0% 120%, rgba(0, 0, 0, 0.12), transparent 40%);
+  pointer-events: none;
 }
 
-.data-card :deep(.q-table thead tr) {
-  background: linear-gradient(135deg, #ede7f6 0%, #e8eaf6 100%);
+.p01-hero__content {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #fff;
 }
 
-.data-card :deep(.q-table thead th) {
+.p01-hero__titles {
+  line-height: 1.15;
+}
+
+.p01-hero__title {
+  display: flex;
+  align-items: center;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+}
+
+.p01-hero__subtitle {
+  font-size: 13px;
+  opacity: 0.92;
+  margin-top: 2px;
+  padding-left: 2px;
+}
+
+/* ===================== BODY ===================== */
+.p01-body {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.p01-tabs-card {
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.p01-tabs {
+  font-weight: 600;
+}
+
+.p01-panels {
+  background: transparent;
+}
+
+/* ===================== FILTROS ===================== */
+.p01-filtros {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.p01-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1.5px solid #e0e0e0;
+  background: #fff;
+  color: #555;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex: 1 1 auto;
+  justify-content: center;
+}
+
+.p01-chip:hover {
+  border-color: #bdbdbd;
+  transform: translateY(-1px);
+}
+
+.p01-chip--active {
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+.p01-chip__count {
+  margin-left: 8px;
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 999px;
+  min-width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
   font-weight: 700;
-  color: #4527a0;
-  font-size: 0.95rem;
+  padding: 0 6px;
+}
+
+.p01-chip--active .p01-chip__count {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* ===================== TABLA (ESCRITORIO) ===================== */
+.p01-table {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+.p01-table :deep(thead th) {
+  font-size: 12px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.5px;
+  color: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
-.data-card :deep(.q-table tbody tr:hover) {
-  background: rgba(69, 39, 160, 0.04);
+.p01-table--tour :deep(thead th) { background: #0f9b8e; }
+.p01-table--checkin :deep(thead th) { background: #2e9e4f; }
+.p01-table--checkout :deep(thead th) { background: #e53935; }
+
+.p01-table :deep(tbody tr:nth-child(even)) {
+  background: #fafafa;
 }
 
-.data-card :deep(.q-table tbody td) {
+.p01-row :deep(.q-td) {
+  cursor: pointer;
+}
+
+.p01-td {
+  font-size: 14px;
+  color: #1a1a1a;
   vertical-align: top;
-  padding: 12px 16px;
+  padding-top: 12px;
+  padding-bottom: 12px;
 }
 
-.body--dark .page-header,
-.body--dark .summary-card,
-.body--dark .data-card,
-.body--dark .empty-state,
-.body--dark .filter-card {
-  background: #1f1f1f;
-  border-color: rgba(255, 255, 255, 0.06);
-  box-shadow: none;
+.p01-preline {
+  white-space: pre-line;
+  line-height: 1.4;
 }
 
-.body--dark .puesto01-page {
-  background: linear-gradient(180deg, #111827 0%, #0f172a 100%);
+.p01-casitas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.p01-casita-chip {
+  cursor: pointer;
+}
+
+.p01-hora-pill {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.p01-hora-pill--solid {
+  color: #fff !important;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* ===================== CARDS (MÓVIL) ===================== */
+.p01-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.p01-card {
+  display: flex;
+  background: #fff;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
+}
+
+.p01-card__bar {
+  width: 6px;
+  background: var(--accent);
+  flex: 0 0 auto;
+}
+
+.p01-card__main {
+  padding: 14px 16px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.p01-card__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.p01-card__primary {
+  font-size: 17px;
+  font-weight: 800;
+  color: #1a1a1a;
+  flex: 1 1 auto;
+  min-width: 0;
+  word-break: break-word;
+  cursor: pointer;
+}
+
+.p01-card__casitas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.p01-card__field {
+  margin-top: 8px;
+}
+
+.p01-card__label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #9e9e9e;
+}
+
+.p01-card__value {
+  font-size: 14px;
+  color: #2a2a2a;
+  word-break: break-word;
+  cursor: pointer;
+}
+
+/* ===================== ESTADOS ===================== */
+.p01-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 16px;
+  text-align: center;
+}
+
+.p01-fase2 {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 60px 20px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06);
 }
 </style>

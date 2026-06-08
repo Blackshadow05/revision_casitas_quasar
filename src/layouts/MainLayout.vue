@@ -35,6 +35,15 @@
                 </q-item-section>
               </q-item>
 
+              <q-item v-if="isEstebanB" clickable v-close-popup @click="goTo('/puesto-01')">
+                <q-item-section avatar>
+                  <q-icon name="local_police" color="primary" />
+                </q-item-section>
+                <q-item-section>
+                  <q-item-label>Puesto 01</q-item-label>
+                </q-item-section>
+              </q-item>
+
               <q-separator />
 
               <q-item clickable v-close-popup @click="goToConfig">
@@ -88,6 +97,16 @@
             class="appbar-nav-btn text-white q-mr-md"
             @click="goTo('/dashboard-horario')"
           />
+          <q-btn
+            v-if="isEstebanB"
+            flat
+            no-caps
+            dense
+            icon="local_police"
+            label="Puesto 01"
+            class="appbar-nav-btn text-white q-mr-md"
+            @click="goTo('/puesto-01')"
+          />
           <template v-if="authStore.isLoggedIn">
             <q-btn
               v-for="item in desktopSecurityLinks"
@@ -119,6 +138,7 @@
       >
         <q-tab name="home" icon="home" label="Inicio" @click="goToHome" />
         <q-tab name="menus" icon="restaurant" label="Menús" @click="goToMenus" />
+        <q-tab v-if="isEstebanB" name="puesto01" icon="local_police" label="Puesto 01" @click="goTo('/puesto-01')" />
         <q-tab v-if="false" name="security" icon="security" label="Seguridad" @click="goToSeguridad" />
         <q-tab name="forms" icon="assignment" label="Forms" @click="goToForms" />
       </q-tabs>
@@ -129,7 +149,7 @@
 </template>
 
 <script>
-import { ref, defineComponent, watch, onUnmounted } from "vue";
+import { ref, computed, defineComponent, watch, onUnmounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useQuasar } from "quasar";
 import InstallPrompt from "../components/InstallPrompt.vue";
@@ -150,6 +170,8 @@ export default defineComponent({
     const route = useRoute();
     const casasStore = useCasasStore();
     const authStore = useAuthStore();
+    // Puesto 01 solo visible para el usuario Esteban B
+    const isEstebanB = computed(() => authStore.user?.Usuario === "Esteban B");
     let stopHomeUpdates = null;
 
     const detachHomeUpdates = () => {
@@ -163,7 +185,8 @@ export default defineComponent({
     watch(() => route.path, (path) => {
       if (path === '/') tab.value = 'home';
       else if (path === '/menus') tab.value = 'menus';
-      else if (path === '/google-sheets' || path === '/google-sheets/puesto-01' || path.startsWith('/seguridad')) tab.value = 'security';
+      else if (path === '/puesto-01') tab.value = 'puesto01';
+      else if (path.startsWith('/seguridad')) tab.value = 'security';
       else if (path === '/forms') tab.value = 'forms';
       else tab.value = '';
     }, { immediate: true });
@@ -224,14 +247,6 @@ export default defineComponent({
       router.push(path);
     };
 
-    const goToGoogleSheets = () => {
-      router.push('/google-sheets');
-    };
-
-    const goToPuesto01 = () => {
-      router.push('/google-sheets/puesto-01');
-    };
-
     const goToForms = () => {
       router.push('/forms');
     };
@@ -248,12 +263,11 @@ export default defineComponent({
       q,
       tab,
       authStore,
+      isEstebanB,
       desktopSecurityLinks,
       goTo,
       goToHome,
       goToMenus,
-      goToGoogleSheets,
-      goToPuesto01,
       goToForms,
       goToConfig,
       goToSeguridad,

@@ -229,7 +229,7 @@
         {{ syncError }}
       </q-banner>
 
-      <div v-if="firstSyncPending || isSyncing || lastSyncAt" class="sync-status-card q-mb-md">
+      <div v-if="firstSyncPending || isSyncing" class="sync-status-card q-mb-md">
         <div class="row items-center justify-between no-wrap q-col-gutter-sm">
           <div class="row items-center no-wrap col">
             <q-icon

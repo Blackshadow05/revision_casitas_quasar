@@ -865,51 +865,6 @@
       </div>
     </div>
 
-    <!-- Full Screen Image Viewer -->
-    <q-dialog v-model="dialog" maximized transition-show="fade" transition-hide="fade">
-      <q-card class="bg-black text-white">
-        <q-card-actions align="right" class="absolute-top-right z-max">
-          <q-btn flat round icon="share" color="white" @click="shareImage" :disable="!canShare" />
-          <q-btn flat round icon="download" color="white" @click="downloadImage" />
-          <q-btn flat round icon="close" color="white" @click="dialog = false" />
-        </q-card-actions>
-         <q-carousel
-           v-model="dialogSlide"
-           animated
-           infinite
-           arrows
-           navigation
-           class="bg-transparent full-height image-carousel overlay-carousel"
-           navigation-icon="radio_button_unchecked"
-           navigation-active-icon="radio_button_checked"
-           control-color="white"
-           control-type="flat"
-           control-text-color="white"
-           :swipeable="(imageZoomLevels[dialogSlide] || 1) === 1"
-           navigation-position="bottom"
-         >
-           <q-carousel-slide 
-             v-for="(img, index) in images" 
-             :key="index" 
-             :name="index" 
-             class="flex flex-center q-pa-none"
-           >
-             <q-img 
-               :src="img" 
-               fit="contain" 
-               :style="getImageStyle(index)"
-               class="zoomable-image"
-               draggable="false"
-               @touchstart.stop="onTouchStart"
-               @touchmove.stop.prevent="onTouchMove"
-               @touchend.stop="onTouchEnd"
-               @wheel.prevent="onWheel"
-             />
-           </q-carousel-slide>
-         </q-carousel>
-      </q-card>
-    </q-dialog>
-
     <!-- Photo Selection Dialog -->
     <q-dialog v-model="photoSheetOpen" position="bottom">
       <q-card class="photo-bottom-sheet">
@@ -948,13 +903,15 @@
 </template>
 
 <script>
-import { defineComponent, computed, ref, onMounted, watch } from 'vue'
+import { defineComponent, computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useCasasStore } from '../stores/casas'
 import { useAuthStore } from '../stores/auth'
 import { date, useQuasar } from 'quasar'
 import { useRoute } from 'vue-router'
 import { supabase } from '../supabase'
 import { CLOUDINARY_CONFIG } from '../cloudinary'
+import PhotoSwipeLightbox from 'photoswipe/lightbox'
+import 'photoswipe/style.css'
 
 export default defineComponent({
   name: 'DetailsPage',
@@ -963,69 +920,67 @@ export default defineComponent({
     const store = useCasasStore()
     const route = useRoute()
     const slide = ref(0)
-    const dialog = ref(false)
-    const dialogSlide = ref(0)
-    const isZooming = ref(false)
-    const isInteracting = ref(false)
-    const imageZoomLevels = ref({}) // Store zoom per image index (compat with swipeable check)
-    const imageTransforms = ref({}) // Store scale and pan per image
-    const gestureState = ref({
-      mode: 'none',
-      startDistance: 0,
-      startScale: 1,
-      startCenter: { x: 0, y: 0 },
-      startX: 0,
-      startY: 0,
-      lastPoint: { x: 0, y: 0 }
+
+    // ─── PhotoSwipe lightbox (pinch-to-zoom, swipe, doble-tap) ───
+    let lightbox = null
+
+    // PhotoSwipe necesita el tamaño real de cada imagen; lo precargamos.
+    const loadImageSize = (src) => new Promise((resolve) => {
+      const img = new Image()
+      img.onload = () => resolve({
+        src,
+        width: img.naturalWidth || 1600,
+        height: img.naturalHeight || 1200
+      })
+      img.onerror = () => resolve({ src, width: 1600, height: 1200 })
+      img.src = src
     })
 
-    const clamp = (val, min, max) => Math.min(Math.max(val, min), max)
-
-    const ensureTransform = (index) => {
-      if (!imageTransforms.value[index]) {
-        imageTransforms.value[index] = { scale: 1, x: 0, y: 0 }
+    const getCurrentImageUrl = () => {
+      if (lightbox && lightbox.pswp) {
+        return images.value[lightbox.pswp.currIndex]
       }
-      if (!imageZoomLevels.value[index]) {
-        imageZoomLevels.value[index] = 1
-      }
+      return null
     }
 
-    const getMaxOffset = (scale) => {
-      const vw = typeof window !== 'undefined' ? (window.innerWidth || 0) : 0
-      const vh = typeof window !== 'undefined' ? (window.innerHeight || 0) : 0
-      return {
-        x: Math.max(0, ((scale - 1) * vw) / 2),
-        y: Math.max(0, ((scale - 1) * vh) / 2)
-      }
+    const initLightbox = () => {
+      lightbox = new PhotoSwipeLightbox({
+        pswpModule: () => import('photoswipe'),
+        bgOpacity: 1,
+        showHideAnimationType: 'fade',
+        wheelToZoom: true,
+        zoom: true,
+        padding: { top: 60, bottom: 60, left: 0, right: 0 }
+      })
+
+      // Botones personalizados de compartir y descargar en la barra superior
+      lightbox.on('uiRegister', () => {
+        lightbox.pswp.ui.registerElement({
+          name: 'download-button',
+          order: 9,
+          isButton: true,
+          tagName: 'button',
+          title: 'Descargar',
+          html: '<svg aria-hidden="true" class="pswp__icn" viewBox="0 0 24 24" width="24" height="24"><path fill="#fff" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>',
+          onClick: () => downloadImage()
+        })
+
+        if (canShare.value) {
+          lightbox.pswp.ui.registerElement({
+            name: 'share-button',
+            order: 8,
+            isButton: true,
+            tagName: 'button',
+            title: 'Compartir',
+            html: '<svg aria-hidden="true" class="pswp__icn" viewBox="0 0 24 24" width="24" height="24"><path fill="#fff" d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>',
+            onClick: () => shareImage()
+          })
+        }
+      })
+
+      lightbox.init()
     }
 
-    const applyTransform = (index, transform) => {
-      ensureTransform(index)
-      const next = { ...imageTransforms.value[index], ...transform }
-      const maxOffset = getMaxOffset(next.scale)
-      next.x = clamp(next.x, -maxOffset.x, maxOffset.x)
-      next.y = clamp(next.y, -maxOffset.y, maxOffset.y)
-      imageTransforms.value[index] = next
-      imageZoomLevels.value[index] = next.scale
-    }
-
-    const resetTransform = (index) => {
-      applyTransform(index, { scale: 1, x: 0, y: 0 })
-    }
-
-    const getImageStyle = (index) => {
-      const t = imageTransforms.value[index] || { scale: 1, x: 0, y: 0 }
-      return {
-        height: '100vh',
-        width: '100vw',
-        transform: `translate3d(${t.x}px, ${t.y}px, 0) scale(${t.scale})`,
-        transition: isInteracting.value ? 'none' : 'transform 120ms ease-out',
-        touchAction: 'none',
-        willChange: 'transform',
-        userSelect: 'none'
-      }
-    }
-    
     const casa = computed(() => store.selectedCasa)
     const authStore = useAuthStore()
     const canAdd = computed(() => authStore.canAdd)
@@ -1189,7 +1144,7 @@ export default defineComponent({
     })
 
     const shareImage = async () => {
-      const currentImageUrl = images.value[dialogSlide.value]
+      const currentImageUrl = getCurrentImageUrl()
       if (!currentImageUrl) return
 
       try {
@@ -1234,7 +1189,7 @@ export default defineComponent({
     }
 
     const downloadImage = async () => {
-      const currentImageUrl = images.value[dialogSlide.value]
+      const currentImageUrl = getCurrentImageUrl()
       if (!currentImageUrl) return
 
       try {
@@ -1687,6 +1642,13 @@ export default defineComponent({
       fetchNotasExtra()
     })
 
+    onUnmounted(() => {
+      if (lightbox) {
+        lightbox.destroy()
+        lightbox = null
+      }
+    })
+
     const formatDate = (val) => {
       if (!val) return '--'
       return date.formatDate(val, 'DD MMMM YYYY - HH:mm', {
@@ -1718,21 +1680,11 @@ export default defineComponent({
       return `${cloudinaryBase}/${cleanPath}`
     }
 
-    const onOpenImage = (index) => {
-      dialogSlide.value = index
-      dialog.value = true
-      resetTransform(index)
-      isZooming.value = false
-      isInteracting.value = false
-      gestureState.value = {
-        mode: 'none',
-        startDistance: 0,
-        startScale: 1,
-        startCenter: { x: 0, y: 0 },
-        startX: 0,
-        startY: 0,
-        lastPoint: { x: 0, y: 0 }
-      }
+    const onOpenImage = async (index) => {
+      if (!images.value.length) return
+      const dataSource = await Promise.all(images.value.map(loadImageSize))
+      if (!lightbox) initLightbox()
+      lightbox.loadAndOpen(index, dataSource)
     }
 
     const openNoteImage = (imagePath) => {
@@ -1904,107 +1856,6 @@ export default defineComponent({
       }
     }
 
-    const getTouchCenter = (touches) => ({
-      x: (touches[0].pageX + touches[1].pageX) / 2,
-      y: (touches[0].pageY + touches[1].pageY) / 2
-    })
-
-    const onTouchStart = (event) => {
-      const idx = dialogSlide.value
-      ensureTransform(idx)
-
-      if (event.touches.length === 2) {
-        isZooming.value = true
-        isInteracting.value = true
-        const distance = Math.hypot(
-          event.touches[0].pageX - event.touches[1].pageX,
-          event.touches[0].pageY - event.touches[1].pageY
-        )
-
-        gestureState.value = {
-          mode: 'pinch',
-          startDistance: distance,
-          startScale: imageTransforms.value[idx].scale,
-          startCenter: getTouchCenter(event.touches),
-          startX: imageTransforms.value[idx].x,
-          startY: imageTransforms.value[idx].y,
-          lastPoint: gestureState.value.lastPoint
-        }
-      } else if (event.touches.length === 1 && (imageTransforms.value[idx]?.scale || 1) > 1.01) {
-        isInteracting.value = true
-        gestureState.value = {
-          ...gestureState.value,
-          mode: 'pan',
-          startScale: imageTransforms.value[idx].scale,
-          startX: imageTransforms.value[idx].x,
-          startY: imageTransforms.value[idx].y,
-          lastPoint: { x: event.touches[0].pageX, y: event.touches[0].pageY }
-        }
-      } else {
-        gestureState.value = { ...gestureState.value, mode: 'none' }
-      }
-    }
-
-    const onTouchMove = (event) => {
-      const idx = dialogSlide.value
-
-      if (event.touches.length === 2 && gestureState.value.mode === 'pinch') {
-        event.preventDefault()
-        const distance = Math.hypot(
-          event.touches[0].pageX - event.touches[1].pageX,
-          event.touches[0].pageY - event.touches[1].pageY
-        )
-        const base = gestureState.value
-        if (base.startDistance === 0) return
-
-        const nextScale = clamp(base.startScale * (distance / base.startDistance), 1, 4)
-        const center = getTouchCenter(event.touches)
-        const dx = center.x - base.startCenter.x
-        const dy = center.y - base.startCenter.y
-        applyTransform(idx, {
-          scale: nextScale,
-          x: base.startX + dx,
-          y: base.startY + dy
-        })
-      } else if (event.touches.length === 1 && gestureState.value.mode === 'pan') {
-        event.preventDefault()
-        const point = event.touches[0]
-        const deltaX = point.pageX - gestureState.value.lastPoint.x
-        const deltaY = point.pageY - gestureState.value.lastPoint.y
-        gestureState.value.lastPoint = { x: point.pageX, y: point.pageY }
-        const transform = imageTransforms.value[idx] || { scale: 1, x: 0, y: 0 }
-        applyTransform(idx, {
-          scale: transform.scale,
-          x: transform.x + deltaX,
-          y: transform.y + deltaY
-        })
-      }
-    }
-
-    const onTouchEnd = () => {
-      const idx = dialogSlide.value
-      ensureTransform(idx)
-      const current = imageTransforms.value[idx]
-      const clampedScale = clamp(current.scale, 1, 4)
-      const nextX = clampedScale === 1 ? 0 : current.x
-      const nextY = clampedScale === 1 ? 0 : current.y
-      applyTransform(idx, { scale: clampedScale, x: nextX, y: nextY })
-      isZooming.value = false
-      isInteracting.value = false
-      gestureState.value = { ...gestureState.value, mode: 'none' }
-    }
-
-    const onWheel = (event) => {
-      event.preventDefault()
-      const idx = dialogSlide.value
-      ensureTransform(idx)
-      const delta = event.deltaY > 0 ? 0.9 : 1.1
-      const transform = imageTransforms.value[idx]
-      const nextScale = clamp(transform.scale * delta, 1, 4)
-      applyTransform(idx, { scale: nextScale })
-      isInteracting.value = false
-    }
-
     const images = computed(() => {
       if (!casa.value) return []
       const found = []
@@ -2092,19 +1943,8 @@ export default defineComponent({
       electronicItems,
       otherItems,
       themeClass,
-      dialog,
-      dialogSlide,
-      imageZoomLevels,
-      imageTransforms,
-      isZooming,
-      isInteracting,
       onOpenImage,
       openNoteImage,
-      getImageStyle,
-      onTouchStart,
-      onTouchMove,
-      onTouchEnd,
-      onWheel,
       // Share
       canShare,
       shareImage,

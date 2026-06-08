@@ -49,8 +49,7 @@ export default defineComponent({
       dailyLogs: 0,
       incidents: 0,
       lostFound: 0,
-      assetLogs: 0,
-      puesto01: 0
+      assetLogs: 0
     })
 
     const menuItems = buildSecurityMenuItems(counts)
@@ -63,58 +62,24 @@ export default defineComponent({
       router.push('/')
     }
 
-    const getLocalDateString = (date = new Date()) => {
-      const year = date.getFullYear()
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const day = String(date.getDate()).padStart(2, '0')
-      return `${year}-${month}-${day}`
-    }
-
-    const normalizeDateOnly = (value) => {
-      if (!value) return ''
-      if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) {
-        return value.slice(0, 10)
-      }
-      const parsed = new Date(value)
-      if (Number.isNaN(parsed.getTime())) return ''
-      return getLocalDateString(parsed)
-    }
-
     const fetchCounts = async () => {
       loading.value = true
       try {
         const todayStart = new Date()
         todayStart.setHours(0, 0, 0, 0)
         const todayIso = todayStart.toISOString()
-        const todayLocal = getLocalDateString()
 
-        const fetchPuesto01Count = async () => {
-          const { data, error } = await supabase
-            .from('operaciones_memo')
-            .select('id, fecha_update')
-            .order('fecha_update', { ascending: false })
-            .limit(1000)
-
-          if (error) throw error
-
-          return {
-            count: (data || []).filter((item) => normalizeDateOnly(item.fecha_update) === todayLocal).length
-          }
-        }
-
-        const [logsRes, incidentsRes, lostRes, assetsRes, puesto01Res] = await Promise.all([
+        const [logsRes, incidentsRes, lostRes, assetsRes] = await Promise.all([
           supabase.from('daily_logs').select('id', { count: 'exact', head: true }).gte('created_at', todayIso),
           supabase.from('incidents').select('id', { count: 'exact', head: true }).in('status', ['Abierto', 'En Investigación']),
           supabase.from('lost_found').select('id', { count: 'exact', head: true }).eq('status', 'Almacenado'),
-          supabase.from('asset_logs').select('id', { count: 'exact', head: true }).gte('timestamp', todayIso),
-          fetchPuesto01Count()
+          supabase.from('asset_logs').select('id', { count: 'exact', head: true }).gte('timestamp', todayIso)
         ])
 
         counts.dailyLogs = logsRes.count || 0
         counts.incidents = incidentsRes.count || 0
         counts.lostFound = lostRes.count || 0
         counts.assetLogs = assetsRes.count || 0
-        counts.puesto01 = puesto01Res.count || 0
       } catch (err) {
         console.error('Error fetching security counts:', err)
       } finally {

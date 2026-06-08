@@ -66,11 +66,18 @@
           flat
           bordered
           class="op-card q-mb-sm"
+          :class="{ 'op-card--en-proceso': tourEnProceso(t) }"
         >
           <q-card-section class="q-pa-md">
-            <div class="campo">
-              <div class="campo-label">Proveedor Experiencia</div>
-              <div class="campo-valor text-weight-bold text-teal-9">{{ valor(t.tipo_tour) }}</div>
+            <div class="row items-start justify-between no-wrap q-mb-xs">
+              <div class="campo q-mb-none">
+                <div class="campo-label">Proveedor Experiencia</div>
+                <div class="campo-valor text-weight-bold text-teal-9">{{ valor(t.tipo_tour) }}</div>
+              </div>
+              <div v-if="tourEnProceso(t)" class="en-proceso-badge">
+                <span class="en-proceso-dot"></span>
+                En Proceso
+              </div>
             </div>
             <div class="campo">
               <div class="campo-label">Detalle del tour</div>
@@ -110,19 +117,19 @@
           class="op-card op-card--out q-mb-sm"
         >
           <q-card-section class="q-pa-md row items-center q-col-gutter-md">
-            <div class="col-4 campo">
+            <div class="col-12 col-sm-3 campo">
               <div class="campo-label">Casita</div>
-              <div class="campo-valor text-weight-bold text-h6">
+              <div class="campo-valor text-weight-bold">
                 <q-chip v-for="cas in c.casitas" :key="cas" dense color="red-1" text-color="red-9" class="text-weight-bold">
                   {{ cas }}
                 </q-chip>
               </div>
             </div>
-            <div class="col-4 campo">
+            <div class="col-12 col-sm-5 campo">
               <div class="campo-label">Method</div>
               <div class="campo-valor">{{ c.method }}</div>
             </div>
-            <div class="col-4 campo">
+            <div class="col-12 col-sm-4 campo">
               <div class="campo-label">ETD</div>
               <div class="campo-valor">{{ c.etd }}</div>
             </div>
@@ -169,9 +176,9 @@
           class="op-card op-card--in q-mb-sm"
         >
           <q-card-section class="q-pa-md row items-center q-col-gutter-md">
-            <div class="col-4 campo">
+            <div class="col-12 col-sm-3 campo">
               <div class="campo-label">Casita</div>
-              <div class="campo-valor text-weight-bold text-h6">
+              <div class="campo-valor text-weight-bold">
                 <template v-for="item in c.items" :key="item.id">
                   <div class="casita-montaje-row">
                     <q-chip 
@@ -191,23 +198,31 @@
                       />
                     </q-chip>
                   </div>
-                  <div
-                    v-if="dia === 'manana' && casitasOcupadasEnArrivals.has(valor(item.casita))"
-                    class="advertencia-ocupada"
-                  >
-                    <q-icon name="warning" size="14px" class="q-mr-xs" />
-                    Esta casa ya se encuentra ocupada
-                  </div>
                 </template>
               </div>
             </div>
-            <div class="col-4 campo">
+            <div class="col-12 col-sm-5 campo">
               <div class="campo-label">Method</div>
               <div class="campo-valor">{{ c.method }}</div>
             </div>
-            <div class="col-4 campo">
+            <div class="col-12 col-sm-4 campo">
               <div class="campo-label">ETA</div>
               <div class="campo-valor">{{ c.eta }}</div>
+            </div>
+
+            <!-- Advertencia de ocupación (al final de la card, ancho completo) -->
+            <div
+              v-if="dia === 'manana' && c.items.some(item => casitasOcupadasEnArrivals.has(valor(item.casita)))"
+              class="col-12 q-mt-xs"
+            >
+              <div
+                v-for="item in c.items.filter(item => casitasOcupadasEnArrivals.has(valor(item.casita)))"
+                :key="'warn-' + item.id"
+                class="advertencia-ocupada"
+              >
+                <q-icon name="warning" size="14px" class="q-mr-xs" />
+                La casa {{ valor(item.casita) }} ya se encuentra ocupada
+              </div>
             </div>
           </q-card-section>
         </q-card>
@@ -304,7 +319,7 @@
 </template>
 
 <script>
-import { computed, defineComponent, onMounted, reactive, ref, watch } from 'vue'
+import { computed, defineComponent, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { supabase } from '../supabase'
 
 const MONTHS = {
@@ -355,6 +370,21 @@ function parseFechaIngreso (str) {
   }
 }
 
+// Convierte una hora ("14:30:00", "14:30", "2:30 PM", "11:30hrs") a minutos
+// desde medianoche. Devuelve null si no se puede parsear.
+function parseHoraMin (str) {
+  const s = String(str == null ? '' : str)
+  const m = s.match(/(\d{1,2}):(\d{2})/)
+  if (!m) return null
+  let h = parseInt(m[1], 10)
+  const min = parseInt(m[2], 10)
+  if (isNaN(h) || isNaN(min)) return null
+  const low = s.toLowerCase()
+  if (low.includes('pm') && h < 12) h += 12
+  if (low.includes('am') && h === 12) h = 0
+  return h * 60 + min
+}
+
 // Prioridad de ordenamiento para tipo_tour.
 function tourPrioridad (tipoTour) {
   const t = norm(tipoTour)
@@ -371,6 +401,10 @@ export default defineComponent({
     const loading = ref(true)
     const errorMsg = ref('')
     const dia = ref('hoy')
+
+    // Reloj reactivo: se actualiza cada minuto para refrescar el estado "En Proceso".
+    const ahora = ref(new Date())
+    let relojTimer = null
 
     const secciones = reactive({
       tours: true,
@@ -442,6 +476,18 @@ export default defineComponent({
         .sort((a, b) => tourPrioridad(a.tipo_tour) - tourPrioridad(b.tipo_tour))
     )
 
+    // Un tour está "En Proceso" si es del día de hoy y la hora actual está entre
+    // su hora de salida y su hora de llegada (requiere ambas horas).
+    function tourEnProceso (t) {
+      if (dia.value !== 'hoy') return false
+      const ini = parseHoraMin(t.hora_salida)
+      const fin = parseHoraMin(t.hora_llegada)
+      if (ini == null || fin == null) return false
+      const d = ahora.value
+      const nowMin = d.getHours() * 60 + d.getMinutes()
+      return nowMin >= ini && nowMin < fin
+    }
+
     const checkoutsRaw = computed(() =>
       rowsDelDia.value.filter((r) => norm(r.tipo).includes('departure'))
     )
@@ -500,18 +546,37 @@ export default defineComponent({
       montajeDialogOpen.value = true
     }
 
+    // Actualiza el montaje_hecho de la fila local (feedback inmediato en UI).
+    function actualizarMontajeLocal (id, hecho) {
+      const row = rows.value.find((r) => r.id === id)
+      if (row) row.montaje_hecho = hecho ? 'hecho' : null
+    }
+
+    // Persiste la marca de montaje vía RPC. A diferencia de un UPDATE directo
+    // sobre operaciones_memo (que el GAS borra en cada refresh), los RPC
+    // escriben en montajes_manuales con clave natural (casita+día+mes), de modo
+    // que el trigger BEFORE INSERT vuelve a marcar 'hecho' en cada reinserción.
     async function toggleMontaje (item) {
       item.saving = true
-      const nuevoValor = item.checked ? 'hecho' : null
       try {
-        const { error } = await supabase
-          .from('operaciones_memo')
-          .update({ montaje_hecho: nuevoValor })
-          .eq('id', item.id)
-        if (error) throw error
-        // Actualizar el row local
-        const row = rows.value.find((r) => r.id === item.id)
-        if (row) row.montaje_hecho = nuevoValor
+        if (item.checked) {
+          const { data, error } = await supabase
+            .rpc('confirmar_montaje_manual', { p_id: item.id })
+          if (error) throw error
+          if (data === false) {
+            throw new Error('No se pudo leer la casita/fecha de este registro')
+          }
+          actualizarMontajeLocal(item.id, true)
+        } else {
+          const { data, error } = await supabase
+            .rpc('desconfirmar_montaje_manual', { p_id: item.id })
+          if (error) throw error
+          // data = true si la casita sigue marcada por una revisión "Check in";
+          // en ese caso no se puede desmarcar, el checkbox vuelve a activarse.
+          const sigueHecho = data === true
+          item.checked = sigueHecho
+          actualizarMontajeLocal(item.id, sigueHecho)
+        }
       } catch (e) {
         // Revertir en caso de error
         item.checked = !item.checked
@@ -681,7 +746,14 @@ export default defineComponent({
       }
     }
 
-    onMounted(cargar)
+    onMounted(() => {
+      cargar()
+      relojTimer = setInterval(() => { ahora.value = new Date() }, 60000)
+    })
+
+    onUnmounted(() => {
+      if (relojTimer) clearInterval(relojTimer)
+    })
 
     return {
       loading,
@@ -705,6 +777,7 @@ export default defineComponent({
       abrirMontajeDialog,
       toggleMontaje,
       esMontajeHecho,
+      tourEnProceso,
       valor
     }
   }
@@ -733,6 +806,48 @@ export default defineComponent({
 
 .op-card--out {
   border-left: 4px solid #ef5350;
+}
+
+.op-card--en-proceso {
+  border: 1.5px solid #43a047;
+  box-shadow: 0 0 14px rgba(67, 160, 71, 0.28);
+}
+
+.en-proceso-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  background: linear-gradient(135deg, #2e7d32, #66bb6a);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  padding: 4px 11px;
+  border-radius: 20px;
+  white-space: nowrap;
+  box-shadow: 0 0 0 0 rgba(67, 160, 71, 0.6);
+  animation: enProcesoPulse 1.7s ease-in-out infinite;
+}
+
+@keyframes enProcesoPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(67, 160, 71, 0.55); }
+  70%  { box-shadow: 0 0 0 11px rgba(67, 160, 71, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(67, 160, 71, 0); }
+}
+
+.en-proceso-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fff;
+  animation: enProcesoBlink 1s ease-in-out infinite;
+}
+
+@keyframes enProcesoBlink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.3; transform: scale(0.6); }
 }
 
 .op-card--in {
@@ -791,5 +906,23 @@ export default defineComponent({
 .casita-montaje-row {
   display: inline-flex;
   align-items: center;
+  margin-right: 4px;
+  margin-bottom: 4px;
+  max-width: 100%;
+}
+
+/* Permite que un valor de casita largo (ej. "Outside Guests",
+   "Koen Masschelein") haga salto de línea dentro del chip en vez de
+   desbordarse y encimarse sobre la columna Method. */
+.campo-valor .q-chip {
+  height: auto;
+  min-height: 24px;
+  max-width: 100%;
+}
+
+.campo-valor .q-chip :deep(.q-chip__content) {
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.2;
 }
 </style>

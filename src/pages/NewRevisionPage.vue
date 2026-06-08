@@ -102,7 +102,7 @@
       </div>
 
       <!-- Fecha Ingreso de la casita (solo si caja_fuerte es Check in) -->
-      <div v-if="form.caja_fuerte === 'Check in'" class="section-container" :class="{ 'error-section': validationErrors.fecha_ingreso_casita }">
+      <div v-if="form.caja_fuerte === 'Check in' || form.caja_fuerte === 'Back to Back'" class="section-container" :class="{ 'error-section': validationErrors.fecha_ingreso_casita }">
         <div class="section-label q-mb-md" :class="{ 'error-label': validationErrors.fecha_ingreso_casita }">
           <q-icon name="event" color="grey-7" class="q-mr-sm" size="20px" />
           Fecha Ingreso de la casita <span class="required-asterisk">*</span>
@@ -848,8 +848,8 @@ export default defineComponent({
         errors.quien_revisa = !form.value.quien_revisa
         errors.caja_fuerte = !form.value.caja_fuerte
         errors.puertas_ventanas = !form.value.puertas_ventanas
-        // fecha_ingreso_casita es obligatorio solo si caja_fuerte es Check in
-        errors.fecha_ingreso_casita = form.value.caja_fuerte === 'Check in' && !form.value.fecha_ingreso_casita_selection
+        // fecha_ingreso_casita es obligatorio solo si caja_fuerte es Check in o Back to Back
+        errors.fecha_ingreso_casita = (form.value.caja_fuerte === 'Check in' || form.value.caja_fuerte === 'Back to Back') && !form.value.fecha_ingreso_casita_selection
         errors.chromecast = !form.value.chromecast
         errors.speaker = !form.value.speaker
         errors.usb_speaker = !form.value.usb_speaker
@@ -896,8 +896,8 @@ export default defineComponent({
       if (!form.value.sombrero) count++
       if (!form.value.bolso_yute) count++
       if (!form.value.camas_ordenadas) count++
-      // fecha_ingreso_casita obligatorio solo si caja_fuerte es Check in
-      if (form.value.caja_fuerte === 'Check in' && !form.value.fecha_ingreso_casita_selection) count++
+      // fecha_ingreso_casita obligatorio solo si caja_fuerte es Check in o Back to Back
+      if ((form.value.caja_fuerte === 'Check in' || form.value.caja_fuerte === 'Back to Back') && !form.value.fecha_ingreso_casita_selection) count++
       if (evidencia1Required.value && !form.value.evidencia_01) count++
       if (evidencia2Required.value && !form.value.evidencia_02) count++
       return count
@@ -1451,7 +1451,7 @@ export default defineComponent({
           evidencia_01: evidencia01Url,
           evidencia_02: evidencia02Url,
           evidencia_03: evidencia03Url,
-          fecha_ingreso_casita: form.value.caja_fuerte === 'Check in' ? form.value.fecha_ingreso_casita : '',
+          fecha_ingreso_casita: (form.value.caja_fuerte === 'Check in' || form.value.caja_fuerte === 'Back to Back') ? form.value.fecha_ingreso_casita : '',
           notas: form.value.notas,
           created_at: localTime,
           update_at: localTime
@@ -1468,7 +1468,7 @@ export default defineComponent({
           console.log('[NewRevisionPage] Revisión guardada exitosamente')
 
           // === Sincronizar montaje_hecho en operaciones_memo ===
-          if (form.value.caja_fuerte === 'Check in' && form.value.fecha_ingreso_casita) {
+          if ((form.value.caja_fuerte === 'Check in' || form.value.caja_fuerte === 'Back to Back') && form.value.fecha_ingreso_casita) {
             try {
               // Parsear fecha_ingreso_casita (DD-MM-YYYY)
               const partes = form.value.fecha_ingreso_casita.split('-')
@@ -1578,9 +1578,9 @@ export default defineComponent({
       loadUsers()
     })
 
-    // Clear fecha_ingreso_casita when caja_fuerte changes away from Check in
+    // Clear fecha_ingreso_casita when caja_fuerte changes away from Check in or Back to Back
     watch(() => form.value.caja_fuerte, (newVal) => {
-      if (newVal !== 'Check in') {
+      if (newVal !== 'Check in' && newVal !== 'Back to Back') {
         form.value.fecha_ingreso_casita = ''
         form.value.fecha_ingreso_casita_selection = ''
       }

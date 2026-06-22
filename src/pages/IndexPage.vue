@@ -546,7 +546,7 @@
     <!-- Floating Action Button (visible sólo en pantallas < md) -->
     <q-page-sticky position="bottom-right" :offset="[18, 18]">
       <q-fab
-        v-if="$q.screen.lt.md"
+        v-if="$q.screen.lt.md && canAdd"
         icon="add"
         color="primary"
         class="fab-btn"
@@ -1060,6 +1060,8 @@ export default defineComponent({
     }
 
     const addNew = () => {
+      if (!canAdd.value) return
+
       localStorage.removeItem('new_revision_form')
       localStorage.removeItem('new_revision_compression_info')
       router.push('/new-revision')

@@ -5,8 +5,13 @@ const routes = [
     children: [
       { path: '', component: () => import('pages/IndexPage.vue') },
       { path: 'quiniela', component: () => import('pages/QuinielaPage.vue') },
+      { path: 'quiniela/pronostico', component: () => import('pages/QuinielaPronosticoPage.vue') },
       { path: 'details', component: () => import('pages/DetailsPage.vue') },
-      { path: 'new-revision', component: () => import('pages/NewRevisionPage.vue') },
+      {
+        path: 'new-revision',
+        component: () => import('pages/NewRevisionPage.vue'),
+        meta: { requiresAuth: true }
+      },
       { path: 'menus', component: () => import('pages/MenusPage.vue') },
       { path: 'menus/scan', component: () => import('pages/ScanMenuPage.vue') },
       { path: 'config', component: () => import('pages/ConfigPage.vue') },

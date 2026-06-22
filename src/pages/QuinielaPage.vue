@@ -30,29 +30,35 @@
       </div>
 
       <div v-if="proximo || enVivo" class="qn-next">
-        <div v-if="enVivo" class="qn-live-strip">
-          <span class="qn-live-dot"></span>
-          EN VIVO: {{ enVivo.equipo_local }} {{ enVivo.goles_local ?? 0 }}-{{ enVivo.goles_visita ?? 0 }} {{ enVivo.equipo_visita }}
-          <span v-if="enVivo.minuto" class="q-ml-xs">· {{ enVivo.minuto }}'</span>
-        </div>
-        <div v-if="proximo" class="qn-next-body">
-          <div class="qn-next-tag"><q-icon name="schedule" size="14px" class="q-mr-xs" />Próximo partido en</div>
-          <div class="qn-next-timer">{{ cuenta }}</div>
-          <div class="qn-next-match">
-            <img v-if="proximo.m.equipo_local_logo" :src="proximo.m.equipo_local_logo" class="qn-next-flag" alt="" />
-            {{ proximo.m.equipo_local }} <span class="qn-next-vs">vs</span> {{ proximo.m.equipo_visita }}
-            <img v-if="proximo.m.equipo_visita_logo" :src="proximo.m.equipo_visita_logo" class="qn-next-flag" alt="" />
-          </div>
-          <div class="qn-next-sub">{{ hora(proximo.m) }} CR · {{ proximo.m.ronda }}</div>
+        <div class="qn-next-body">
+          <template v-if="enVivo">
+            <div class="qn-next-tag"><span class="qn-live-dot"></span> En vivo</div>
+            <div class="qn-next-timer">{{ enVivo.goles_local ?? 0 }} <span class="qn-next-vs">-</span> {{ enVivo.goles_visita ?? 0 }}</div>
+            <div class="qn-next-match">
+              <img v-if="enVivo.equipo_local_logo" :src="enVivo.equipo_local_logo" class="qn-next-flag" alt="" />
+              {{ enVivo.equipo_local }} <span class="qn-next-vs">vs</span> {{ enVivo.equipo_visita }}
+              <img v-if="enVivo.equipo_visita_logo" :src="enVivo.equipo_visita_logo" class="qn-next-flag" alt="" />
+            </div>
+            <div class="qn-next-sub">{{ enVivo.minuto ? enVivo.minuto + "'" : 'En juego' }} · {{ enVivo.ronda }}</div>
+          </template>
+          <template v-else-if="proximo">
+            <div class="qn-next-tag"><q-icon name="schedule" size="14px" class="q-mr-xs" />Próximo partido en</div>
+            <div class="qn-next-timer">{{ cuenta }}</div>
+            <div class="qn-next-match">
+              <img v-if="proximo.m.equipo_local_logo" :src="proximo.m.equipo_local_logo" class="qn-next-flag" alt="" />
+              {{ proximo.m.equipo_local }} <span class="qn-next-vs">vs</span> {{ proximo.m.equipo_visita }}
+              <img v-if="proximo.m.equipo_visita_logo" :src="proximo.m.equipo_visita_logo" class="qn-next-flag" alt="" />
+            </div>
+            <div class="qn-next-sub">{{ hora(proximo.m) }} CR · {{ proximo.m.ronda }}</div>
+          </template>
         </div>
       </div>
 
       <q-expansion-item dense class="qn-rules" icon="help_outline" label="Cómo se puntúa">
         <div class="qn-rules-body">
-          <div class="row items-center q-mb-xs"><q-icon name="check_circle" color="green-7" size="18px" class="q-mr-sm" /> Marcador exacto: <b class="q-ml-xs">{{ cfg.pts_exacto }} pts</b></div>
-          <div class="row items-center q-mb-xs"><q-icon name="check_circle" color="blue-7" size="18px" class="q-mr-sm" /> Acertar quién gana/empata: <b class="q-ml-xs">{{ cfg.pts_resultado }} pt</b></div>
-          <div class="row items-center q-mb-xs"><q-icon name="star" color="amber-8" size="18px" class="q-mr-sm" /> Bonus por acertar los goles de un equipo: <b class="q-ml-xs">+{{ cfg.pts_bonus_equipo }}</b></div>
-          <div class="row items-center text-grey-7"><q-icon name="schedule" size="16px" class="q-mr-sm" /> Se abre {{ cfg.abre_horas_antes }} h antes y se cierra {{ cfg.bloquea_minutos_antes }} min antes del partido.</div>
+          <div class="row items-center q-mb-xs"><q-icon name="check_circle" color="green-7" size="18px" class="q-mr-sm" /> Acertar el marcador exacto: <b class="q-ml-xs">{{ cfg.pts_exacto }} pts</b></div>
+          <div class="row items-center q-mb-xs"><q-icon name="check_circle" color="blue-7" size="18px" class="q-mr-sm" /> Acertar solo el resultado (quién gana o si empata), sin el marcador: <b class="q-ml-xs">{{ cfg.pts_resultado }} pt</b></div>
+          <div class="row items-center text-grey-7"><q-icon name="schedule" size="16px" class="q-mr-sm" /> Los pronósticos se abren {{ cfg.abre_horas_antes }} h antes y se bloquean {{ cfg.bloquea_minutos_antes }} min antes del partido. Después del bloqueo ya puedes ver los pronósticos de los demás.</div>
         </div>
       </q-expansion-item>
 
@@ -68,6 +74,38 @@
               :color="filtro === f.value ? 'green-8' : 'grey-3'"
               :text-color="filtro === f.value ? 'white' : 'grey-8'"
               @click="filtro = f.value">{{ f.label }}</q-chip>
+          </div>
+
+          <div v-if="(filtro === 'fin' || filtro === 'todos') && !loading" class="qn-date-wrap">
+            <div class="qn-date-toggle row items-center q-mb-sm">
+              <q-chip clickable :selected="fechaActiva"
+                :color="fechaActiva ? 'amber-8' : 'grey-3'"
+                :text-color="fechaActiva ? 'white' : 'grey-8'"
+                icon="event" @click="toggleFecha">Por fecha</q-chip>
+              <span v-if="fechaActiva" class="qn-date-label">{{ fechaLabel }}</span>
+            </div>
+            <transition name="qn-calendar">
+              <div v-if="fechaActiva" class="qn-calendar-shell" aria-label="Seleccionar fecha de los partidos">
+                <q-date
+                  v-model="fechaCalendario"
+                  mask="YYYY-MM-DD"
+                  color="green-8"
+                  text-color="white"
+                  :locale="calendarLocale"
+                  :first-day-of-week="1"
+                  today-btn
+                  flat
+                  class="qn-calendar-picker"
+                />
+                <div class="qn-calendar-actions">
+                  <div class="qn-calendar-hint">
+                    <q-icon name="event" size="18px" />
+                    Toca un día para filtrar
+                  </div>
+                  <q-btn flat no-caps color="grey-7" icon="close" label="Quitar filtro" @click="limpiarFecha" />
+                </div>
+              </div>
+            </transition>
           </div>
 
           <div v-if="loading" class="flex flex-center q-my-xl">
@@ -131,6 +169,23 @@
                 </div>
               </div>
 
+              <div v-if="tipo(m) !== 'prox' && ((m.tarjetas_local && m.tarjetas_local.length) || (m.tarjetas_visita && m.tarjetas_visita.length))" class="qn-tarjetas">
+                <div class="qn-goles-col">
+                  <div v-for="(t, i) in (m.tarjetas_local || [])" :key="'tl' + i" class="qn-gol">
+                    <span class="qn-card-ic" :class="t.tipo === 'roja' ? 'qn-card-red' : 'qn-card-yellow'"></span>
+                    <span class="qn-gol-name ellipsis">{{ t.name }}</span>
+                    <span class="qn-gol-min">&nbsp;{{ t.minute }}'</span>
+                  </div>
+                </div>
+                <div class="qn-goles-col qn-goles-right">
+                  <div v-for="(t, i) in (m.tarjetas_visita || [])" :key="'tv' + i" class="qn-gol qn-gol-r">
+                    <span class="qn-gol-min">{{ t.minute }}'&nbsp;</span>
+                    <span class="qn-gol-name ellipsis">{{ t.name }}</span>
+                    <span class="qn-card-ic q-ml-xs" :class="t.tipo === 'roja' ? 'qn-card-red' : 'qn-card-yellow'"></span>
+                  </div>
+                </div>
+              </div>
+
               <div class="qn-pred">
                 <template v-if="editable(m)">
                   <div class="qn-pred-row">
@@ -160,7 +215,7 @@
                     <q-icon :name="lockIcon(m)" size="15px" class="q-mr-xs" />{{ lockTexto(m) }}
                   </div>
 
-                  <q-btn v-if="tipo(m) !== 'prox'" flat dense no-caps size="sm" color="green-9"
+                  <q-btn v-if="tipo(m) !== 'prox' || locked(m)" flat dense no-caps size="sm" color="green-9"
                     :icon="pubPron[m.id] ? 'expand_less' : 'groups'"
                     :label="pubPron[m.id] ? 'Ocultar' : 'Ver pronósticos'" class="q-mt-xs"
                     @click="togglePron(m)" />
@@ -185,7 +240,7 @@
             <div class="q-mt-md">Aún no hay puntos en juego</div>
           </div>
           <div v-else class="qn-rank">
-            <div v-for="(r, i) in ranking" :key="r.id" class="qn-rank-row" :class="{ 'qn-me': esMio(r) }">
+            <div v-for="(r, i) in ranking" :key="r.id" class="qn-rank-row" :class="{ 'qn-me': esMio(r) }" @click="abrirPron(r)">
               <div class="qn-pos" :class="'qn-pos-' + (i + 1)">{{ i + 1 }}</div>
               <div class="qn-rank-name ellipsis">
                 {{ r.nombre }}
@@ -193,6 +248,7 @@
                 <div class="text-caption text-grey-6">{{ r.exactos }} exactos · {{ r.aciertos }} aciertos · {{ r.jugados }} jugados</div>
               </div>
               <div class="qn-rank-pts">{{ r.puntos }}<span>pts</span></div>
+              <q-icon name="chevron_right" size="20px" color="grey-5" class="qn-rank-go" />
             </div>
           </div>
         </q-tab-panel>
@@ -226,6 +282,7 @@
 
 <script>
 import { defineComponent, ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { supabase } from '../supabase'
 import { notify } from '../utils/notify'
 
@@ -238,7 +295,7 @@ const ERROR_MSG = {
   PIN_INCORRECTO: 'PIN incorrecto para ese nombre',
   PIN_INVALIDO: 'El PIN debe ser de 4 dígitos',
   NOMBRE_VACIO: 'Escribe tu nombre',
-  BLOQUEADO: 'Ya no se puede cambiar: falta menos de 1 hora',
+  BLOQUEADO: 'Ya no se puede cambiar: falta menos de 15 minutos',
   AUN_NO_ABRE: 'Aún no se habilita (abre 12 h antes)',
   PARTIDO_NO_EXISTE: 'Partido no encontrado',
   MARCADOR_INVALIDO: 'Marcador inválido'
@@ -253,8 +310,9 @@ function msgFromError (e) {
 export default defineComponent({
   name: 'QuinielaPage',
   setup () {
+    const router = useRouter()
     const tab = ref('partidos')
-    const cfg = ref({ abre_horas_antes: 12, bloquea_minutos_antes: 60, pts_exacto: 3, pts_resultado: 1, pts_bonus_equipo: 1 })
+    const cfg = ref({ abre_horas_antes: 12, bloquea_minutos_antes: 15, pts_exacto: 3, pts_resultado: 1, pts_bonus_equipo: 1 })
     const partidos = ref([])
     const ranking = ref([])
     const misPron = reactive({})
@@ -269,6 +327,31 @@ export default defineComponent({
     const joinData = reactive({ nombre: '', pin: '' })
     const joinLoading = ref(false)
     const savingId = ref(null)
+    const fechaActiva = ref(false)
+    const fechaCalendario = ref('2026-01-01')
+    const calendarLocale = {
+      days: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
+      daysShort: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'],
+      months: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
+      monthsShort: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+      firstDayOfWeek: 1,
+      format24h: true,
+      pluralDay: 'días'
+    }
+
+    const keyFmt = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'America/Costa_Rica' })
+
+    const fechaSel = computed(() => {
+      if (!fechaActiva.value) return null
+      return fechaCalendario.value
+    })
+
+    const fechaLabel = computed(() => {
+      if (!fechaActiva.value || !fechaCalendario.value) return ''
+      const [year, month, day] = fechaCalendario.value.split('-').map(Number)
+      return new Intl.DateTimeFormat('es-CR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
+        .format(new Date(Date.UTC(year, month - 1, day)))
+    })
 
     let nowTimer = null
     let clockTimer = null
@@ -328,6 +411,9 @@ export default defineComponent({
       if (filtro.value === 'live') arr = arr.filter(m => tipo(m) === 'live')
       else if (filtro.value === 'prox') arr = arr.filter(m => tipo(m) === 'prox')
       else if (filtro.value === 'fin') arr = arr.filter(m => tipo(m) === 'fin')
+      if (fechaActiva.value && fechaSel.value) {
+        arr = arr.filter(m => keyFmt.format(new Date(m.kickoff)) === fechaSel.value)
+      }
       return arr
     })
 
@@ -349,6 +435,10 @@ export default defineComponent({
     })
 
     const esMio = (r) => identity.value && (r.nombre || '').toLowerCase() === identity.value.nombre.toLowerCase()
+
+    const abrirPron = (r) => {
+      router.push({ path: '/quiniela/pronostico', query: { nombre: r.nombre } })
+    }
 
     const enVivo = computed(() => partidos.value.find(m => tipo(m) === 'live') || null)
 
@@ -464,6 +554,21 @@ export default defineComponent({
       await loadMine()
     }
 
+    const toggleFecha = () => {
+      if (fechaActiva.value) { fechaActiva.value = false; return }
+      let refPartido = null
+      if (filtro.value === 'fin') refPartido = partidos.value.find(m => tipo(m) === 'fin')
+      if (!refPartido) refPartido = partidos.value[0]
+      const d = refPartido ? new Date(refPartido.kickoff) : new Date()
+      const pad = (n) => String(n).padStart(2, '0')
+      fechaCalendario.value = `2026-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+      fechaActiva.value = true
+    }
+
+    const limpiarFecha = () => {
+      fechaActiva.value = false
+    }
+
     onMounted(async () => {
       const saved = localStorage.getItem(IDENTITY_KEY)
       if (saved) { try { identity.value = JSON.parse(saved) } catch (e) { identity.value = null } }
@@ -503,8 +608,10 @@ export default defineComponent({
     return {
       tab, cfg, partidos, ranking, misPron, pubPron, form, identity, loading, filtro, filtros,
       showJoin, joinData, joinLoading, savingId, inicial,
-      tipo, hora, editable, estadoTexto, lockIcon, lockTexto, grupos, esMio,
+      tipo, hora, editable, locked, estadoTexto, lockIcon, lockTexto, grupos, esMio, abrirPron,
       enVivo, proximo, cuenta,
+      fechaActiva, fechaCalendario, calendarLocale, fechaLabel,
+      toggleFecha, limpiarFecha,
       join, salir, guardar, togglePron
     }
   }
@@ -584,15 +691,6 @@ export default defineComponent({
   color: #fff;
   box-shadow: 0 8px 22px rgba(20, 83, 45, 0.35);
 }
-.qn-live-strip {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: rgba(0, 0, 0, 0.22);
-  padding: 6px 14px;
-  font-size: 12.5px;
-  font-weight: 700;
-}
 .qn-live-dot {
   width: 9px; height: 9px; border-radius: 50%;
   background: #ff5252;
@@ -658,6 +756,26 @@ export default defineComponent({
 .qn-gol-r { justify-content: flex-end; }
 .qn-gol-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .qn-gol-min { color: #888; flex-shrink: 0; }
+
+.qn-tarjetas {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed #f0f0f0;
+}
+.qn-card-ic {
+  display: inline-block;
+  width: 9px;
+  height: 13px;
+  border-radius: 2px;
+  margin-right: 5px;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+.qn-card-yellow { background: #fbc02d; }
+.qn-card-red { background: #e53935; }
 
 .qn-tabs { margin-top: 14px; background: #fff; border-radius: 14px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05); }
 .qn-panels { background: transparent; margin-top: 12px; }
@@ -735,8 +853,9 @@ export default defineComponent({
 .qn-pub-row:last-child { border-bottom: none; }
 
 .qn-rank { background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06); }
-.qn-rank-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid #f2f2f2; }
+.qn-rank-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid #f2f2f2; cursor: pointer; transition: background 0.15s; }
 .qn-rank-row:last-child { border-bottom: none; }
+.qn-rank-row:hover { background: rgba(46, 125, 50, 0.06); }
 .qn-me { background: linear-gradient(90deg, rgba(255, 213, 79, 0.18), transparent); }
 .qn-pos { width: 30px; height: 30px; border-radius: 50%; background: #eee; color: #555; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .qn-pos-1 { background: linear-gradient(135deg, #ffd54f, #f9a825); color: #fff; }
@@ -746,13 +865,68 @@ export default defineComponent({
 .qn-yo { background: #2e7d32; color: #fff; font-size: 10px; padding: 1px 6px; border-radius: 8px; margin-left: 6px; vertical-align: middle; }
 .qn-rank-pts { font-weight: 900; font-size: 20px; color: #1b5e20; }
 .qn-rank-pts span { font-size: 11px; font-weight: 600; color: #9e9e9e; margin-left: 3px; }
+.qn-rank-go { flex-shrink: 0; }
 
 .qn-join { width: 360px; max-width: 92vw; border-radius: 20px; }
+
+.qn-date-wrap { margin-bottom: 12px; }
+.qn-date-toggle { min-height: 32px; }
+.qn-date-label { font-size: 13px; font-weight: 700; color: #1b5e20; margin-left: 8px; }
+
+.qn-calendar-shell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+  margin-bottom: 4px;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid rgba(27, 94, 32, 0.1);
+  border-radius: 18px;
+  box-shadow: 0 10px 28px rgba(27, 94, 32, 0.12);
+}
+.qn-calendar-picker {
+  width: 100%;
+  max-width: 380px;
+  box-shadow: none;
+}
+.qn-calendar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 4px 2px 12px;
+  border-top: 1px solid #edf2ed;
+}
+.qn-calendar-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #6b766c;
+  font-size: 12px;
+}
+
+.qn-calendar-enter-active, .qn-calendar-leave-active {
+  transition: max-height 0.28s ease, opacity 0.28s ease;
+  overflow: hidden;
+  max-height: 520px;
+}
+.qn-calendar-enter-from, .qn-calendar-leave-to {
+  max-height: 0;
+  opacity: 0;
+}
 
 @media (max-width: 599px) {
   .qn-title { font-size: 22px; }
   .qn-logo { width: 40px; height: 40px; }
   .qn-team-name { font-size: 12px; }
   .qn-score { font-size: 22px; }
+  .qn-calendar-shell { padding: 4px; border-radius: 16px; }
+  .qn-calendar-actions { padding-left: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qn-calendar-enter-active, .qn-calendar-leave-active { transition: none; }
 }
 </style>

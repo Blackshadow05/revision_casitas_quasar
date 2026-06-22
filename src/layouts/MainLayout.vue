@@ -14,7 +14,7 @@
 
         <q-space />
 
-        <q-btn flat round dense icon="menu" class="menu-button text-white gt-xs" aria-label="Abrir navegación">
+        <q-btn v-if="authStore.isLoggedIn" flat round dense icon="menu" class="menu-button text-white gt-xs" aria-label="Abrir navegación">
           <q-menu anchor="bottom right" self="top right" class="menu-dropdown">
             <q-list style="min-width: 220px">
               <q-item clickable v-close-popup @click="goToHome">
@@ -55,7 +55,7 @@
                 </q-item-section>
               </q-item>
 
-              <q-item clickable v-close-popup @click="goToForms">
+              <q-item v-if="authStore.isLoggedIn" clickable v-close-popup @click="goToForms">
                 <q-item-section avatar>
                   <q-icon name="assignment" color="primary" />
                 </q-item-section>
@@ -98,6 +98,16 @@
             @click="goTo('/quiniela')"
           />
           <q-btn
+            flat
+            no-caps
+            dense
+            icon="restaurant"
+            label="Menús"
+            class="appbar-nav-btn text-white q-mr-md"
+            @click="goToMenus"
+          />
+          <q-btn
+            v-if="authStore.isLoggedIn"
             flat
             no-caps
             dense
@@ -150,7 +160,7 @@
         <q-tab name="menus" icon="restaurant" label="Menús" @click="goToMenus" />
         <q-tab v-if="isEstebanB" name="puesto01" icon="local_police" label="Puesto 01" @click="goTo('/puesto-01')" />
         <q-tab v-if="false" name="security" icon="security" label="Seguridad" @click="goToSeguridad" />
-        <q-tab name="forms" icon="assignment" label="Forms" @click="goToForms" />
+        <q-tab v-if="authStore.isLoggedIn" name="forms" icon="assignment" label="Forms" @click="goToForms" />
       </q-tabs>
     </q-footer>
 

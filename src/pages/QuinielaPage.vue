@@ -68,6 +68,7 @@
 
       <q-tabs v-model="tab" class="qn-tabs" active-color="green-9" indicator-color="amber-8" align="justify" no-caps dense>
         <q-tab name="partidos" icon="sports_soccer" label="Partidos" />
+        <q-tab name="posiciones" icon="table_chart" label="Posiciones" />
         <q-tab name="ranking" icon="leaderboard" label="Ranking" />
       </q-tabs>
 
@@ -258,6 +259,45 @@
             </div>
           </div>
         </q-tab-panel>
+
+        <q-tab-panel name="posiciones" class="q-pa-none">
+          <div v-if="gruposPos.length === 0" class="flex flex-center column q-my-xl text-grey-6">
+            <q-icon name="table_chart" size="56px" color="grey-4" />
+            <div class="q-mt-md">Aún no hay posiciones</div>
+            <div class="text-caption">Se calculan con los partidos jugados.</div>
+          </div>
+          <div v-for="gp in gruposPos" :key="gp.grupo" class="qn-grupo">
+            <div class="qn-grupo-head">Grupo {{ gp.grupo }}</div>
+            <div class="qn-tabla">
+              <div class="qn-tabla-row qn-tabla-head">
+                <span class="qn-col-pos">#</span>
+                <span class="qn-col-eq">Equipo</span>
+                <span class="qn-col-n">PJ</span>
+                <span class="qn-col-n qn-hide-xs">G</span>
+                <span class="qn-col-n qn-hide-xs">E</span>
+                <span class="qn-col-n qn-hide-xs">P</span>
+                <span class="qn-col-n">DG</span>
+                <span class="qn-col-n qn-col-pts">Pts</span>
+              </div>
+              <div v-for="(t, i) in gp.equipos" :key="t.equipo" class="qn-tabla-row" :class="{ 'qn-clasifica': i < 2 }">
+                <span class="qn-col-pos">{{ i + 1 }}</span>
+                <span class="qn-col-eq">
+                  <img v-if="t.logo" :src="t.logo" class="qn-tabla-flag" alt="" />
+                  <span class="ellipsis">{{ t.equipo }}</span>
+                </span>
+                <span class="qn-col-n">{{ t.pj }}</span>
+                <span class="qn-col-n qn-hide-xs">{{ t.g }}</span>
+                <span class="qn-col-n qn-hide-xs">{{ t.e }}</span>
+                <span class="qn-col-n qn-hide-xs">{{ t.p }}</span>
+                <span class="qn-col-n">{{ t.dg > 0 ? '+' + t.dg : t.dg }}</span>
+                <span class="qn-col-n qn-col-pts">{{ t.pts }}</span>
+              </div>
+            </div>
+          </div>
+          <div v-if="gruposPos.length" class="qn-tabla-nota">
+            <span class="qn-clasifica-dot"></span> Los 2 primeros de cada grupo avanzan (más los mejores terceros).
+          </div>
+        </q-tab-panel>
       </q-tab-panels>
     </div>
 
@@ -321,6 +361,7 @@ export default defineComponent({
     const cfg = ref({ abre_horas_antes: 12, bloquea_minutos_antes: 15, pts_exacto: 3, pts_resultado: 1, pts_bonus_equipo: 1 })
     const partidos = ref([])
     const ranking = ref([])
+    const posiciones = ref([])
     const misPron = reactive({})
     const pubPron = reactive({})
     const form = reactive({})
@@ -499,6 +540,25 @@ export default defineComponent({
       ranking.value = (data || []).sort((a, b) => b.puntos - a.puntos || b.exactos - a.exactos)
     }
 
+    const loadPosiciones = async () => {
+      const { data } = await supabase.from('qn_posiciones').select('*')
+      posiciones.value = data || []
+    }
+
+    const gruposPos = computed(() => {
+      const map = new Map()
+      for (const t of posiciones.value) {
+        if (!map.has(t.grupo)) map.set(t.grupo, [])
+        map.get(t.grupo).push(t)
+      }
+      const out = []
+      for (const [grupo, equipos] of map) {
+        equipos.sort((a, b) => b.pts - a.pts || b.dg - a.dg || b.gf - a.gf || a.equipo.localeCompare(b.equipo))
+        out.push({ grupo, equipos })
+      }
+      return out.sort((a, b) => a.grupo.localeCompare(b.grupo))
+    })
+
     const loadMine = async () => {
       if (!identity.value) return
       const { data, error } = await supabase.rpc('qn_mis_pronosticos', { p_nombre: identity.value.nombre, p_pin: identity.value.pin })
@@ -561,7 +621,7 @@ export default defineComponent({
     }
 
     const refrescar = async () => {
-      await Promise.all([loadPartidos(), loadRanking()])
+      await Promise.all([loadPartidos(), loadRanking(), loadPosiciones()])
       await loadMine()
     }
 
@@ -597,7 +657,7 @@ export default defineComponent({
       if (saved) { try { identity.value = JSON.parse(saved) } catch (e) { identity.value = null } }
 
       await loadConfig()
-      await Promise.all([loadPartidos(), loadRanking()])
+      await Promise.all([loadPartidos(), loadRanking(), loadPosiciones()])
       await loadMine()
       loading.value = false
 
@@ -613,6 +673,7 @@ export default defineComponent({
           if (i >= 0) partidos.value[i] = { ...partidos.value[i], ...r }
           else partidos.value.push(r)
           loadRanking()
+          loadPosiciones()
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'qn_pronosticos' }, () => {
           loadRanking()
@@ -629,7 +690,7 @@ export default defineComponent({
     })
 
     return {
-      tab, cfg, partidos, ranking, misPron, pubPron, form, identity, loading, filtro, filtros,
+      tab, cfg, partidos, ranking, gruposPos, misPron, pubPron, form, identity, loading, filtro, filtros,
       showJoin, joinData, joinLoading, savingId, inicial,
       tipo, hora, editable, locked, estadoTexto, lockIcon, lockTexto, grupos, esMio, abrirPron,
       enVivo, proximo, cuenta,
@@ -867,6 +928,59 @@ export default defineComponent({
 .qn-yo { background: #2e7d32; color: #fff; font-size: 10px; padding: 1px 6px; border-radius: 8px; margin-left: 6px; vertical-align: middle; }
 .qn-rank-pts { font-weight: 900; font-size: 20px; color: #1b5e20; }
 .qn-rank-pts span { font-size: 11px; font-weight: 600; color: #9e9e9e; margin-left: 3px; }
+
+.qn-grupo { margin-bottom: 18px; }
+.qn-grupo-head {
+  font-weight: 800;
+  color: #1b5e20;
+  font-size: 14px;
+  margin: 2px 2px 8px;
+  display: flex;
+  align-items: center;
+}
+.qn-grupo-head::before {
+  content: "";
+  width: 6px; height: 16px;
+  background: linear-gradient(180deg, #ffd54f, #f9a825);
+  border-radius: 3px;
+  margin-right: 8px;
+}
+.qn-tabla { background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06); }
+.qn-tabla-row {
+  display: flex;
+  align-items: center;
+  padding: 9px 10px;
+  border-bottom: 1px solid #f2f2f2;
+  font-size: 13px;
+}
+.qn-tabla-row:last-child { border-bottom: none; }
+.qn-tabla-head {
+  background: #1b5e20;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 7px 10px;
+}
+.qn-col-pos { width: 22px; text-align: center; font-weight: 700; color: #757575; flex-shrink: 0; }
+.qn-tabla-head .qn-col-pos { color: #fff; }
+.qn-col-eq { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; font-weight: 600; }
+.qn-tabla-flag { width: 22px; height: 15px; object-fit: cover; border-radius: 2px; flex-shrink: 0; }
+.qn-col-n { width: 30px; text-align: center; flex-shrink: 0; color: #555; font-variant-numeric: tabular-nums; }
+.qn-col-pts { font-weight: 800; color: #1b5e20; width: 34px; }
+.qn-tabla-head .qn-col-n, .qn-tabla-head .qn-col-pts { color: #fff; }
+.qn-clasifica { border-left: 4px solid #2e7d32; }
+.qn-clasifica .qn-col-pos { color: #2e7d32; }
+.qn-tabla-nota {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: #757575;
+  margin: 4px 4px 8px;
+}
+.qn-clasifica-dot { width: 10px; height: 10px; border-radius: 2px; background: #2e7d32; flex-shrink: 0; }
 .qn-rank-go { flex-shrink: 0; }
 
 .qn-join { width: 360px; max-width: 92vw; border-radius: 20px; }
@@ -925,6 +1039,7 @@ export default defineComponent({
   .qn-score { font-size: 22px; }
   .qn-calendar-shell { padding: 4px; border-radius: 16px; }
   .qn-calendar-actions { padding-left: 8px; }
+  .qn-hide-xs { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

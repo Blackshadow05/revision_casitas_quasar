@@ -311,6 +311,7 @@
 
 <script>
 import { computed, defineComponent, onMounted, ref } from 'vue'
+import { notify } from '../utils/notify'
 import { useQuasar } from 'quasar'
 import { supabase } from '../supabase'
 
@@ -491,9 +492,9 @@ export default defineComponent({
           .eq('id', row.id)
         if (error) throw error
         row[field] = valorLimpio
-        $q.notify({ type: 'positive', message: 'Cambio guardado', position: 'top', timeout: 1500 })
+        notify({ type: 'positive', message: 'Cambio guardado', position: 'top', timeout: 1500 })
       } catch (e) {
-        $q.notify({ type: 'negative', message: 'No se pudo guardar: ' + (e.message || e), position: 'top' })
+        notify({ type: 'negative', message: 'No se pudo guardar: ' + (e.message || e), position: 'top' })
         cargar()
       }
     }
@@ -509,9 +510,9 @@ export default defineComponent({
           .in('id', ids)
         if (error) throw error
         grupo.items.forEach((i) => { i[field] = valorLimpio })
-        $q.notify({ type: 'positive', message: 'Cambio guardado', position: 'top', timeout: 1500 })
+        notify({ type: 'positive', message: 'Cambio guardado', position: 'top', timeout: 1500 })
       } catch (e) {
-        $q.notify({ type: 'negative', message: 'No se pudo guardar: ' + (e.message || e), position: 'top' })
+        notify({ type: 'negative', message: 'No se pudo guardar: ' + (e.message || e), position: 'top' })
         cargar()
       }
     }

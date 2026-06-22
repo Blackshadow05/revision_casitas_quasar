@@ -305,6 +305,7 @@
 
 <script>
 import { defineComponent, ref, computed, onMounted } from 'vue'
+import { notify } from '../utils/notify'
 import { useRouter, useRoute } from 'vue-router'
 import { supabase } from '../supabase'
 import { useAuthStore } from '../stores/auth'
@@ -488,7 +489,7 @@ export default defineComponent({
       const file = e.target.files?.[0]
       if (!file) return
       if (newPhotos.value.length >= 4) {
-        $q.notify({ type: 'warning', message: 'Máximo 4 fotos' })
+        notify({ type: 'warning', message: 'Máximo 4 fotos' })
         return
       }
       try {
@@ -561,7 +562,7 @@ export default defineComponent({
         }
       } catch (err) {
         console.error('Error fetching incident:', err)
-        $q.notify({ type: 'negative', message: 'Error al cargar incidente' })
+        notify({ type: 'negative', message: 'Error al cargar incidente' })
       } finally {
         loadingData.value = false
       }
@@ -598,7 +599,7 @@ export default defineComponent({
           }
           const { error } = await supabase.from('incidents').insert(record)
           if (error) throw error
-          $q.notify({ type: 'positive', message: 'Incidente registrado', icon: 'check_circle' })
+          notify({ type: 'positive', message: 'Incidente registrado', icon: 'check_circle' })
         } else {
           const updates = {
             title: form.value.title.trim(),
@@ -620,12 +621,12 @@ export default defineComponent({
             .update(updates)
             .eq('id', incidentId.value)
           if (error) throw error
-          $q.notify({ type: 'positive', message: 'Incidente actualizado', icon: 'check_circle' })
+          notify({ type: 'positive', message: 'Incidente actualizado', icon: 'check_circle' })
         }
         router.push('/seguridad/incidentes')
       } catch (err) {
         console.error('Error saving incident:', err)
-        $q.notify({ type: 'negative', message: 'Error al guardar', caption: err.message })
+        notify({ type: 'negative', message: 'Error al guardar', caption: err.message })
       } finally {
         saving.value = false
       }
@@ -644,11 +645,11 @@ export default defineComponent({
           .update({ status: 'Resuelto', resolved_at: localResolvedAt })
           .eq('id', incidentId.value)
         if (error) throw error
-        $q.notify({ type: 'positive', message: 'Incidente resuelto', icon: 'check_circle' })
+        notify({ type: 'positive', message: 'Incidente resuelto', icon: 'check_circle' })
         router.push('/seguridad/incidentes')
       } catch (err) {
         console.error('Error resolving incident:', err)
-        $q.notify({ type: 'negative', message: 'Error al resolver', caption: err.message })
+        notify({ type: 'negative', message: 'Error al resolver', caption: err.message })
       } finally {
         saving.value = false
       }

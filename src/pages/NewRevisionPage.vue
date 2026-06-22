@@ -686,6 +686,7 @@ import { useAuthStore } from '../stores/auth'
 import { supabase } from '../supabase'
 import { CLOUDINARY_CONFIG } from '../cloudinary'
 import { playSound } from '../utils/sounds'
+import { notify } from '../utils/notify'
 
 export default defineComponent({
   name: 'NewRevisionPage',
@@ -698,6 +699,7 @@ export default defineComponent({
     const photoSheetOpen = ref(false)
     const formSubmitted = ref(false)
     const currentPhotoField = ref('')
+    const lastCaptureSource = ref('')
     const fileEvidencia01 = ref(null)
     const fileEvidencia02 = ref(null)
     const fileEvidencia03 = ref(null)
@@ -1264,6 +1266,7 @@ export default defineComponent({
     }
 
     const selectPhotoSource = (source) => {
+      lastCaptureSource.value = source
       photoSheetOpen.value = false
       setTimeout(() => {
         capturePhoto(currentPhotoField.value, source)
@@ -1298,6 +1301,38 @@ export default defineComponent({
       if (!file) return ''
       if (typeof file === 'string') return file
       return URL.createObjectURL(file)
+    }
+
+    const promptNextPhoto = (justCompletedField) => {
+      if (lastCaptureSource.value !== 'camera') return
+      let nextField = null
+      let nextLabel = ''
+      let completedLabel = ''
+      if (justCompletedField === 'evidencia_01') {
+        completedLabel = 'Evidencia 1'
+        if (showEvidencia2.value && !form.value.evidencia_02) {
+          nextField = 'evidencia_02'
+          nextLabel = 'Evidencia 2'
+        }
+      } else if (justCompletedField === 'evidencia_02') {
+        completedLabel = 'Evidencia 2'
+        if (showEvidencia3.value && !form.value.evidencia_03) {
+          nextField = 'evidencia_03'
+          nextLabel = 'Evidencia 3'
+        }
+      }
+      if (nextField) {
+        notify({
+          type: 'success',
+          message: `${completedLabel} guardada`,
+          caption: `Puedes tomar ${nextLabel} o cerrar para terminar`,
+          timeout: 2500,
+          position: 'top'
+        })
+        setTimeout(() => {
+          openPhotoSheet(nextField)
+        }, 900)
+      }
     }
 
     const openImageModal = (url) => {
@@ -1600,6 +1635,7 @@ export default defineComponent({
         } catch (e) {
           console.error('[Watcher] Compression failed for evidencia_01:', e)
         }
+        promptNextPhoto('evidencia_01')
       }
     })
 
@@ -1616,6 +1652,7 @@ export default defineComponent({
         } catch (e) {
           console.error('[Watcher] Compression failed for evidencia_02:', e)
         }
+        promptNextPhoto('evidencia_02')
       }
     })
 

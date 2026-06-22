@@ -280,6 +280,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { notify } from '../utils/notify'
 import { useRouter } from 'vue-router'
 import { useQuasar, copyToClipboard } from 'quasar'
 import { supabase } from '../supabase'
@@ -291,7 +292,7 @@ const authStore = useAuthStore()
 
 // ── Access guard ──────────────────────────────────────────────────────────────
 if (!authStore.user || authStore.user.Usuario !== 'Esteban B') {
-  $q.notify({ type: 'negative', message: 'No tienes permiso para acceder a esta sección.' })
+  notify({ type: 'negative', message: 'No tienes permiso para acceder a esta sección.' })
   router.replace('/config')
 }
 
@@ -387,7 +388,7 @@ async function fetchSnippets() {
     if (error) throw error
     snippets.value = data || []
   } catch (err) {
-    $q.notify({ type: 'negative', message: 'Error al cargar snippets: ' + err.message })
+    notify({ type: 'negative', message: 'Error al cargar snippets: ' + err.message })
   } finally {
     loading.value = false
   }
@@ -397,9 +398,9 @@ async function fetchSnippets() {
 async function copyCode(snippet) {
   try {
     await copyToClipboard(snippet.code)
-    $q.notify({ type: 'positive', message: '¡Código copiado al portapapeles!', icon: 'content_copy', timeout: 1500 })
+    notify({ type: 'positive', message: '¡Código copiado al portapapeles!', icon: 'content_copy', timeout: 1500 })
   } catch {
-    $q.notify({ type: 'negative', message: 'No se pudo copiar el código.' })
+    notify({ type: 'negative', message: 'No se pudo copiar el código.' })
   }
 }
 
@@ -415,7 +416,7 @@ async function toggleFavorite(snippet) {
     if (error) throw error
   } catch (err) {
     snippet.is_favorite = !newVal // revert
-    $q.notify({ type: 'negative', message: 'Error al actualizar: ' + err.message })
+    notify({ type: 'negative', message: 'Error al actualizar: ' + err.message })
   }
 }
 
@@ -466,7 +467,7 @@ async function saveSnippet() {
         })
         .eq('id', editingSnippet.value.id)
       if (error) throw error
-      $q.notify({ type: 'positive', message: 'Snippet actualizado correctamente.' })
+      notify({ type: 'positive', message: 'Snippet actualizado correctamente.' })
     } else {
       const { error } = await supabase
         .from('personal_snippets')
@@ -477,12 +478,12 @@ async function saveSnippet() {
           code: form.value.code.trim(),
         })
       if (error) throw error
-      $q.notify({ type: 'positive', message: '¡Snippet creado exitosamente!' })
+      notify({ type: 'positive', message: '¡Snippet creado exitosamente!' })
     }
     closeDialog()
     await fetchSnippets()
   } catch (err) {
-    $q.notify({ type: 'negative', message: 'Error al guardar: ' + err.message })
+    notify({ type: 'negative', message: 'Error al guardar: ' + err.message })
   } finally {
     saving.value = false
   }
@@ -503,12 +504,12 @@ async function deleteSnippet() {
       .delete()
       .eq('id', snippetToDelete.value.id)
     if (error) throw error
-    $q.notify({ type: 'positive', message: 'Snippet eliminado.' })
+    notify({ type: 'positive', message: 'Snippet eliminado.' })
     deleteDialogOpen.value = false
     snippetToDelete.value = null
     await fetchSnippets()
   } catch (err) {
-    $q.notify({ type: 'negative', message: 'Error al eliminar: ' + err.message })
+    notify({ type: 'negative', message: 'Error al eliminar: ' + err.message })
   } finally {
     deleting.value = false
   }

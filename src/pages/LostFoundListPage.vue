@@ -216,6 +216,7 @@
 
 <script>
 import { defineComponent, ref, computed, onMounted } from 'vue'
+import { notify } from '../utils/notify'
 import { useRouter } from 'vue-router'
 import { supabase } from '../supabase'
 import { useAuthStore } from '../stores/auth'
@@ -368,7 +369,7 @@ export default defineComponent({
         items.value = data || []
       } catch (err) {
         console.error('Error fetching lost & found:', err)
-        quasar.notify({ type: 'negative', message: 'Error al cargar objetos perdidos' })
+        notify({ type: 'negative', message: 'Error al cargar objetos perdidos' })
       } finally {
         loading.value = false
       }

@@ -132,6 +132,7 @@
 
 <script setup>
 import { ref, computed } from "vue";
+import { notify } from '../utils/notify'
 import { supabase } from "../supabase";
 import { useQuasar } from "quasar";
 import { useAuthStore } from '../stores/auth'
@@ -242,7 +243,7 @@ const generateCSV = async () => {
   // Check validation based on report type
   if (reportType.value === "all") {
     if (!dateFrom.value || !dateTo.value) {
-      $q.notify({
+      notify({
         type: "warning",
         message: "Por favor seleccione un rango de fechas",
       });
@@ -251,7 +252,7 @@ const generateCSV = async () => {
   }
 
   if (selectedFields.value.length === 0) {
-    $q.notify({
+    notify({
       type: "warning",
       message: "Por favor seleccione al menos un campo",
     });
@@ -308,7 +309,7 @@ const generateCSV = async () => {
     previewData.value = filteredData.slice(0, 5);
 
     if (data.length === 0) {
-      $q.notify({
+      notify({
         type: "info",
         message: "No se encontraron registros en el rango de fechas seleccionado",
       });
@@ -355,13 +356,13 @@ const generateCSV = async () => {
 
     const reportTypeLabel = reportType.value === "last" ? "última revisión por casita" : "todas las revisiones";
 
-    $q.notify({
+    notify({
       type: "positive",
       message: `Reporte generado exitosamente: ${filteredData.length} registros (${reportTypeLabel})`,
     });
   } catch (error) {
     console.error("Error generating CSV:", error);
-    $q.notify({
+    notify({
       type: "negative",
       message: "Error al generar el reporte: " + error.message,
     });

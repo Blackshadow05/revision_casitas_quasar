@@ -104,6 +104,7 @@
 
 <script>
 import { computed, defineComponent, onMounted, ref } from 'vue'
+import { notify } from '../utils/notify'
 import { supabase } from '../supabase'
 import { date, useQuasar } from 'quasar'
 import { useAuthStore } from '../stores/auth'
@@ -146,7 +147,7 @@ export default defineComponent({
         menus.value = data
       } catch (error) {
         console.error('Error fetching menus:', error)
-        $q.notify({ type: 'negative', message: 'Error al cargar menús' })
+        notify({ type: 'negative', message: 'Error al cargar menús' })
       } finally {
         loading.value = false
       }

@@ -146,6 +146,7 @@
 
 <script>
 import { defineComponent, ref, computed, onMounted } from 'vue'
+import { notify } from '../utils/notify'
 import { useRouter } from 'vue-router'
 import { supabase } from '../supabase'
 import { useAuthStore } from '../stores/auth'
@@ -245,7 +246,7 @@ export default defineComponent({
         incidents.value = data || []
       } catch (err) {
         console.error('Error fetching incidents:', err)
-        $q.notify({ type: 'negative', message: 'Error al cargar incidentes' })
+        notify({ type: 'negative', message: 'Error al cargar incidentes' })
       } finally {
         loading.value = false
       }

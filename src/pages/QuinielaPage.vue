@@ -1,0 +1,758 @@
+<template>
+  <q-page class="qn-page">
+    <div class="qn-banner">
+      <div class="qn-banner-overlay"></div>
+      <div class="qn-banner-content">
+        <q-icon name="emoji_events" class="qn-trophy" />
+        <div class="qn-title">Quiniela Mundial 2026</div>
+        <div class="qn-subtitle">Pronostica los marcadores y compite por el primer lugar</div>
+      </div>
+    </div>
+
+    <div class="qn-wrap">
+      <div class="qn-identity">
+        <template v-if="identity">
+          <div class="row items-center no-wrap">
+            <q-avatar size="34px" color="amber-8" text-color="white" class="q-mr-sm">
+              {{ inicial }}
+            </q-avatar>
+            <div>
+              <div class="text-caption text-grey-7" style="line-height:1">Jugando como</div>
+              <div class="text-weight-bold">{{ identity.nombre }}</div>
+            </div>
+          </div>
+          <q-btn flat dense no-caps size="sm" color="grey-7" icon="logout" label="Salir" @click="salir" />
+        </template>
+        <template v-else>
+          <div class="text-grey-8">Únete para pronosticar</div>
+          <q-btn unelevated no-caps rounded color="green-8" icon="how_to_reg" label="Unirme" @click="showJoin = true" />
+        </template>
+      </div>
+
+      <div v-if="proximo || enVivo" class="qn-next">
+        <div v-if="enVivo" class="qn-live-strip">
+          <span class="qn-live-dot"></span>
+          EN VIVO: {{ enVivo.equipo_local }} {{ enVivo.goles_local ?? 0 }}-{{ enVivo.goles_visita ?? 0 }} {{ enVivo.equipo_visita }}
+          <span v-if="enVivo.minuto" class="q-ml-xs">· {{ enVivo.minuto }}'</span>
+        </div>
+        <div v-if="proximo" class="qn-next-body">
+          <div class="qn-next-tag"><q-icon name="schedule" size="14px" class="q-mr-xs" />Próximo partido en</div>
+          <div class="qn-next-timer">{{ cuenta }}</div>
+          <div class="qn-next-match">
+            <img v-if="proximo.m.equipo_local_logo" :src="proximo.m.equipo_local_logo" class="qn-next-flag" alt="" />
+            {{ proximo.m.equipo_local }} <span class="qn-next-vs">vs</span> {{ proximo.m.equipo_visita }}
+            <img v-if="proximo.m.equipo_visita_logo" :src="proximo.m.equipo_visita_logo" class="qn-next-flag" alt="" />
+          </div>
+          <div class="qn-next-sub">{{ hora(proximo.m) }} CR · {{ proximo.m.ronda }}</div>
+        </div>
+      </div>
+
+      <q-expansion-item dense class="qn-rules" icon="help_outline" label="Cómo se puntúa">
+        <div class="qn-rules-body">
+          <div class="row items-center q-mb-xs"><q-icon name="check_circle" color="green-7" size="18px" class="q-mr-sm" /> Marcador exacto: <b class="q-ml-xs">{{ cfg.pts_exacto }} pts</b></div>
+          <div class="row items-center q-mb-xs"><q-icon name="check_circle" color="blue-7" size="18px" class="q-mr-sm" /> Acertar quién gana/empata: <b class="q-ml-xs">{{ cfg.pts_resultado }} pt</b></div>
+          <div class="row items-center q-mb-xs"><q-icon name="star" color="amber-8" size="18px" class="q-mr-sm" /> Bonus por acertar los goles de un equipo: <b class="q-ml-xs">+{{ cfg.pts_bonus_equipo }}</b></div>
+          <div class="row items-center text-grey-7"><q-icon name="schedule" size="16px" class="q-mr-sm" /> Se abre {{ cfg.abre_horas_antes }} h antes y se cierra {{ cfg.bloquea_minutos_antes }} min antes del partido.</div>
+        </div>
+      </q-expansion-item>
+
+      <q-tabs v-model="tab" class="qn-tabs" active-color="green-9" indicator-color="amber-8" align="justify" no-caps dense>
+        <q-tab name="partidos" icon="sports_soccer" label="Partidos" />
+        <q-tab name="ranking" icon="leaderboard" label="Ranking" />
+      </q-tabs>
+
+      <q-tab-panels v-model="tab" animated class="qn-panels">
+        <q-tab-panel name="partidos" class="q-pa-none">
+          <div class="qn-filtros row q-gutter-xs q-mb-md">
+            <q-chip v-for="f in filtros" :key="f.value" clickable :selected="filtro === f.value"
+              :color="filtro === f.value ? 'green-8' : 'grey-3'"
+              :text-color="filtro === f.value ? 'white' : 'grey-8'"
+              @click="filtro = f.value">{{ f.label }}</q-chip>
+          </div>
+
+          <div v-if="loading" class="flex flex-center q-my-xl">
+            <q-spinner-dots color="green-8" size="40px" />
+          </div>
+
+          <div v-else-if="grupos.length === 0" class="flex flex-center column q-my-xl text-grey-6">
+            <q-icon name="sports_soccer" size="56px" color="grey-4" />
+            <div class="q-mt-md">No hay partidos para mostrar</div>
+            <div class="text-caption">Los datos se sincronizan automáticamente.</div>
+          </div>
+
+          <div v-for="g in grupos" :key="g.key" class="q-mb-lg">
+            <div class="qn-fecha">{{ g.label }}</div>
+
+            <div v-for="m in g.items" :key="m.id" class="qn-card" :class="'qn-' + tipo(m)">
+              <div class="qn-card-top">
+                <div class="qn-ronda">{{ m.ronda || 'Mundial' }}</div>
+                <div class="qn-estado" :class="'qn-estado-' + tipo(m)">
+                  <q-icon v-if="tipo(m) === 'live'" name="fiber_manual_record" size="10px" class="qn-blink q-mr-xs" />
+                  {{ estadoTexto(m) }}
+                </div>
+              </div>
+
+              <div class="qn-match">
+                <div class="qn-team">
+                  <img v-if="m.equipo_local_logo" :src="m.equipo_local_logo" class="qn-logo" alt="" />
+                  <q-icon v-else name="shield" size="34px" color="grey-5" />
+                  <div class="qn-team-name">{{ m.equipo_local || '—' }}</div>
+                </div>
+
+                <div class="qn-center">
+                  <div v-if="tipo(m) !== 'prox' && m.goles_local != null" class="qn-score">
+                    {{ m.goles_local }} <span class="qn-dash">-</span> {{ m.goles_visita }}
+                  </div>
+                  <div v-else class="qn-vs">VS</div>
+                  <div class="qn-hora">{{ hora(m) }}</div>
+                </div>
+
+                <div class="qn-team">
+                  <img v-if="m.equipo_visita_logo" :src="m.equipo_visita_logo" class="qn-logo" alt="" />
+                  <q-icon v-else name="shield" size="34px" color="grey-5" />
+                  <div class="qn-team-name">{{ m.equipo_visita || '—' }}</div>
+                </div>
+              </div>
+
+              <div v-if="tipo(m) !== 'prox' && ((m.goleadores_local && m.goleadores_local.length) || (m.goleadores_visita && m.goleadores_visita.length))" class="qn-goles">
+                <div class="qn-goles-col">
+                  <div v-for="(g, i) in (m.goleadores_local || [])" :key="'l' + i" class="qn-gol">
+                    <q-icon name="sports_soccer" size="11px" :color="g.owngoal ? 'red-6' : 'grey-7'" class="q-mr-xs" />
+                    <span class="qn-gol-name ellipsis">{{ g.name }}</span>
+                    <span class="qn-gol-min">&nbsp;{{ g.minute }}'{{ g.penalty ? ' (P)' : '' }}{{ g.owngoal ? ' (ag)' : '' }}</span>
+                  </div>
+                </div>
+                <div class="qn-goles-col qn-goles-right">
+                  <div v-for="(g, i) in (m.goleadores_visita || [])" :key="'v' + i" class="qn-gol qn-gol-r">
+                    <span class="qn-gol-min">{{ g.minute }}'{{ g.penalty ? ' (P)' : '' }}{{ g.owngoal ? ' (ag)' : '' }}&nbsp;</span>
+                    <span class="qn-gol-name ellipsis">{{ g.name }}</span>
+                    <q-icon name="sports_soccer" size="11px" :color="g.owngoal ? 'red-6' : 'grey-7'" class="q-ml-xs" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="qn-pred">
+                <template v-if="editable(m)">
+                  <div class="qn-pred-row">
+                    <q-input v-model="form[m.id].gl" type="number" dense outlined min="0" max="30"
+                      input-class="text-center text-weight-bold" class="qn-num" inputmode="numeric" />
+                    <span class="qn-pred-x">:</span>
+                    <q-input v-model="form[m.id].gv" type="number" dense outlined min="0" max="30"
+                      input-class="text-center text-weight-bold" class="qn-num" inputmode="numeric" />
+                    <q-btn v-if="identity" unelevated no-caps rounded color="green-8" icon="save"
+                      :loading="savingId === m.id" label="Guardar" class="q-ml-sm" @click="guardar(m)" />
+                    <q-btn v-else unelevated no-caps rounded color="amber-8" icon="how_to_reg"
+                      label="Unirme" class="q-ml-sm" @click="showJoin = true" />
+                  </div>
+                  <div v-if="misPron[m.id]" class="qn-pred-hint">
+                    <q-icon name="bookmark" size="14px" /> Tu pronóstico actual: {{ misPron[m.id].goles_local }} - {{ misPron[m.id].goles_visita }}
+                  </div>
+                </template>
+
+                <template v-else>
+                  <div v-if="misPron[m.id]" class="qn-mine">
+                    <span>Tu pronóstico: <b>{{ misPron[m.id].goles_local }} - {{ misPron[m.id].goles_visita }}</b></span>
+                    <q-badge v-if="misPron[m.id].scored" :color="misPron[m.id].puntos > 0 ? 'green-7' : 'grey-6'" class="q-ml-sm">
+                      +{{ misPron[m.id].puntos }} pts
+                    </q-badge>
+                  </div>
+                  <div v-else class="qn-locked">
+                    <q-icon :name="lockIcon(m)" size="15px" class="q-mr-xs" />{{ lockTexto(m) }}
+                  </div>
+
+                  <q-btn v-if="tipo(m) !== 'prox'" flat dense no-caps size="sm" color="green-9"
+                    :icon="pubPron[m.id] ? 'expand_less' : 'groups'"
+                    :label="pubPron[m.id] ? 'Ocultar' : 'Ver pronósticos'" class="q-mt-xs"
+                    @click="togglePron(m)" />
+                  <div v-if="pubPron[m.id]" class="qn-pub">
+                    <div v-if="pubPron[m.id].length === 0" class="text-caption text-grey-6 q-pa-sm">Nadie pronosticó este partido.</div>
+                    <div v-for="(p, i) in pubPron[m.id]" :key="i" class="qn-pub-row">
+                      <span class="ellipsis">{{ p.nombre }}</span>
+                      <span class="text-weight-bold">{{ p.goles_local }} - {{ p.goles_visita }}</span>
+                      <q-badge v-if="p.scored" :color="p.puntos > 0 ? 'green-7' : 'grey-5'">+{{ p.puntos }}</q-badge>
+                      <span v-else class="text-grey-5 text-caption">—</span>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </q-tab-panel>
+
+        <q-tab-panel name="ranking" class="q-pa-none">
+          <div v-if="ranking.length === 0" class="flex flex-center column q-my-xl text-grey-6">
+            <q-icon name="leaderboard" size="56px" color="grey-4" />
+            <div class="q-mt-md">Aún no hay puntos en juego</div>
+          </div>
+          <div v-else class="qn-rank">
+            <div v-for="(r, i) in ranking" :key="r.id" class="qn-rank-row" :class="{ 'qn-me': esMio(r) }">
+              <div class="qn-pos" :class="'qn-pos-' + (i + 1)">{{ i + 1 }}</div>
+              <div class="qn-rank-name ellipsis">
+                {{ r.nombre }}
+                <span v-if="esMio(r)" class="qn-yo">tú</span>
+                <div class="text-caption text-grey-6">{{ r.exactos }} exactos · {{ r.aciertos }} aciertos · {{ r.jugados }} jugados</div>
+              </div>
+              <div class="qn-rank-pts">{{ r.puntos }}<span>pts</span></div>
+            </div>
+          </div>
+        </q-tab-panel>
+      </q-tab-panels>
+    </div>
+
+    <q-dialog v-model="showJoin">
+      <q-card class="qn-join">
+        <q-card-section class="text-center">
+          <q-icon name="sports_soccer" size="48px" color="green-8" />
+          <div class="text-h6 text-weight-bold q-mt-sm">Unirse a la quiniela</div>
+          <div class="text-grey-7 text-caption">Escribe tu nombre y un PIN de 4 dígitos. El PIN protege tus pronósticos.</div>
+        </q-card-section>
+        <q-card-section class="q-gutter-md">
+          <q-input v-model="joinData.nombre" label="Tu nombre" outlined dense maxlength="40" autofocus>
+            <template v-slot:prepend><q-icon name="person" /></template>
+          </q-input>
+          <q-input v-model="joinData.pin" label="PIN (4 dígitos)" outlined dense mask="####" inputmode="numeric">
+            <template v-slot:prepend><q-icon name="pin" /></template>
+          </q-input>
+          <div class="text-caption text-grey-6">Si ya te uniste antes, usa el mismo nombre y PIN para recuperar tus pronósticos.</div>
+        </q-card-section>
+        <q-card-actions align="right" class="q-pa-md">
+          <q-btn flat no-caps label="Cancelar" color="grey-7" v-close-popup />
+          <q-btn unelevated no-caps rounded color="green-8" label="Entrar" :loading="joinLoading" @click="join" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+  </q-page>
+</template>
+
+<script>
+import { defineComponent, ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { supabase } from '../supabase'
+import { notify } from '../utils/notify'
+
+const IDENTITY_KEY = 'quiniela_identity'
+const FIN = new Set(['FT', 'AET', 'PEN', 'WO'])
+const LIVE = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE', 'INT', 'SUSP'])
+
+const ERROR_MSG = {
+  CREDENCIALES: 'Nombre o PIN incorrecto',
+  PIN_INCORRECTO: 'PIN incorrecto para ese nombre',
+  PIN_INVALIDO: 'El PIN debe ser de 4 dígitos',
+  NOMBRE_VACIO: 'Escribe tu nombre',
+  BLOQUEADO: 'Ya no se puede cambiar: falta menos de 1 hora',
+  AUN_NO_ABRE: 'Aún no se habilita (abre 12 h antes)',
+  PARTIDO_NO_EXISTE: 'Partido no encontrado',
+  MARCADOR_INVALIDO: 'Marcador inválido'
+}
+
+function msgFromError (e) {
+  const raw = (e && e.message) ? e.message : String(e)
+  for (const k in ERROR_MSG) { if (raw.includes(k)) return ERROR_MSG[k] }
+  return 'No se pudo completar la acción'
+}
+
+export default defineComponent({
+  name: 'QuinielaPage',
+  setup () {
+    const tab = ref('partidos')
+    const cfg = ref({ abre_horas_antes: 12, bloquea_minutos_antes: 60, pts_exacto: 3, pts_resultado: 1, pts_bonus_equipo: 1 })
+    const partidos = ref([])
+    const ranking = ref([])
+    const misPron = reactive({})
+    const pubPron = reactive({})
+    const form = reactive({})
+    const identity = ref(null)
+    const now = ref(Date.now())
+    const clock = ref(Date.now())
+    const loading = ref(true)
+    const filtro = ref('prox')
+    const showJoin = ref(false)
+    const joinData = reactive({ nombre: '', pin: '' })
+    const joinLoading = ref(false)
+    const savingId = ref(null)
+
+    let nowTimer = null
+    let clockTimer = null
+    let pollTimer = null
+    let channel = null
+
+    const filtros = [
+      { label: 'Todos', value: 'todos' },
+      { label: 'En vivo', value: 'live' },
+      { label: 'Próximos', value: 'prox' },
+      { label: 'Finalizados', value: 'fin' }
+    ]
+
+    const inicial = computed(() => (identity.value?.nombre || '?').trim().charAt(0).toUpperCase())
+
+    const tipo = (m) => {
+      const s = m.estado_corto
+      if (FIN.has(s)) return 'fin'
+      if (LIVE.has(s)) return 'live'
+      return 'prox'
+    }
+    const ko = (m) => new Date(m.kickoff).getTime()
+    const locked = (m) => now.value >= ko(m) - cfg.value.bloquea_minutos_antes * 60000
+    const abierto = (m) => now.value >= ko(m) - cfg.value.abre_horas_antes * 3600000
+    const editable = (m) => tipo(m) === 'prox' && abierto(m) && !locked(m)
+
+    const hora = (m) => {
+      try {
+        return new Date(m.kickoff).toLocaleTimeString('es-CR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Costa_Rica' })
+      } catch (e) { return '' }
+    }
+
+    const estadoTexto = (m) => {
+      const t = tipo(m)
+      if (t === 'fin') return 'Final'
+      if (t === 'live') {
+        if (m.estado_corto === 'HT') return 'Medio tiempo'
+        return m.minuto ? m.minuto + "'" : 'En vivo'
+      }
+      return hora(m)
+    }
+
+    const lockIcon = (m) => {
+      if (tipo(m) !== 'prox') return 'sports'
+      return abierto(m) ? 'lock' : 'schedule'
+    }
+    const lockTexto = (m) => {
+      const t = tipo(m)
+      if (t === 'live') return 'Partido en juego'
+      if (t === 'fin') return 'Partido finalizado'
+      if (!abierto(m)) return 'Abre ' + cfg.value.abre_horas_antes + ' h antes del partido'
+      return 'Pronóstico cerrado'
+    }
+
+    const lista = computed(() => {
+      let arr = partidos.value
+      if (filtro.value === 'live') arr = arr.filter(m => tipo(m) === 'live')
+      else if (filtro.value === 'prox') arr = arr.filter(m => tipo(m) === 'prox')
+      else if (filtro.value === 'fin') arr = arr.filter(m => tipo(m) === 'fin')
+      return arr
+    })
+
+    const grupos = computed(() => {
+      const fmt = new Intl.DateTimeFormat('es-CR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Costa_Rica' })
+      const keyFmt = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'America/Costa_Rica' })
+      const out = []
+      let cur = null
+      for (const m of lista.value) {
+        const d = new Date(m.kickoff)
+        const key = keyFmt.format(d)
+        if (!cur || cur.key !== key) {
+          cur = { key, label: fmt.format(d), items: [] }
+          out.push(cur)
+        }
+        cur.items.push(m)
+      }
+      return out
+    })
+
+    const esMio = (r) => identity.value && (r.nombre || '').toLowerCase() === identity.value.nombre.toLowerCase()
+
+    const enVivo = computed(() => partidos.value.find(m => tipo(m) === 'live') || null)
+
+    const proximo = computed(() => {
+      const t = clock.value
+      let best = null
+      for (const m of partidos.value) {
+        if (m.finalizado) continue
+        const ko = new Date(m.kickoff).getTime()
+        if (ko > t && (!best || ko < best.ko)) best = { m, ko }
+      }
+      return best
+    })
+
+    const cuenta = computed(() => {
+      if (!proximo.value) return ''
+      let ms = proximo.value.ko - clock.value
+      if (ms < 0) ms = 0
+      const pad = (n) => String(n).padStart(2, '0')
+      const d = Math.floor(ms / 86400000)
+      const h = Math.floor((ms % 86400000) / 3600000)
+      const mn = Math.floor((ms % 3600000) / 60000)
+      const s = Math.floor((ms % 60000) / 1000)
+      return (d > 0 ? d + 'd ' : '') + pad(h) + ':' + pad(mn) + ':' + pad(s)
+    })
+
+    const seedForm = () => {
+      for (const m of partidos.value) {
+        if (!form[m.id]) form[m.id] = { gl: null, gv: null }
+        const mp = misPron[m.id]
+        if (mp) { form[m.id].gl = mp.goles_local; form[m.id].gv = mp.goles_visita }
+      }
+    }
+
+    const loadConfig = async () => {
+      const { data } = await supabase.from('qn_config').select('*').eq('id', 1).single()
+      if (data) cfg.value = data
+    }
+
+    const loadPartidos = async () => {
+      const { data, error } = await supabase.from('qn_partidos').select('*').order('kickoff', { ascending: true })
+      if (!error) { partidos.value = data || []; seedForm() }
+    }
+
+    const loadRanking = async () => {
+      const { data } = await supabase.from('qn_ranking').select('*')
+      ranking.value = (data || []).sort((a, b) => b.puntos - a.puntos || b.exactos - a.exactos)
+    }
+
+    const loadMine = async () => {
+      if (!identity.value) return
+      const { data, error } = await supabase.rpc('qn_mis_pronosticos', { p_nombre: identity.value.nombre, p_pin: identity.value.pin })
+      if (error) return
+      for (const k in misPron) delete misPron[k]
+      for (const r of (data || [])) {
+        misPron[r.match_id] = { goles_local: r.goles_local, goles_visita: r.goles_visita, puntos: r.puntos, scored: r.scored }
+      }
+      seedForm()
+    }
+
+    const join = async () => {
+      const nombre = (joinData.nombre || '').trim()
+      const pin = (joinData.pin || '').trim()
+      if (!nombre) { notify({ type: 'warning', message: 'Escribe tu nombre', position: 'top' }); return }
+      if (!/^\d{4}$/.test(pin)) { notify({ type: 'warning', message: 'El PIN debe ser de 4 dígitos', position: 'top' }); return }
+      joinLoading.value = true
+      const { error } = await supabase.rpc('qn_registrar', { p_nombre: nombre, p_pin: pin })
+      joinLoading.value = false
+      if (error) { notify({ type: 'negative', message: msgFromError(error), position: 'top' }); return }
+      identity.value = { nombre, pin }
+      localStorage.setItem(IDENTITY_KEY, JSON.stringify(identity.value))
+      showJoin.value = false
+      joinData.nombre = ''
+      joinData.pin = ''
+      await loadMine()
+      notify({ type: 'positive', message: '¡Listo, ' + nombre + '!', position: 'top' })
+    }
+
+    const salir = () => {
+      identity.value = null
+      localStorage.removeItem(IDENTITY_KEY)
+      for (const k in misPron) delete misPron[k]
+      seedForm()
+      notify({ type: 'info', message: 'Saliste de la quiniela', position: 'top' })
+    }
+
+    const guardar = async (m) => {
+      if (!identity.value) { showJoin.value = true; return }
+      const f = form[m.id] || {}
+      const gl = parseInt(f.gl, 10)
+      const gv = parseInt(f.gv, 10)
+      if (!Number.isInteger(gl) || !Number.isInteger(gv) || gl < 0 || gv < 0 || gl > 30 || gv > 30) {
+        notify({ type: 'warning', message: 'Ingresa un marcador válido (0-30)', position: 'top' }); return
+      }
+      savingId.value = m.id
+      const { error } = await supabase.rpc('qn_guardar_pronostico', {
+        p_nombre: identity.value.nombre, p_pin: identity.value.pin, p_match_id: m.id, p_gl: gl, p_gv: gv
+      })
+      savingId.value = null
+      if (error) { notify({ type: 'negative', message: msgFromError(error), position: 'top' }); return }
+      misPron[m.id] = { goles_local: gl, goles_visita: gv, puntos: 0, scored: false }
+      notify({ type: 'positive', message: 'Pronóstico guardado', position: 'top' })
+    }
+
+    const togglePron = async (m) => {
+      if (pubPron[m.id]) { delete pubPron[m.id]; return }
+      const { data } = await supabase.from('qn_pronosticos_publicos').select('*').eq('match_id', m.id).order('puntos', { ascending: false })
+      pubPron[m.id] = data || []
+    }
+
+    const refrescar = async () => {
+      await Promise.all([loadPartidos(), loadRanking()])
+      await loadMine()
+    }
+
+    onMounted(async () => {
+      const saved = localStorage.getItem(IDENTITY_KEY)
+      if (saved) { try { identity.value = JSON.parse(saved) } catch (e) { identity.value = null } }
+
+      await loadConfig()
+      await Promise.all([loadPartidos(), loadRanking()])
+      await loadMine()
+      loading.value = false
+
+      nowTimer = setInterval(() => { now.value = Date.now() }, 30000)
+      clockTimer = setInterval(() => { clock.value = Date.now() }, 1000)
+      pollTimer = setInterval(refrescar, 60000)
+
+      channel = supabase.channel('qn_rt')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'qn_partidos' }, (payload) => {
+          const r = payload.new
+          if (!r || !r.id) return
+          const i = partidos.value.findIndex(p => p.id === r.id)
+          if (i >= 0) partidos.value[i] = { ...partidos.value[i], ...r }
+          else partidos.value.push(r)
+          loadRanking()
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'qn_pronosticos' }, () => {
+          loadRanking()
+          loadMine()
+        })
+        .subscribe()
+    })
+
+    onUnmounted(() => {
+      if (nowTimer) clearInterval(nowTimer)
+      if (clockTimer) clearInterval(clockTimer)
+      if (pollTimer) clearInterval(pollTimer)
+      if (channel) supabase.removeChannel(channel)
+    })
+
+    return {
+      tab, cfg, partidos, ranking, misPron, pubPron, form, identity, loading, filtro, filtros,
+      showJoin, joinData, joinLoading, savingId, inicial,
+      tipo, hora, editable, estadoTexto, lockIcon, lockTexto, grupos, esMio,
+      enVivo, proximo, cuenta,
+      join, salir, guardar, togglePron
+    }
+  }
+})
+</script>
+
+<style scoped>
+.qn-page {
+  background: #f4f7f4;
+  padding-bottom: 32px;
+}
+
+.qn-banner {
+  position: relative;
+  overflow: hidden;
+  padding: 34px 20px 30px;
+  background:
+    radial-gradient(circle at 18% 20%, rgba(255, 215, 0, 0.22), transparent 42%),
+    radial-gradient(circle at 85% 80%, rgba(255, 255, 255, 0.16), transparent 40%),
+    linear-gradient(135deg, #1b5e20 0%, #2e7d32 45%, #1b5e20 100%);
+  color: #fff;
+  text-align: center;
+}
+
+.qn-banner-overlay {
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0 2px, transparent 2px 60px);
+  pointer-events: none;
+}
+
+.qn-banner-content { position: relative; z-index: 1; }
+
+.qn-trophy {
+  font-size: 50px;
+  color: #ffd54f;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.35));
+}
+
+.qn-title {
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.qn-subtitle { opacity: 0.92; font-size: 13px; margin-top: 4px; }
+
+.qn-wrap { max-width: 720px; margin: 0 auto; padding: 16px; }
+
+.qn-identity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  border-radius: 16px;
+  padding: 10px 14px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  margin-top: -28px;
+  position: relative;
+  z-index: 2;
+  border: 1px solid rgba(46, 125, 50, 0.12);
+}
+
+.qn-rules { margin-top: 12px; background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05); }
+.qn-rules-body { padding: 4px 16px 14px; font-size: 13px; color: #333; }
+
+.qn-next {
+  margin-top: 12px;
+  border-radius: 16px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 90% 10%, rgba(255, 213, 79, 0.22), transparent 45%),
+    linear-gradient(135deg, #14532d 0%, #1b5e20 60%, #0f3d18 100%);
+  color: #fff;
+  box-shadow: 0 8px 22px rgba(20, 83, 45, 0.35);
+}
+.qn-live-strip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.qn-live-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: #ff5252;
+  box-shadow: 0 0 0 0 rgba(255, 82, 82, 0.7);
+  animation: qnpulse 1.2s infinite;
+}
+@keyframes qnpulse {
+  0% { box-shadow: 0 0 0 0 rgba(255, 82, 82, 0.6); }
+  70% { box-shadow: 0 0 0 8px rgba(255, 82, 82, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 82, 82, 0); }
+}
+.qn-next-body { padding: 14px 16px 16px; text-align: center; }
+.qn-next-tag {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  opacity: 0.9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.qn-next-timer {
+  font-size: 38px;
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: 1px;
+  color: #ffd54f;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  margin: 2px 0 4px;
+}
+.qn-next-match {
+  font-size: 15px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.qn-next-vs { color: #ffd54f; font-weight: 700; }
+.qn-next-flag { width: 24px; height: 17px; object-fit: cover; border-radius: 2px; }
+.qn-next-sub { font-size: 12px; opacity: 0.85; margin-top: 3px; }
+
+.qn-goles {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed #eee;
+}
+.qn-goles-col { flex: 1; min-width: 0; }
+.qn-goles-right { text-align: right; }
+.qn-gol {
+  display: flex;
+  align-items: center;
+  font-size: 11.5px;
+  color: #444;
+  margin-bottom: 2px;
+}
+.qn-gol-r { justify-content: flex-end; }
+.qn-gol-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qn-gol-min { color: #888; flex-shrink: 0; }
+
+.qn-tabs { margin-top: 14px; background: #fff; border-radius: 14px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05); }
+.qn-panels { background: transparent; margin-top: 12px; }
+.qn-panels :deep(.q-tab-panel) { padding: 0; }
+
+.qn-filtros { flex-wrap: wrap; }
+
+.qn-fecha {
+  font-weight: 800;
+  color: #1b5e20;
+  text-transform: capitalize;
+  margin: 4px 2px 10px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+}
+.qn-fecha::before {
+  content: "";
+  width: 6px; height: 18px;
+  background: linear-gradient(180deg, #ffd54f, #f9a825);
+  border-radius: 3px;
+  margin-right: 8px;
+}
+
+.qn-card {
+  background: #fff;
+  border-radius: 18px;
+  padding: 14px;
+  margin-bottom: 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.07);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  border-left: 5px solid #bdbdbd;
+}
+.qn-card.qn-live { border-left-color: #e53935; }
+.qn-card.qn-fin { border-left-color: #1b5e20; }
+.qn-card.qn-prox { border-left-color: #1e88e5; }
+
+.qn-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.qn-ronda { font-size: 11px; font-weight: 700; color: #757575; text-transform: uppercase; letter-spacing: 0.4px; }
+.qn-estado { font-size: 12px; font-weight: 800; display: flex; align-items: center; padding: 3px 10px; border-radius: 999px; }
+.qn-estado-prox { background: #e3f2fd; color: #1565c0; }
+.qn-estado-live { background: #ffebee; color: #c62828; }
+.qn-estado-fin { background: #e8f5e9; color: #1b5e20; }
+
+.qn-blink { animation: qnblink 1s infinite; }
+@keyframes qnblink { 50% { opacity: 0.25; } }
+
+.qn-match { display: flex; align-items: flex-start; justify-content: space-between; }
+.qn-team { width: 38%; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.qn-logo { width: 46px; height: 46px; object-fit: contain; }
+.qn-team-name { font-size: 13px; font-weight: 700; margin-top: 6px; line-height: 1.2; }
+
+.qn-center { width: 24%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-top: 4px; }
+.qn-score { font-size: 26px; font-weight: 900; color: #1a1a1a; }
+.qn-dash { color: #bbb; }
+.qn-vs { font-size: 16px; font-weight: 900; color: #9e9e9e; }
+.qn-hora { font-size: 12px; color: #757575; margin-top: 2px; font-weight: 600; }
+
+.qn-pred { margin-top: 12px; border-top: 1px dashed #e0e0e0; padding-top: 10px; }
+.qn-pred-row { display: flex; align-items: center; justify-content: center; }
+.qn-num { width: 62px; }
+.qn-pred-x { font-size: 20px; font-weight: 900; margin: 0 8px; color: #757575; }
+.qn-pred-hint { text-align: center; font-size: 12px; color: #2e7d32; margin-top: 6px; }
+
+.qn-mine { font-size: 13px; color: #333; display: flex; align-items: center; justify-content: center; }
+.qn-locked { font-size: 12.5px; color: #9e9e9e; display: flex; align-items: center; justify-content: center; font-weight: 600; }
+
+.qn-pub { margin-top: 8px; background: #fafafa; border-radius: 12px; padding: 4px 10px; }
+.qn-pub-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 2px; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+.qn-pub-row:last-child { border-bottom: none; }
+
+.qn-rank { background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06); }
+.qn-rank-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid #f2f2f2; }
+.qn-rank-row:last-child { border-bottom: none; }
+.qn-me { background: linear-gradient(90deg, rgba(255, 213, 79, 0.18), transparent); }
+.qn-pos { width: 30px; height: 30px; border-radius: 50%; background: #eee; color: #555; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.qn-pos-1 { background: linear-gradient(135deg, #ffd54f, #f9a825); color: #fff; }
+.qn-pos-2 { background: linear-gradient(135deg, #cfd8dc, #90a4ae); color: #fff; }
+.qn-pos-3 { background: linear-gradient(135deg, #d7a87a, #a1664a); color: #fff; }
+.qn-rank-name { flex: 1; font-weight: 700; min-width: 0; }
+.qn-yo { background: #2e7d32; color: #fff; font-size: 10px; padding: 1px 6px; border-radius: 8px; margin-left: 6px; vertical-align: middle; }
+.qn-rank-pts { font-weight: 900; font-size: 20px; color: #1b5e20; }
+.qn-rank-pts span { font-size: 11px; font-weight: 600; color: #9e9e9e; margin-left: 3px; }
+
+.qn-join { width: 360px; max-width: 92vw; border-radius: 20px; }
+
+@media (max-width: 599px) {
+  .qn-title { font-size: 22px; }
+  .qn-logo { width: 40px; height: 40px; }
+  .qn-team-name { font-size: 12px; }
+  .qn-score { font-size: 22px; }
+}
+</style>

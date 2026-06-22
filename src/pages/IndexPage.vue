@@ -64,6 +64,17 @@
       </q-card>
     </q-dialog>
 
+    <!-- Acceso Quiniela Mundialista (visible siempre, sin login) -->
+    <div class="quiniela-banner" @click="goToQuiniela">
+      <div class="quiniela-banner-glow"></div>
+      <q-icon name="emoji_events" class="quiniela-banner-trophy" />
+      <div class="quiniela-banner-text">
+        <div class="quiniela-banner-title">Quiniela Mundial 2026</div>
+        <div class="quiniela-banner-sub">Pronostica los partidos y compite. ¡No necesitas cuenta!</div>
+      </div>
+      <q-icon name="chevron_right" size="26px" class="quiniela-banner-arrow" />
+    </div>
+
     <!-- Login Button (Only visible if not logged in) -->
     <div v-if="!isLoggedIn" class="flex flex-center q-pa-xl column">
       <q-icon name="lock_person" size="100px" color="grey-5" class="q-mb-md" />
@@ -82,6 +93,8 @@
 
     <!-- Main Content (Only visible if logged in) -->
     <div v-if="isLoggedIn">
+      <q-scroll-observer @scroll="onScroll" />
+
       <!-- Top Bar / Profile Section -->
       <div class="q-mb-md">
         <!-- Fila principal con usuario y botón logout -->
@@ -229,15 +242,14 @@
         {{ syncError }}
       </q-banner>
 
-      <div v-if="firstSyncPending || isSyncing" class="sync-status-card q-mb-md">
+      <div v-if="firstSyncPending" class="sync-status-card q-mb-md">
         <div class="row items-center justify-between no-wrap q-col-gutter-sm">
           <div class="row items-center no-wrap col">
             <q-icon
-              :name="firstSyncPending ? 'cloud_download' : (isSyncing ? 'sync' : 'check_circle')"
+              name="cloud_download"
               size="22px"
               color="primary"
               class="q-mr-sm"
-              :class="{ 'rotate-sync': isSyncing }"
             />
             <div>
               <div v-if="syncTitle" class="text-weight-bold text-grey-9">
@@ -246,7 +258,7 @@
               <div class="text-caption text-grey-7">{{ syncStatusText }}</div>
             </div>
           </div>
-          <q-spinner-dots v-if="firstSyncPending || isSyncing" color="primary" size="26px" />
+          <q-spinner-dots color="primary" size="26px" />
         </div>
       </div>
 
@@ -499,6 +511,38 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
+    <!-- Floating Search Bar (aparece al hacer scroll hacia abajo, solo móvil/tablet) -->
+    <q-page-sticky position="top" :offset="[0, 8]">
+      <transition name="float-search">
+        <div v-if="showFloatingSearch && isLoggedIn && !$q.screen.gt.md" class="floating-search-bar row items-center q-gutter-x-sm">
+          <q-input
+            v-model="search"
+            placeholder="Buscar por casita, revisor o notas..."
+            outlined
+            rounded
+            dense
+            bg-color="white"
+            class="col"
+            clearable
+          >
+            <template v-slot:prepend>
+              <q-icon name="search" class="text-grey-5" />
+            </template>
+          </q-input>
+          <q-btn
+            round
+            flat
+            icon="filter_list"
+            color="primary"
+            class="bg-white floating-filter-btn"
+            @click="showFilterModal = true"
+          >
+            <q-tooltip>Filtros</q-tooltip>
+          </q-btn>
+        </div>
+      </transition>
+    </q-page-sticky>
+
     <!-- Floating Action Button (visible sólo en pantallas < md) -->
     <q-page-sticky position="bottom-right" :offset="[18, 18]">
       <q-fab
@@ -509,12 +553,30 @@
         @click="addNew"
       />
     </q-page-sticky>
+
+    <!-- Scroll to top button (visible en todas las pantallas cuando hay scroll) -->
+    <q-page-sticky position="bottom-left" :offset="[18, 18]">
+      <transition name="scroll-top-fade">
+        <q-btn
+          v-if="showScrollTop"
+          round
+          color="white"
+          text-color="primary"
+          icon="keyboard_arrow_up"
+          class="scroll-top-btn"
+          @click="scrollToTop"
+        >
+          <q-tooltip>Ir al inicio</q-tooltip>
+        </q-btn>
+      </transition>
+    </q-page-sticky>
   </q-page>
 </template>
 
 
 <script>
-import { computed, defineComponent, onMounted, onUnmounted, ref, watch, reactive } from 'vue'
+import { computed, defineComponent, onMounted, onUnmounted, ref, watch, reactive, nextTick } from 'vue'
+import { notify } from '../utils/notify'
 import { useCasasStore } from '../stores/casas'
 import { useAuthStore } from '../stores/auth'
 import { date, useQuasar } from 'quasar'
@@ -587,6 +649,17 @@ export default defineComponent({
     const route = useRoute()
     const $q = useQuasar()
     const infiniteScroll = ref(null)
+    const showFloatingSearch = ref(false)
+    const showScrollTop = ref(false)
+
+    const onScroll = (info) => {
+      showFloatingSearch.value = info.position.top > 420
+      showScrollTop.value = info.position.top > 600
+    }
+
+    const scrollToTop = () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
 
     // ===== Avisos de operación (tabla operaciones_memo) =====
     // Muestra mensajes cuando faltan <= 40 min para la hora del registro y se
@@ -788,7 +861,8 @@ export default defineComponent({
         showFilterModal.value = false
         filterDate.value = null
         selectedFilter.value = null
-        $q.notify({
+        window.scrollTo({ top: 0 })
+        notify({
           type: 'positive',
           message: `Filtro aplicado: ${store.activeFilter?.label}`,
           position: 'top'
@@ -808,7 +882,8 @@ export default defineComponent({
       })
       
       showFilterModal.value = false
-      $q.notify({
+      window.scrollTo({ top: 0 })
+      notify({
         type: 'positive',
         message: `Filtro aplicado: ${filterData.label}`,
         position: 'top'
@@ -819,7 +894,8 @@ export default defineComponent({
       selectedFilter.value = null
       filterDate.value = null
       await store.clearAdvancedFilter()
-      $q.notify({
+      window.scrollTo({ top: 0 })
+      notify({
         type: 'info',
         message: 'Filtros limpiados',
         position: 'top'
@@ -829,7 +905,8 @@ export default defineComponent({
     const clearFiltersFromBadge = async () => {
       selectedFilter.value = null
       await store.clearAdvancedFilter()
-      $q.notify({
+      window.scrollTo({ top: 0 })
+      notify({
         type: 'info',
         message: 'Filtro limpiado',
         position: 'top'
@@ -854,7 +931,7 @@ export default defineComponent({
         await loadData()
         await cargarMemos()
       } else {
-        $q.notify({
+        notify({
           type: 'negative',
           message: result.message || 'Error al iniciar sesión',
           position: 'top'
@@ -884,7 +961,7 @@ export default defineComponent({
     const syncError = computed(() => syncState.value.error)
     const lastSyncAt = computed(() => syncState.value.lastSyncAt)
     const syncTitle = computed(() => {
-      if (firstSyncPending.value || isSyncing.value) {
+      if (firstSyncPending.value) {
         return 'Sincronizando'
       }
 
@@ -898,10 +975,6 @@ export default defineComponent({
         }
 
         return 'Preparando el cache local del inicio...'
-      }
-
-      if (isSyncing.value) {
-        return 'Buscando cambios recientes en Supabase...'
       }
 
       if (lastSyncAt.value) {
@@ -944,6 +1017,9 @@ export default defineComponent({
 
     watch(() => store.search, () => {
       infiniteScroll.value?.reset()
+      nextTick(() => {
+        window.scrollTo({ top: 0 })
+      })
     })
 
     const checkSessionInterval = setInterval(async () => {
@@ -960,7 +1036,9 @@ export default defineComponent({
 
     onMounted(async () => {
       if (isLoggedIn.value) {
-        await initData()
+        if (store.allCasas.length === 0) {
+          await initData()
+        }
         await cargarMemos()
       }
       // Reloj para recalcular la ventana de 40 min.
@@ -993,6 +1071,10 @@ export default defineComponent({
 
     const goToOperacionDiaria = () => {
       router.push('/operacion-diaria')
+    }
+
+    const goToQuiniela = () => {
+      router.push('/quiniela')
     }
 
     const goToDetails = (casa) => {
@@ -1072,12 +1154,17 @@ export default defineComponent({
       loadData,
       onLoad,
       infiniteScroll,
+      showFloatingSearch,
+      onScroll,
+      showScrollTop,
+      scrollToTop,
       getThemeClass,
       getActionBadgeClass,
       getActionIcon,
       getCardNoteText,
       goToDashboardHorario,
       goToOperacionDiaria,
+      goToQuiniela,
       goToDetails,
       showFilterModal,
       applyFilters,
@@ -1114,6 +1201,51 @@ export default defineComponent({
 .gradient-text {
   color: #2e7d32; /* Match the image header color */
 }
+
+.quiniela-banner {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  border-radius: 18px;
+  cursor: pointer;
+  color: #fff;
+  background:
+    radial-gradient(circle at 12% 30%, rgba(255, 213, 79, 0.28), transparent 45%),
+    linear-gradient(135deg, #1b5e20 0%, #2e7d32 50%, #1b5e20 100%);
+  box-shadow: 0 10px 24px rgba(27, 94, 32, 0.32);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.quiniela-banner:active {
+  transform: scale(0.985);
+  box-shadow: 0 6px 16px rgba(27, 94, 32, 0.28);
+}
+
+.quiniela-banner-glow {
+  position: absolute;
+  top: -40%;
+  right: -10%;
+  width: 160px;
+  height: 160px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.18), transparent 70%);
+  pointer-events: none;
+}
+
+.quiniela-banner-trophy {
+  font-size: 40px;
+  color: #ffd54f;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.3));
+  flex-shrink: 0;
+}
+
+.quiniela-banner-text { flex: 1; min-width: 0; position: relative; z-index: 1; }
+.quiniela-banner-title { font-size: 17px; font-weight: 900; letter-spacing: 0.3px; }
+.quiniela-banner-sub { font-size: 12px; opacity: 0.92; }
+.quiniela-banner-arrow { color: rgba(255, 255, 255, 0.85); flex-shrink: 0; }
 
 /* ===== Avisos de operación ===== */
 .avisos-wrapper {
@@ -1378,6 +1510,48 @@ export default defineComponent({
 
 .search-input {
   border-radius: 12px;
+}
+
+.floating-search-bar {
+  width: calc(100vw - 24px);
+  max-width: 560px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(8px);
+  border-radius: 16px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  z-index: 300;
+}
+
+.floating-filter-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+}
+
+.float-search-enter-active,
+.float-search-leave-active {
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+.float-search-enter-from,
+.float-search-leave-to {
+  transform: translateY(-110%);
+  opacity: 0;
+}
+
+.scroll-top-btn {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.scroll-top-fade-enter-active,
+.scroll-top-fade-leave-active {
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+.scroll-top-fade-enter-from,
+.scroll-top-fade-leave-to {
+  transform: translateY(20px);
+  opacity: 0;
 }
 
 .filter-btn {

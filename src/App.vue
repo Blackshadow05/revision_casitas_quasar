@@ -1,22 +1,22 @@
 <template>
   <router-view />
-  <DailyNotice />
+  <Toaster position="bottom-right" rich-colors close-button expand />
 </template>
 
 <script>
 import { defineComponent, onMounted } from 'vue'
-import DailyNotice from './components/DailyNotice.vue'
+import { Toaster } from 'vue-sonner'
 import { supabase } from './supabase'
-import { useQuasar } from 'quasar'
+import { notify } from './utils/notify'
 import { playSound } from './utils/sounds'
 
 export default defineComponent({
   name: 'App',
-  components: { DailyNotice },
+  components: { Toaster },
   setup () {
-    const $q = useQuasar()
-
     onMounted(() => {
+      try { localStorage.removeItem('dailyNoticeSeen') } catch (e) { /* ignore */ }
+
       // Suscripción global a cambios en Puesto_01 para notificaciones
       supabase
         .channel('puesto-01-global-notifications')
@@ -25,7 +25,6 @@ export default defineComponent({
           { event: '*', schema: 'public', table: 'Puesto_01' },
           (payload) => {
             let message = ''
-            let icon = 'info'
             let color = 'primary'
             
             const row = payload.new || payload.old
@@ -34,23 +33,21 @@ export default defineComponent({
 
             if (payload.eventType === 'INSERT') {
               message = `Nuevo registro: ${nombre} (${casita})`
-              icon = 'add_circle'
               color = 'positive'
               playSound('receive')
             } else if (payload.eventType === 'UPDATE') {
               message = `Actualización: ${nombre} (${casita})`
-              icon = 'update'
               color = 'info'
             }
 
             if (message) {
-              $q.notify({
+              notify({
                 message,
-                icon,
-                color,
+                caption: payload.eventType === 'INSERT' ? 'Nuevo registro' : 'Actualización',
+                type: color,
                 position: 'top-right',
                 timeout: 3000,
-                actions: [{ label: 'Ver', color: 'white', handler: () => { /* Navegación opcional */ } }]
+                actions: [{ label: 'Ver', handler: () => { /* Navegación opcional */ } }]
               })
             }
           }

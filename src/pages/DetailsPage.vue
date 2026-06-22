@@ -904,6 +904,7 @@
 
 <script>
 import { defineComponent, computed, ref, onMounted, onUnmounted, watch } from 'vue'
+import { notify } from '../utils/notify'
 import { useCasasStore } from '../stores/casas'
 import { useAuthStore } from '../stores/auth'
 import { date, useQuasar } from 'quasar'
@@ -1162,7 +1163,7 @@ export default defineComponent({
         } else {
           // Fallback: copy URL to clipboard
           await navigator.clipboard.writeText(currentImageUrl)
-          $q.notify({
+          notify({
             message: 'Enlace copiado al portapapeles',
             color: 'positive',
             position: 'top',
@@ -1175,7 +1176,7 @@ export default defineComponent({
           // Fallback to clipboard
           try {
             await navigator.clipboard.writeText(currentImageUrl)
-            $q.notify({
+            notify({
               message: 'Enlace copiado al portapapeles',
               color: 'positive',
               position: 'top',
@@ -1207,7 +1208,7 @@ export default defineComponent({
         document.body.removeChild(link)
         window.URL.revokeObjectURL(url)
 
-        $q.notify({
+        notify({
           message: 'Imagen descargada correctamente',
           color: 'positive',
           position: 'top',
@@ -1215,7 +1216,7 @@ export default defineComponent({
         })
       } catch (error) {
         console.error('Error downloading:', error)
-        $q.notify({
+        notify({
           message: 'Error al descargar la imagen',
           color: 'negative',
           position: 'top',

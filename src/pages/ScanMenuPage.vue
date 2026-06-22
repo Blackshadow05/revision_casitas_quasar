@@ -161,6 +161,7 @@
 
 <script>
 import { defineComponent, ref, reactive } from 'vue'
+import { notify } from '../utils/notify'
 import { useRouter } from 'vue-router'
 import { useQuasar, date } from 'quasar'
 import { GoogleGenerativeAI } from '@google/generative-ai'
@@ -290,7 +291,7 @@ export default defineComponent({
         }
       } catch (error) {
         console.error('Scan Error:', error)
-        $q.notify({ type: 'negative', message: 'Error: ' + error.message })
+        notify({ type: 'negative', message: 'Error: ' + error.message })
       } finally {
         loading.value = false
       }
@@ -362,11 +363,11 @@ export default defineComponent({
           }
         }
 
-        $q.notify({ type: 'positive', message: '¡Todos los menús guardados!' })
+        notify({ type: 'positive', message: '¡Todos los menús guardados!' })
         router.push('/menus')
       } catch (error) {
         console.error('Save Error:', error)
-        $q.notify({ type: 'negative', message: 'Error guardando: ' + error.message })
+        notify({ type: 'negative', message: 'Error guardando: ' + error.message })
       } finally {
         loading.value = false
         savingDayIndex.value = null
@@ -438,9 +439,9 @@ export default defineComponent({
         }
 
         if (result.error) throw result.error
-        $q.notify({ type: 'positive', message: `Menú del ${dia.dia_semana} guardado` })
+        notify({ type: 'positive', message: `Menú del ${dia.dia_semana} guardado` })
       } catch (err) {
-        $q.notify({ type: 'negative', message: 'Error: ' + err.message })
+        notify({ type: 'negative', message: 'Error: ' + err.message })
       } finally {
         savingDayIndex.value = null
       }

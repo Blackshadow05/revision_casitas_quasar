@@ -297,6 +297,7 @@
 
 <script>
 import { defineComponent, ref, onMounted, computed } from "vue";
+import { notify } from '../utils/notify'
 import { useRouter } from "vue-router";
 import { supabase } from "../supabase";
 import { useQuasar } from "quasar";
@@ -389,7 +390,7 @@ export default defineComponent({
         users.value = data || [];
       } catch (error) {
         console.error("Error loading users:", error);
-        $q.notify({
+        notify({
           color: "negative",
           message: "Error al cargar usuarios",
         });
@@ -400,7 +401,7 @@ export default defineComponent({
 
     const addUser = async () => {
       if (!newUser.value.Usuario || !newUser.value.password_hash) {
-        $q.notify({
+        notify({
           color: "warning",
           message: "El nombre de usuario y contraseña son obligatorios",
         });
@@ -417,7 +418,7 @@ export default defineComponent({
 
         if (error) throw error;
 
-        $q.notify({
+        notify({
           color: "positive",
           message: "Usuario agregado correctamente",
         });
@@ -427,7 +428,7 @@ export default defineComponent({
         loadUsers();
       } catch (error) {
         console.error("Error adding user:", error);
-        $q.notify({
+        notify({
           color: "negative",
           message: "Error al agregar usuario: " + error.message,
         });
@@ -451,7 +452,7 @@ export default defineComponent({
 
     const updateUser = async () => {
       if (!editingUser.value.password_hash && !isSuperAdmin.value) {
-        $q.notify({
+        notify({
           color: "warning",
           message: "La contraseña no puede estar vacía",
         });
@@ -480,7 +481,7 @@ export default defineComponent({
 
         if (error) throw error;
 
-        $q.notify({
+        notify({
           color: "positive",
           message: isSuperAdmin.value ? "Usuario actualizado correctamente" : "Contraseña actualizada correctamente",
         });
@@ -490,7 +491,7 @@ export default defineComponent({
         loadUsers();
       } catch (error) {
         console.error("Error updating user:", error);
-        $q.notify({
+        notify({
           color: "negative",
           message: "Error al actualizar usuario: " + error.message,
         });
@@ -514,7 +515,7 @@ export default defineComponent({
 
         if (error) throw error;
 
-        $q.notify({
+        notify({
           color: "positive",
           message: "Usuario eliminado correctamente",
         });
@@ -524,7 +525,7 @@ export default defineComponent({
         loadUsers();
       } catch (error) {
         console.error("Error deleting user:", error);
-        $q.notify({
+        notify({
           color: "negative",
           message: "Error al eliminar usuario",
         });

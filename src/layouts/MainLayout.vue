@@ -92,6 +92,15 @@
             flat
             no-caps
             dense
+            icon="emoji_events"
+            label="Quiniela"
+            class="appbar-nav-btn text-white q-mr-md"
+            @click="goTo('/quiniela')"
+          />
+          <q-btn
+            flat
+            no-caps
+            dense
             icon="schedule"
             label="Horarios"
             class="appbar-nav-btn text-white q-mr-md"
@@ -137,6 +146,7 @@
         no-caps
       >
         <q-tab name="home" icon="home" label="Inicio" @click="goToHome" />
+        <q-tab name="quiniela" icon="emoji_events" label="Quiniela" @click="goTo('/quiniela')" />
         <q-tab name="menus" icon="restaurant" label="Menús" @click="goToMenus" />
         <q-tab v-if="isEstebanB" name="puesto01" icon="local_police" label="Puesto 01" @click="goTo('/puesto-01')" />
         <q-tab v-if="false" name="security" icon="security" label="Seguridad" @click="goToSeguridad" />
@@ -150,6 +160,7 @@
 
 <script>
 import { ref, computed, defineComponent, watch, onUnmounted } from "vue";
+import { notify } from '../utils/notify'
 import { useRouter, useRoute } from "vue-router";
 import { useQuasar } from "quasar";
 import InstallPrompt from "../components/InstallPrompt.vue";
@@ -184,6 +195,7 @@ export default defineComponent({
     // Sincronizar tab con la ruta actual
     watch(() => route.path, (path) => {
       if (path === '/') tab.value = 'home';
+      else if (path === '/quiniela') tab.value = 'quiniela';
       else if (path === '/menus') tab.value = 'menus';
       else if (path === '/puesto-01') tab.value = 'puesto01';
       else if (path.startsWith('/seguridad')) tab.value = 'security';
@@ -218,7 +230,7 @@ export default defineComponent({
           }
 
           playSound('receive')
-          q.notify({
+          notify({
             type,
             message: `Revisión casita ${casita} por ${usuario}`,
             caption,

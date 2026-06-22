@@ -215,6 +215,7 @@
 
 <script>
 import { defineComponent, ref, computed, onMounted } from 'vue'
+import { notify } from '../utils/notify'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { supabase } from '../supabase'
@@ -485,7 +486,7 @@ export default defineComponent({
       const file = e.target.files?.[0]
       if (!file) return
       if (form.value.photos.length >= 2) {
-        $q.notify({ type: 'warning', message: 'Máximo 2 fotos permitidas' })
+        notify({ type: 'warning', message: 'Máximo 2 fotos permitidas' })
         return
       }
 
@@ -494,7 +495,7 @@ export default defineComponent({
         const preview = URL.createObjectURL(compressed)
         form.value.photos.push({ file: compressed, preview })
         const reduction = Math.max(0, Math.round(((file.size - compressed.size) / file.size) * 100))
-        $q.notify({ type: 'info', message: 'Foto optimizada', caption: `Reducción ${reduction}%` })
+        notify({ type: 'info', message: 'Foto optimizada', caption: `Reducción ${reduction}%` })
       } catch (err) {
         console.error('Compression failed, using original file', err)
         const fallbackPreview = URL.createObjectURL(file)
@@ -564,12 +565,12 @@ export default defineComponent({
 
         if (error) throw error
 
-        $q.notify({ type: 'positive', message: 'Reporte guardado correctamente', icon: 'check_circle' })
+        notify({ type: 'positive', message: 'Reporte guardado correctamente', icon: 'check_circle' })
         modalOpen.value = false
         await fetchReports()
       } catch (err) {
         console.error('Error saving report:', err)
-        $q.notify({ type: 'negative', message: 'Error al guardar el reporte', caption: err.message })
+        notify({ type: 'negative', message: 'Error al guardar el reporte', caption: err.message })
       } finally {
         saving.value = false
       }

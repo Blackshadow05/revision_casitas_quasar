@@ -849,6 +849,7 @@
 
 <script>
 import { defineComponent, ref, computed, onMounted, watch } from "vue";
+import { notify } from '../utils/notify'
 import { useQuasar } from "quasar";
 import { supabase } from "../supabase";
 import { useAuthStore } from "../stores/auth";
@@ -893,7 +894,7 @@ export default defineComponent({
     async function guardarPeriodo() {
       if (!fechaInicio.value || !fechaFin.value) return;
       if (fechaInicio.value >= fechaFin.value) {
-        $q.notify({ type: "warning", message: "La fecha de inicio debe ser anterior a la fecha de fin" });
+        notify({ type: "warning", message: "La fecha de inicio debe ser anterior a la fecha de fin" });
         return;
       }
       savingPeriodo.value = true;
@@ -906,9 +907,9 @@ export default defineComponent({
       });
       savingPeriodo.value = false;
       if (error) {
-        $q.notify({ type: "negative", message: `Error: ${error.message}` });
+        notify({ type: "negative", message: `Error: ${error.message}` });
       } else {
-        $q.notify({ type: "positive", message: "Periodo guardado correctamente", icon: "check" });
+        notify({ type: "positive", message: "Periodo guardado correctamente", icon: "check" });
         fechaInicio.value = "";
         fechaFin.value = "";
         fetchPeriodos();
@@ -1225,7 +1226,7 @@ export default defineComponent({
     async function saveEditPeriodo() {
       if (!editingPeriodo.value) return;
       if (!editingPeriodo.value.nombre || !editingPeriodo.value.fecha_inicio || !editingPeriodo.value.fecha_fin) {
-        $q.notify({ type: 'warning', message: 'Completa todos los campos' });
+        notify({ type: 'warning', message: 'Completa todos los campos' });
         return;
       }
       savingEditPeriodo.value = true;
@@ -1239,9 +1240,9 @@ export default defineComponent({
         .eq('id', editingPeriodo.value.id);
       savingEditPeriodo.value = false;
       if (error) {
-        $q.notify({ type: 'negative', message: `Error: ${error.message}` });
+        notify({ type: 'negative', message: `Error: ${error.message}` });
       } else {
-        $q.notify({ type: 'positive', message: 'Quincena actualizada', icon: 'check' });
+        notify({ type: 'positive', message: 'Quincena actualizada', icon: 'check' });
         showEditDialog.value = false;
         // Refrescar lista
         const saved = selectedPeriodo.value?.id;

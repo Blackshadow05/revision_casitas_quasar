@@ -168,6 +168,7 @@
 
 <script>
 import { defineComponent, ref, computed, onMounted } from 'vue'
+import { notify } from '../utils/notify'
 import { useRouter } from 'vue-router'
 import { supabase } from '../supabase'
 import { useAuthStore } from '../stores/auth'
@@ -294,7 +295,7 @@ export default defineComponent({
         assetLogs.value = data || []
       } catch (err) {
         console.error('Error fetching asset logs:', err)
-        $q.notify({ type: 'negative', message: 'Error al cargar activos' })
+        notify({ type: 'negative', message: 'Error al cargar activos' })
       } finally {
         loading.value = false
       }
@@ -317,12 +318,12 @@ export default defineComponent({
         }
         const { error } = await supabase.from('asset_logs').insert(record)
         if (error) throw error
-        $q.notify({ type: 'positive', message: 'Registro guardado', icon: 'check_circle' })
+        notify({ type: 'positive', message: 'Registro guardado', icon: 'check_circle' })
         closeDialog()
         await fetchLogs()
       } catch (err) {
         console.error('Error saving asset log:', err)
-        $q.notify({ type: 'negative', message: 'Error al guardar', caption: err.message })
+        notify({ type: 'negative', message: 'Error al guardar', caption: err.message })
       } finally {
         saving.value = false
       }

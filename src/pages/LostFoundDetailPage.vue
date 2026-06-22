@@ -313,6 +313,7 @@
 
 <script>
 import { defineComponent, ref, computed, onMounted } from 'vue'
+import { notify } from '../utils/notify'
 import { useRouter, useRoute } from 'vue-router'
 import { supabase } from '../supabase'
 import { useAuthStore } from '../stores/auth'
@@ -549,7 +550,7 @@ export default defineComponent({
 
     const scanImageForDescription = async (fileToScan) => {
       scanningImage.value = true
-      $q.notify({ type: 'info', message: 'Identificando objeto...', timeout: 2000 })
+      notify({ type: 'info', message: 'Identificando objeto...', timeout: 2000 })
       try {
         const apiKey = import.meta.env.VITE_GEMINI_API_KEY
         if (!apiKey) throw new Error('API Key no encontrada')
@@ -585,10 +586,10 @@ export default defineComponent({
         if (!extracted.item_name && !extracted.description) throw new Error('Gemini no detecto datos del objeto')
         if (extracted.item_name) form.value.item_name = extracted.item_name
         if (extracted.description) form.value.description = extracted.description
-        $q.notify({ type: 'positive', message: 'Objeto identificado' })
+        notify({ type: 'positive', message: 'Objeto identificado' })
       } catch (error) {
         console.error('Scan Error:', error)
-        $q.notify({
+        notify({
           type: 'warning',
           message: 'No se pudo identificar el objeto',
           caption: error?.message || 'Revisa la consola del navegador para mas detalle',
@@ -666,7 +667,7 @@ export default defineComponent({
         }
       } catch (err) {
         console.error('Error fetching item:', err)
-        $q.notify({ type: 'negative', message: 'Error al cargar el objeto' })
+        notify({ type: 'negative', message: 'Error al cargar el objeto' })
       } finally {
         loadingData.value = false
       }
@@ -699,7 +700,7 @@ export default defineComponent({
           }
           const { error } = await supabase.from('lost_found').insert(record)
           if (error) throw error
-          $q.notify({ type: 'positive', message: 'Objeto registrado', icon: 'check_circle' })
+          notify({ type: 'positive', message: 'Objeto registrado', icon: 'check_circle' })
         } else {
           // Delivery mode updates
           const updates = {
@@ -714,12 +715,12 @@ export default defineComponent({
             .update(updates)
             .eq('id', itemId.value)
           if (error) throw error
-          $q.notify({ type: 'positive', message: 'Objeto actualizado', icon: 'check_circle' })
+          notify({ type: 'positive', message: 'Objeto actualizado', icon: 'check_circle' })
         }
         router.push('/seguridad/objetos-perdidos')
       } catch (err) {
         console.error('Error saving item:', err)
-        $q.notify({ type: 'negative', message: 'Error al guardar', caption: err.message })
+        notify({ type: 'negative', message: 'Error al guardar', caption: err.message })
       } finally {
         saving.value = false
       }

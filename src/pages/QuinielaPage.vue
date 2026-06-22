@@ -1,12 +1,16 @@
 <template>
   <q-page class="qn-page">
     <div class="qn-banner">
-      <div class="qn-banner-overlay"></div>
-      <div class="qn-banner-content">
-        <q-icon name="emoji_events" class="qn-trophy" />
-        <div class="qn-title">Quiniela Mundial 2026</div>
-        <div class="qn-subtitle">Pronostica los marcadores y compite por el primer lugar</div>
-      </div>
+      <img
+        src="/images/quiniela-mundial-2026-hero.jpg"
+        alt="Quiniela Mundial 2026"
+        class="qn-banner-image"
+        width="1672"
+        height="941"
+        loading="eager"
+        decoding="async"
+        fetchpriority="high"
+      />
     </div>
 
     <div class="qn-wrap">
@@ -56,9 +60,9 @@
 
       <q-expansion-item dense class="qn-rules" icon="help_outline" label="Cómo se puntúa">
         <div class="qn-rules-body">
-          <div class="row items-center q-mb-xs"><q-icon name="check_circle" color="green-7" size="18px" class="q-mr-sm" /> Acertar el marcador exacto: <b class="q-ml-xs">{{ cfg.pts_exacto }} pts</b></div>
-          <div class="row items-center q-mb-xs"><q-icon name="check_circle" color="blue-7" size="18px" class="q-mr-sm" /> Acertar solo el resultado (quién gana o si empata), sin el marcador: <b class="q-ml-xs">{{ cfg.pts_resultado }} pt</b></div>
-          <div class="row items-center text-grey-7"><q-icon name="schedule" size="16px" class="q-mr-sm" /> Los pronósticos se abren {{ cfg.abre_horas_antes }} h antes y se bloquean {{ cfg.bloquea_minutos_antes }} min antes del partido. Después del bloqueo ya puedes ver los pronósticos de los demás.</div>
+          <div class="row no-wrap items-start q-mb-xs"><q-icon name="check_circle" color="green-7" size="18px" class="q-mr-sm" /><span>Acertar el marcador exacto: <b class="q-ml-xs">{{ cfg.pts_exacto }} pts</b></span></div>
+          <div class="row no-wrap items-start q-mb-xs"><q-icon name="check_circle" color="blue-7" size="18px" class="q-mr-sm" /><span>Acertar solo el resultado (quién gana o si empata), sin el marcador: <b class="q-ml-xs">{{ cfg.pts_resultado }} pt</b></span></div>
+          <div class="row no-wrap items-start text-grey-7"><q-icon name="schedule" size="16px" class="q-mr-sm" /><span>Los pronósticos se abren {{ cfg.abre_horas_antes }} h antes y se bloquean {{ cfg.bloquea_minutos_antes }} min antes del partido. Después del bloqueo ya puedes ver los pronósticos de los demás.</span></div>
         </div>
       </q-expansion-item>
 
@@ -83,11 +87,13 @@
                 :text-color="fechaActiva ? 'white' : 'grey-8'"
                 icon="event" @click="toggleFecha">Por fecha</q-chip>
               <span v-if="fechaActiva" class="qn-date-label">{{ fechaLabel }}</span>
+              <q-btn v-if="fechaActiva && !calAbierto" flat dense no-caps size="sm" color="grey-7" icon="close" label="Quitar" @click="limpiarFecha" class="q-ml-auto" />
             </div>
             <transition name="qn-calendar">
-              <div v-if="fechaActiva" class="qn-calendar-shell" aria-label="Seleccionar fecha de los partidos">
+              <div v-if="calAbierto" class="qn-calendar-shell" aria-label="Seleccionar fecha de los partidos">
                 <q-date
                   v-model="fechaCalendario"
+                  @update:model-value="alElegirFecha"
                   mask="YYYY-MM-DD"
                   color="green-8"
                   text-color="white"
@@ -328,6 +334,7 @@ export default defineComponent({
     const joinLoading = ref(false)
     const savingId = ref(null)
     const fechaActiva = ref(false)
+    const calAbierto = ref(false)
     const fechaCalendario = ref('2026-01-01')
     const calendarLocale = {
       days: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
@@ -410,7 +417,11 @@ export default defineComponent({
       let arr = partidos.value
       if (filtro.value === 'live') arr = arr.filter(m => tipo(m) === 'live')
       else if (filtro.value === 'prox') arr = arr.filter(m => tipo(m) === 'prox')
-      else if (filtro.value === 'fin') arr = arr.filter(m => tipo(m) === 'fin')
+      else if (filtro.value === 'fin') {
+        arr = arr
+          .filter(m => tipo(m) === 'fin')
+          .sort((a, b) => ko(b) - ko(a))
+      }
       if (fechaActiva.value && fechaSel.value) {
         arr = arr.filter(m => keyFmt.format(new Date(m.kickoff)) === fechaSel.value)
       }
@@ -555,18 +566,30 @@ export default defineComponent({
     }
 
     const toggleFecha = () => {
-      if (fechaActiva.value) { fechaActiva.value = false; return }
-      let refPartido = null
-      if (filtro.value === 'fin') refPartido = partidos.value.find(m => tipo(m) === 'fin')
-      if (!refPartido) refPartido = partidos.value[0]
-      const d = refPartido ? new Date(refPartido.kickoff) : new Date()
-      const pad = (n) => String(n).padStart(2, '0')
-      fechaCalendario.value = `2026-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+      if (calAbierto.value) { calAbierto.value = false; return }
+      if (!fechaActiva.value) {
+        let refPartido = null
+        if (filtro.value === 'fin') {
+          refPartido = partidos.value
+            .filter(m => tipo(m) === 'fin')
+            .sort((a, b) => ko(b) - ko(a))[0]
+        }
+        if (!refPartido) refPartido = partidos.value[0]
+        const d = refPartido ? new Date(refPartido.kickoff) : new Date()
+        const pad = (n) => String(n).padStart(2, '0')
+        fechaCalendario.value = `2026-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+      }
+      calAbierto.value = true
+    }
+
+    const alElegirFecha = () => {
       fechaActiva.value = true
+      calAbierto.value = false
     }
 
     const limpiarFecha = () => {
       fechaActiva.value = false
+      calAbierto.value = false
     }
 
     onMounted(async () => {
@@ -610,8 +633,8 @@ export default defineComponent({
       showJoin, joinData, joinLoading, savingId, inicial,
       tipo, hora, editable, locked, estadoTexto, lockIcon, lockTexto, grupos, esMio, abrirPron,
       enVivo, proximo, cuenta,
-      fechaActiva, fechaCalendario, calendarLocale, fechaLabel,
-      toggleFecha, limpiarFecha,
+      fechaActiva, calAbierto, fechaCalendario, calendarLocale, fechaLabel,
+      toggleFecha, limpiarFecha, alElegirFecha,
       join, salir, guardar, togglePron
     }
   }
@@ -627,40 +650,19 @@ export default defineComponent({
 .qn-banner {
   position: relative;
   overflow: hidden;
-  padding: 34px 20px 30px;
-  background:
-    radial-gradient(circle at 18% 20%, rgba(255, 215, 0, 0.22), transparent 42%),
-    radial-gradient(circle at 85% 80%, rgba(255, 255, 255, 0.16), transparent 40%),
-    linear-gradient(135deg, #1b5e20 0%, #2e7d32 45%, #1b5e20 100%);
-  color: #fff;
-  text-align: center;
+  width: min(100%, 960px);
+  aspect-ratio: 16 / 9;
+  margin: 0 auto;
+  background: #073b20;
 }
 
-.qn-banner-overlay {
-  position: absolute;
-  inset: 0;
-  background-image:
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0 2px, transparent 2px 60px);
-  pointer-events: none;
+.qn-banner-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
 }
-
-.qn-banner-content { position: relative; z-index: 1; }
-
-.qn-trophy {
-  font-size: 50px;
-  color: #ffd54f;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.35));
-}
-
-.qn-title {
-  font-size: 26px;
-  font-weight: 900;
-  letter-spacing: 0.5px;
-  margin-top: 4px;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-}
-
-.qn-subtitle { opacity: 0.92; font-size: 13px; margin-top: 4px; }
 
 .qn-wrap { max-width: 720px; margin: 0 auto; padding: 16px; }
 
@@ -918,7 +920,6 @@ export default defineComponent({
 }
 
 @media (max-width: 599px) {
-  .qn-title { font-size: 22px; }
   .qn-logo { width: 40px; height: 40px; }
   .qn-team-name { font-size: 12px; }
   .qn-score { font-size: 22px; }

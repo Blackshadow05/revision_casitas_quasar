@@ -3,13 +3,13 @@ import { Notify } from 'quasar'
 function mostrarActualizacion () {
   Notify.create({
     message: 'Nueva version disponible',
-    caption: 'Toca Recargar para aplicar los cambios',
+    caption: 'Toca Instalar para aplicar los cambios',
     color: 'green-9',
     icon: 'system_update',
     position: 'top',
     timeout: 0,
     actions: [
-      { label: 'Recargar', color: 'white', handler: () => window.location.reload() },
+      { label: 'Instalar', color: 'white', handler: () => window.location.reload() },
       { label: 'Despues', color: 'grey-3' }
     ]
   })

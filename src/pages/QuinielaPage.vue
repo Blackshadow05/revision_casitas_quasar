@@ -1,5 +1,27 @@
 <template>
   <q-page class="qn-page">
+    <transition name="qn-sticky">
+      <div v-if="stickyShow && (enVivo || proximo)" class="qn-sticky" :style="{ top: headerH + 'px' }" @click="scrollTop">
+        <template v-if="enVivo">
+          <span class="qn-live-dot"></span>
+          <img v-if="enVivo.equipo_local_logo" :src="enVivo.equipo_local_logo" class="qn-sticky-flag" alt="" />
+          <span class="qn-sticky-team ellipsis">{{ enVivo.equipo_local }}</span>
+          <b class="qn-sticky-score">{{ enVivo.goles_local ?? 0 }} - {{ enVivo.goles_visita ?? 0 }}</b>
+          <span class="qn-sticky-team ellipsis qn-sticky-team-r">{{ enVivo.equipo_visita }}</span>
+          <img v-if="enVivo.equipo_visita_logo" :src="enVivo.equipo_visita_logo" class="qn-sticky-flag" alt="" />
+          <span class="qn-sticky-min">{{ estadoTexto(enVivo) }}</span>
+        </template>
+        <template v-else-if="proximo">
+          <q-icon name="schedule" size="16px" class="q-mr-xs" />
+          <span class="qn-sticky-team ellipsis">{{ proximo.m.equipo_local }}</span>
+          <span class="qn-sticky-vs">vs</span>
+          <span class="qn-sticky-team ellipsis qn-sticky-team-r">{{ proximo.m.equipo_visita }}</span>
+          <span class="qn-sticky-count">{{ cuenta }}</span>
+        </template>
+      </div>
+    </transition>
+
+    <q-pull-to-refresh @refresh="onRefresh" color="green-8" bg-color="white">
     <div class="qn-banner">
       <img
         src="/images/quiniela-mundial-2026-hero.jpg"
@@ -40,6 +62,18 @@
         </template>
       </div>
 
+      <transition name="qn-hint">
+        <div v-if="pushAvail && identity && !pushOn && !pushHintDismissed" class="qn-push-hint">
+          <q-icon name="notifications_none" size="22px" color="green-8" class="qn-push-hint-icon" />
+          <div class="qn-push-hint-text">
+            <div class="text-weight-bold" style="font-size:13px">Activa las notificaciones</div>
+            <div style="font-size:12px;color:#555">Entérate cuando inicia un partido y si ganaste puntos</div>
+          </div>
+          <q-btn unelevated no-caps rounded size="sm" color="green-8" label="Activar" :loading="pushBusy" @click="togglePush" class="q-ml-xs" style="flex-shrink:0" />
+          <q-btn flat round dense icon="close" size="xs" color="grey-5" @click="dismissPushHint" style="flex-shrink:0" />
+        </div>
+      </transition>
+
       <div v-if="proximo || enVivo" class="qn-next">
         <div class="qn-next-body">
           <template v-if="enVivo">
@@ -65,6 +99,8 @@
         </div>
       </div>
 
+      <div ref="sentinel" class="qn-sentinel" aria-hidden="true"></div>
+
       <q-expansion-item dense class="qn-rules" icon="help_outline" label="Cómo se puntúa">
         <div class="qn-rules-body">
           <div class="row no-wrap items-start q-mb-xs"><q-icon name="check_circle" color="green-7" size="18px" class="q-mr-sm" /><span>Acertar el marcador exacto: <b class="q-ml-xs">{{ cfg.pts_exacto }} pts</b></span></div>
@@ -76,6 +112,7 @@
       <q-tabs v-model="tab" class="qn-tabs" active-color="green-9" indicator-color="amber-8" align="justify" no-caps dense>
         <q-tab name="partidos" icon="sports_soccer" label="Partidos" />
         <q-tab name="posiciones" icon="table_chart" label="Posiciones" />
+        <q-tab v-if="hayEliminatorias" name="llaves" icon="account_tree" label="Llaves" />
         <q-tab name="ranking" icon="leaderboard" label="Ranking" />
       </q-tabs>
 
@@ -122,8 +159,25 @@
             </transition>
           </div>
 
-          <div v-if="loading" class="flex flex-center q-my-xl">
-            <q-spinner-dots color="green-8" size="40px" />
+          <div v-if="loading" class="qn-sk-list">
+            <div v-for="n in 4" :key="n" class="qn-card qn-sk-card">
+              <div class="row items-center justify-between q-mb-md">
+                <q-skeleton type="text" width="38%" animation="wave" />
+                <q-skeleton type="QChip" width="64px" height="20px" animation="wave" />
+              </div>
+              <div class="row items-start justify-between no-wrap">
+                <div class="column items-center qn-sk-team">
+                  <q-skeleton type="QAvatar" size="46px" animation="wave" />
+                  <q-skeleton type="text" width="70%" class="q-mt-sm" animation="wave" />
+                </div>
+                <q-skeleton type="text" width="34px" height="26px" class="q-mt-md" animation="wave" />
+                <div class="column items-center qn-sk-team">
+                  <q-skeleton type="QAvatar" size="46px" animation="wave" />
+                  <q-skeleton type="text" width="70%" class="q-mt-sm" animation="wave" />
+                </div>
+              </div>
+              <q-skeleton type="QInput" height="38px" class="q-mt-md" animation="wave" />
+            </div>
           </div>
 
           <div v-else-if="grupos.length === 0" class="flex flex-center column q-my-xl text-grey-6">
@@ -248,7 +302,17 @@
         </q-tab-panel>
 
         <q-tab-panel name="ranking" class="q-pa-none">
-          <div v-if="ranking.length === 0" class="flex flex-center column q-my-xl text-grey-6">
+          <div v-if="loading" class="qn-rank">
+            <div v-for="n in 6" :key="n" class="qn-rank-row qn-sk-rank-row">
+              <q-skeleton type="QAvatar" size="34px" animation="wave" />
+              <div class="qn-rank-name">
+                <q-skeleton type="text" width="45%" animation="wave" />
+                <q-skeleton type="text" width="65%" animation="wave" />
+              </div>
+              <q-skeleton type="text" width="34px" height="22px" animation="wave" />
+            </div>
+          </div>
+          <div v-else-if="ranking.length === 0" class="flex flex-center column q-my-xl text-grey-6">
             <q-icon name="leaderboard" size="56px" color="grey-4" />
             <div class="q-mt-md">Aún no hay puntos en juego</div>
           </div>
@@ -270,7 +334,15 @@
         </q-tab-panel>
 
         <q-tab-panel name="posiciones" class="q-pa-none">
-          <div v-if="gruposPos.length === 0" class="flex flex-center column q-my-xl text-grey-6">
+          <div v-if="loading" class="qn-grupo">
+            <q-skeleton type="text" width="32%" height="20px" class="q-mb-sm" animation="wave" />
+            <div class="qn-tabla">
+              <div v-for="n in 4" :key="n" class="qn-tabla-row qn-sk-tabla-row">
+                <q-skeleton type="text" width="100%" animation="wave" />
+              </div>
+            </div>
+          </div>
+          <div v-else-if="gruposPos.length === 0" class="flex flex-center column q-my-xl text-grey-6">
             <q-icon name="table_chart" size="56px" color="grey-4" />
             <div class="q-mt-md">Aún no hay posiciones</div>
             <div class="text-caption">Se calculan con los partidos jugados.</div>
@@ -307,8 +379,49 @@
             <span class="qn-clasifica-dot"></span> Los 2 primeros de cada grupo avanzan (más los mejores terceros).
           </div>
         </q-tab-panel>
+
+        <q-tab-panel name="llaves" class="q-pa-none">
+          <div v-if="bracket.length === 0" class="flex flex-center column q-my-xl text-grey-6">
+            <q-icon name="account_tree" size="56px" color="grey-4" />
+            <div class="q-mt-md">Aún no hay fase de eliminación</div>
+          </div>
+          <template v-else>
+            <div v-if="eliminatoriasVacias" class="qn-brk-hint">
+              <q-icon name="info" size="18px" class="q-mr-xs" />
+              Las llaves se van completando cuando terminen los grupos.
+            </div>
+            <div class="qn-brk-scrollhint">
+              <q-icon name="swipe" size="15px" class="q-mr-xs" />Desliza para ver todas las rondas
+            </div>
+            <div class="qn-brk-scroll">
+              <div class="qn-brk">
+                <div v-for="col in bracket" :key="col.key" class="qn-brk-col">
+                  <div class="qn-brk-round">{{ col.label }}</div>
+                  <div v-for="m in col.items" :key="m.id" class="qn-brk-card" :class="'qn-brk-' + tipo(m)">
+                    <div class="qn-brk-state" :class="'qn-brk-state-' + tipo(m)">
+                      <span v-if="tipo(m) === 'live'" class="qn-live-dot qn-brk-livedot"></span>{{ brkEstado(m) }}
+                    </div>
+                    <div class="qn-brk-team" :class="{ 'qn-brk-win': ganador(m) === 1, 'qn-brk-dim': !m.equipo_local_logo }">
+                      <img v-if="m.equipo_local_logo" :src="m.equipo_local_logo" class="qn-brk-flag" alt="" />
+                      <span v-else class="qn-brk-ph"></span>
+                      <span class="qn-brk-name ellipsis">{{ m.equipo_local || '—' }}</span>
+                      <span v-if="tipo(m) !== 'prox' && m.goles_local != null" class="qn-brk-score">{{ m.goles_local }}</span>
+                    </div>
+                    <div class="qn-brk-team" :class="{ 'qn-brk-win': ganador(m) === 2, 'qn-brk-dim': !m.equipo_visita_logo }">
+                      <img v-if="m.equipo_visita_logo" :src="m.equipo_visita_logo" class="qn-brk-flag" alt="" />
+                      <span v-else class="qn-brk-ph"></span>
+                      <span class="qn-brk-name ellipsis">{{ m.equipo_visita || '—' }}</span>
+                      <span v-if="tipo(m) !== 'prox' && m.goles_visita != null" class="qn-brk-score">{{ m.goles_visita }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
+        </q-tab-panel>
       </q-tab-panels>
     </div>
+    </q-pull-to-refresh>
 
     <q-dialog v-model="showJoin">
       <q-card class="qn-join">
@@ -336,15 +449,26 @@
 </template>
 
 <script>
-import { defineComponent, ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { defineComponent, ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '../supabase'
 import { notify } from '../utils/notify'
 import { pushSupported, pushDenied, isSubscribed, subscribePush, unsubscribePush } from '../utils/push'
 
 const IDENTITY_KEY = 'quiniela_identity'
+const CELEB_KEY = 'quiniela_celebrados'
 const FIN = new Set(['FT', 'AET', 'PEN', 'WO'])
 const LIVE = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE', 'INT', 'SUSP'])
+
+const KO_ORDER = [
+  { ronda: 'Dieciseisavos', label: '16avos' },
+  { ronda: 'Octavos de final', label: 'Octavos' },
+  { ronda: 'Cuartos de final', label: 'Cuartos' },
+  { ronda: 'Semifinal', label: 'Semis' },
+  { ronda: 'Final', label: 'Final' },
+  { ronda: 'Tercer lugar', label: '3er lugar' }
+]
+const KO_RONDAS = new Set(KO_ORDER.map(r => r.ronda))
 
 const ERROR_MSG = {
   CREDENCIALES: 'Nombre o PIN incorrecto',
@@ -387,8 +511,14 @@ export default defineComponent({
     const pushAvail = ref(false)
     const pushOn = ref(false)
     const pushBusy = ref(false)
+    const pushHintDismissed = ref(localStorage.getItem('qn_push_hint_dismissed') === '1')
     const fechaActiva = ref(false)
     const calAbierto = ref(false)
+    const stickyShow = ref(false)
+    const headerH = ref(56)
+    const sentinel = ref(null)
+    const celebrados = new Set((() => { try { return JSON.parse(localStorage.getItem(CELEB_KEY) || '[]') } catch (e) { return [] } })())
+    let primeraCargaMine = true
     const fechaCalendario = ref('2026-01-01')
     const calendarLocale = {
       days: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
@@ -540,6 +670,94 @@ export default defineComponent({
       return (d > 0 ? d + 'd ' : '') + pad(h) + ':' + pad(mn) + ':' + pad(s)
     })
 
+    const bracket = computed(() => {
+      const cols = []
+      for (const r of KO_ORDER) {
+        const items = partidos.value.filter(m => m.ronda === r.ronda).sort((a, b) => ko(a) - ko(b))
+        if (items.length) cols.push({ key: r.ronda, label: r.label, items })
+      }
+      return cols
+    })
+    const hayEliminatorias = computed(() => partidos.value.some(m => KO_RONDAS.has(m.ronda)))
+    const eliminatoriasVacias = computed(() => bracket.value.every(c => c.items.every(m => !m.equipo_local_logo && !m.equipo_visita_logo)))
+
+    const ganador = (m) => {
+      if (tipo(m) !== 'fin') return 0
+      if (m.goles_local == null || m.goles_visita == null) return 0
+      if (m.goles_local > m.goles_visita) return 1
+      if (m.goles_visita > m.goles_local) return 2
+      return 0
+    }
+    const brkFecha = (m) => {
+      try {
+        return new Date(m.kickoff).toLocaleDateString('es-CR', { day: 'numeric', month: 'short', timeZone: 'America/Costa_Rica' })
+      } catch (e) { return '' }
+    }
+    const brkEstado = (m) => {
+      const t = tipo(m)
+      if (t === 'live') return estadoTexto(m)
+      if (t === 'fin') return 'Final'
+      return brkFecha(m) + ' · ' + hora(m)
+    }
+
+    const scrollTop = () => {
+      try { window.scrollTo({ top: 0, behavior: 'smooth' }) } catch (e) { window.scrollTo(0, 0) }
+    }
+
+    const onRefresh = async (done) => {
+      try { await refrescar() } finally { if (typeof done === 'function') done() }
+    }
+
+    const measureHeader = () => {
+      const h = document.querySelector('.q-header')
+      headerH.value = h ? h.offsetHeight : 56
+    }
+    const onScroll = () => {
+      if (!sentinel.value) { stickyShow.value = false; return }
+      stickyShow.value = sentinel.value.getBoundingClientRect().top < headerH.value
+    }
+    const onResize = () => { measureHeader(); onScroll() }
+
+    const guardarCelebrados = () => {
+      try { localStorage.setItem(CELEB_KEY, JSON.stringify(Array.from(celebrados))) } catch (e) { /* noop */ }
+    }
+    const celebrar = (n) => {
+      const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      notify({
+        type: 'positive',
+        message: n > 1 ? '¡' + n + ' marcadores exactos!' : '¡Marcador exacto! +' + cfg.value.pts_exacto + ' pts',
+        icon: 'celebration',
+        position: 'top'
+      })
+      if (reduce) return
+      const layer = document.createElement('div')
+      layer.className = 'qn-confetti'
+      document.body.appendChild(layer)
+      const colors = ['#ffd54f', '#f9a825', '#2e7d32', '#1b5e20', '#e53935', '#1e88e5', '#ffffff']
+      const total = 90
+      for (let i = 0; i < total; i++) {
+        const p = document.createElement('span')
+        p.className = 'qn-confetti-p'
+        p.style.background = colors[i % colors.length]
+        p.style.left = (Math.random() * 100) + 'vw'
+        const size = 7 + Math.random() * 7
+        p.style.width = size + 'px'
+        p.style.height = (size * (0.4 + Math.random() * 0.6)) + 'px'
+        if (Math.random() > 0.5) p.style.borderRadius = '50%'
+        layer.appendChild(p)
+        const dx = (Math.random() - 0.5) * 260
+        const dy = window.innerHeight + 80
+        const rot = (Math.random() - 0.5) * 1080
+        const anim = p.animate([
+          { transform: 'translate(0,0) rotate(0deg)', opacity: 1 },
+          { transform: 'translate(' + dx + 'px,' + dy + 'px) rotate(' + rot + 'deg)', opacity: 1, offset: 0.85 },
+          { transform: 'translate(' + dx + 'px,' + dy + 'px) rotate(' + rot + 'deg)', opacity: 0 }
+        ], { duration: 2200 + Math.random() * 1600, delay: Math.random() * 350, easing: 'cubic-bezier(.2,.6,.35,1)', fill: 'forwards' })
+        if (i === total - 1) anim.onfinish = () => { if (layer.parentNode) layer.remove() }
+      }
+      setTimeout(() => { if (layer.parentNode) layer.remove() }, 4800)
+    }
+
     const seedForm = () => {
       for (const m of partidos.value) {
         if (!form[m.id]) form[m.id] = { gl: null, gv: null }
@@ -587,9 +805,18 @@ export default defineComponent({
       const { data, error } = await supabase.rpc('qn_mis_pronosticos', { p_nombre: identity.value.nombre, p_pin: identity.value.pin })
       if (error) return
       for (const k in misPron) delete misPron[k]
+      const exacto = cfg.value.pts_exacto
+      const nuevos = []
       for (const r of (data || [])) {
         misPron[r.match_id] = { goles_local: r.goles_local, goles_visita: r.goles_visita, puntos: r.puntos, scored: r.scored }
+        if (r.scored && r.puntos === exacto && !celebrados.has(r.match_id)) {
+          nuevos.push(r.match_id)
+          celebrados.add(r.match_id)
+        }
       }
+      guardarCelebrados()
+      if (nuevos.length && !primeraCargaMine) celebrar(nuevos.length)
+      primeraCargaMine = false
       seedForm()
     }
 
@@ -615,8 +842,14 @@ export default defineComponent({
       identity.value = null
       localStorage.removeItem(IDENTITY_KEY)
       for (const k in misPron) delete misPron[k]
+      primeraCargaMine = true
       seedForm()
       notify({ type: 'info', message: 'Saliste de la quiniela', position: 'top' })
+    }
+
+    const dismissPushHint = () => {
+      pushHintDismissed.value = true
+      localStorage.setItem('qn_push_hint_dismissed', '1')
     }
 
     const togglePush = async () => {
@@ -726,6 +959,12 @@ export default defineComponent({
       clockTimer = setInterval(() => { clock.value = Date.now() }, 1000)
       pollTimer = setInterval(refrescar, 60000)
 
+      await nextTick()
+      measureHeader()
+      onScroll()
+      window.addEventListener('scroll', onScroll, { passive: true })
+      window.addEventListener('resize', onResize)
+
       channel = supabase.channel('qn_rt')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'qn_partidos' }, (payload) => {
           const r = payload.new
@@ -748,14 +987,18 @@ export default defineComponent({
       if (clockTimer) clearInterval(clockTimer)
       if (pollTimer) clearInterval(pollTimer)
       if (channel) supabase.removeChannel(channel)
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onResize)
     })
 
     return {
       tab, cfg, partidos, ranking, gruposPos, misPron, pubPron, form, identity, loading, filtro, filtros,
       showJoin, joinData, joinLoading, savingId, inicial,
-      pushAvail, pushOn, pushBusy, togglePush,
+      pushAvail, pushOn, pushBusy, pushHintDismissed, togglePush, dismissPushHint,
       tipo, hora, editable, locked, estadoTexto, lockIcon, lockTexto, grupos, esMio, abrirPron,
       enVivo, proximo, cuenta,
+      stickyShow, headerH, sentinel, scrollTop, onRefresh,
+      bracket, hayEliminatorias, eliminatoriasVacias, ganador, brkEstado,
       fechaActiva, calAbierto, fechaCalendario, calendarLocale, fechaLabel,
       toggleFecha, limpiarFecha, alElegirFecha,
       join, salir, guardar, togglePron
@@ -1122,6 +1365,24 @@ export default defineComponent({
 .qn-clasifica-dot { width: 10px; height: 10px; border-radius: 2px; background: #2e7d32; flex-shrink: 0; }
 .qn-rank-go { flex-shrink: 0; }
 
+.qn-push-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid rgba(46, 125, 50, 0.2);
+  border-left: 4px solid #2e7d32;
+  border-radius: 14px;
+  padding: 10px 12px;
+  margin-top: 10px;
+  box-shadow: 0 2px 10px rgba(46, 125, 50, 0.1);
+}
+.qn-push-hint-icon { flex-shrink: 0; }
+.qn-push-hint-text { flex: 1; min-width: 0; }
+
+.qn-hint-enter-active, .qn-hint-leave-active { transition: max-height 0.25s ease, opacity 0.25s ease; overflow: hidden; max-height: 80px; }
+.qn-hint-enter-from, .qn-hint-leave-to { max-height: 0; opacity: 0; }
+
 .qn-join { width: 360px; max-width: 92vw; border-radius: 20px; }
 
 .qn-date-wrap { margin-bottom: 12px; }
@@ -1172,6 +1433,134 @@ export default defineComponent({
   opacity: 0;
 }
 
+.qn-sentinel { height: 1px; width: 100%; pointer-events: none; }
+
+.qn-sticky {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px;
+  background: linear-gradient(135deg, #14532d 0%, #1b5e20 65%, #0f3d18 100%);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(20, 83, 45, 0.4);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+}
+.qn-sticky-flag { width: 22px; height: 16px; object-fit: cover; border-radius: 2px; flex-shrink: 0; }
+.qn-sticky-team { max-width: 30%; font-weight: 700; }
+.qn-sticky-team-r { text-align: right; }
+.qn-sticky-score { color: #ffd54f; font-size: 17px; font-weight: 900; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.qn-sticky-vs { color: #ffd54f; font-weight: 800; font-size: 12px; flex-shrink: 0; }
+.qn-sticky-min { margin-left: auto; font-size: 12px; font-weight: 800; color: #ffd54f; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.qn-sticky-count { margin-left: auto; font-size: 15px; font-weight: 900; color: #ffd54f; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+
+.qn-sticky-enter-active, .qn-sticky-leave-active { transition: transform 0.25s ease, opacity 0.25s ease; }
+.qn-sticky-enter-from, .qn-sticky-leave-to { transform: translateY(-100%); opacity: 0; }
+
+.qn-sk-card :deep(.q-skeleton) { --q-skeleton-bg: rgba(0, 0, 0, 0.07); }
+.qn-sk-team { width: 38%; }
+.qn-sk-rank-row { cursor: default; }
+
+.qn-brk-hint {
+  display: flex;
+  align-items: center;
+  background: #e3f2fd;
+  color: #1565c0;
+  border-radius: 12px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.qn-brk-scrollhint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9e9e9e;
+  font-size: 11.5px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.qn-brk-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 10px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+.qn-brk {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  width: max-content;
+  min-width: 100%;
+}
+.qn-brk-col {
+  flex: 0 0 auto;
+  width: 168px;
+  scroll-snap-align: start;
+}
+.qn-brk-round {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #1b5e20;
+  text-align: center;
+  padding: 6px 0;
+  margin-bottom: 8px;
+  background: #fff;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+.qn-brk-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 8px 9px;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.07);
+  border-left: 4px solid #bdbdbd;
+}
+.qn-brk-card.qn-brk-live { border-left-color: #e53935; }
+.qn-brk-card.qn-brk-fin { border-left-color: #1b5e20; }
+.qn-brk-card.qn-brk-prox { border-left-color: #1e88e5; }
+.qn-brk-state {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #9e9e9e;
+}
+.qn-brk-state-live { color: #c62828; }
+.qn-brk-state-fin { color: #1b5e20; }
+.qn-brk-livedot { width: 7px; height: 7px; }
+.qn-brk-team {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #333;
+}
+.qn-brk-team + .qn-brk-team { border-top: 1px dashed #eee; }
+.qn-brk-win { font-weight: 900; color: #0d2818; }
+.qn-brk-dim { color: #9e9e9e; font-weight: 600; font-style: italic; }
+.qn-brk-flag { width: 22px; height: 16px; object-fit: cover; border-radius: 2px; flex-shrink: 0; }
+.qn-brk-ph { width: 22px; height: 16px; border-radius: 2px; background: #ececec; flex-shrink: 0; }
+.qn-brk-name { flex: 1; min-width: 0; }
+.qn-brk-score { font-weight: 900; font-size: 14px; color: #1a1a1a; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.qn-brk-win .qn-brk-score { color: #1b5e20; }
+
 @media (max-width: 599px) {
   .qn-logo { width: 40px; height: 40px; }
   .qn-team-name { font-size: 12px; }
@@ -1179,10 +1568,31 @@ export default defineComponent({
   .qn-calendar-shell { padding: 4px; border-radius: 16px; }
   .qn-calendar-actions { padding-left: 8px; }
   .qn-hide-xs { display: none; }
+  .qn-brk-col { width: 150px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .qn-calendar-enter-active, .qn-calendar-leave-active { transition: none; }
   .qn-shimmer { animation: none; }
+  .qn-sticky-enter-active, .qn-sticky-leave-active { transition: none; }
+}
+</style>
+
+<style>
+.qn-confetti {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 0;
+  z-index: 100000;
+  pointer-events: none;
+  overflow: visible;
+}
+.qn-confetti-p {
+  position: absolute;
+  top: -14px;
+  display: block;
+  will-change: transform, opacity;
 }
 </style>

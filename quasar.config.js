@@ -3,7 +3,8 @@ import { configure } from 'quasar/wrappers'
 export default configure((ctx) => {
   return {
     boot: [
-      'rxdb'
+      'rxdb',
+      'sw-update'
     ],
     css: [
       'app.css'

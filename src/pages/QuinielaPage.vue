@@ -381,7 +381,7 @@
         </q-tab-panel>
 
         <q-tab-panel name="llaves" class="q-pa-none">
-          <div v-if="bracket.length === 0" class="flex flex-center column q-my-xl text-grey-6">
+          <div v-if="brkTree.length === 0" class="flex flex-center column q-my-xl text-grey-6">
             <q-icon name="account_tree" size="56px" color="grey-4" />
             <div class="q-mt-md">Aún no hay fase de eliminación</div>
           </div>
@@ -391,29 +391,54 @@
               Las llaves se van completando cuando terminen los grupos.
             </div>
             <div class="qn-brk-scrollhint">
-              <q-icon name="swipe" size="15px" class="q-mr-xs" />Desliza para ver todas las rondas
+              <q-icon name="swipe" size="15px" class="q-mr-xs" />Desliza para ver todo el cuadro
             </div>
             <div class="qn-brk-scroll">
-              <div class="qn-brk">
-                <div v-for="col in bracket" :key="col.key" class="qn-brk-col">
-                  <div class="qn-brk-round">{{ col.label }}</div>
-                  <div v-for="m in col.items" :key="m.id" class="qn-brk-card" :class="'qn-brk-' + tipo(m)">
-                    <div class="qn-brk-state" :class="'qn-brk-state-' + tipo(m)">
-                      <span v-if="tipo(m) === 'live'" class="qn-live-dot qn-brk-livedot"></span>{{ brkEstado(m) }}
-                    </div>
-                    <div class="qn-brk-team" :class="{ 'qn-brk-win': ganador(m) === 1, 'qn-brk-dim': !m.equipo_local_logo }">
-                      <img v-if="m.equipo_local_logo" :src="m.equipo_local_logo" class="qn-brk-flag" alt="" />
-                      <span v-else class="qn-brk-ph"></span>
-                      <span class="qn-brk-name ellipsis">{{ m.equipo_local || '—' }}</span>
-                      <span v-if="tipo(m) !== 'prox' && m.goles_local != null" class="qn-brk-score">{{ m.goles_local }}</span>
-                    </div>
-                    <div class="qn-brk-team" :class="{ 'qn-brk-win': ganador(m) === 2, 'qn-brk-dim': !m.equipo_visita_logo }">
-                      <img v-if="m.equipo_visita_logo" :src="m.equipo_visita_logo" class="qn-brk-flag" alt="" />
-                      <span v-else class="qn-brk-ph"></span>
-                      <span class="qn-brk-name ellipsis">{{ m.equipo_visita || '—' }}</span>
-                      <span v-if="tipo(m) !== 'prox' && m.goles_visita != null" class="qn-brk-score">{{ m.goles_visita }}</span>
+              <div class="qn-brk2">
+                <div v-for="col in brkTree" :key="col.key" class="qn-brk2-round">
+                  <div class="qn-brk2-roundhead">{{ col.label }}</div>
+                  <div class="qn-brk2-matches">
+                    <div v-for="m in col.items" :key="m.id" class="qn-brk2-match">
+                      <div class="qn-brk2-card" :class="'qn-brk-' + tipo(m)">
+                        <div class="qn-brk-state" :class="'qn-brk-state-' + tipo(m)">
+                          <span v-if="tipo(m) === 'live'" class="qn-live-dot qn-brk-livedot"></span>{{ brkEstado(m) }}
+                        </div>
+                        <div class="qn-brk-team" :class="{ 'qn-brk-win': ganador(m) === 1, 'qn-brk-dim': !m.equipo_local_logo }">
+                          <img v-if="m.equipo_local_logo" :src="m.equipo_local_logo" class="qn-brk-flag" alt="" />
+                          <span v-else class="qn-brk-ph"></span>
+                          <span class="qn-brk-name ellipsis">{{ m.equipo_local || '—' }}</span>
+                          <span v-if="tipo(m) !== 'prox' && m.goles_local != null" class="qn-brk-score">{{ m.goles_local }}</span>
+                        </div>
+                        <div class="qn-brk-team" :class="{ 'qn-brk-win': ganador(m) === 2, 'qn-brk-dim': !m.equipo_visita_logo }">
+                          <img v-if="m.equipo_visita_logo" :src="m.equipo_visita_logo" class="qn-brk-flag" alt="" />
+                          <span v-else class="qn-brk-ph"></span>
+                          <span class="qn-brk-name ellipsis">{{ m.equipo_visita || '—' }}</span>
+                          <span v-if="tipo(m) !== 'prox' && m.goles_visita != null" class="qn-brk-score">{{ m.goles_visita }}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="tercerLugar" class="qn-brk-3rd">
+              <div class="qn-brk-3rd-head"><q-icon name="military_tech" size="16px" class="q-mr-xs" />Tercer lugar</div>
+              <div class="qn-brk2-card qn-brk-3rd-card" :class="'qn-brk-' + tipo(tercerLugar)">
+                <div class="qn-brk-state" :class="'qn-brk-state-' + tipo(tercerLugar)">
+                  <span v-if="tipo(tercerLugar) === 'live'" class="qn-live-dot qn-brk-livedot"></span>{{ brkEstado(tercerLugar) }}
+                </div>
+                <div class="qn-brk-team" :class="{ 'qn-brk-win': ganador(tercerLugar) === 1, 'qn-brk-dim': !tercerLugar.equipo_local_logo }">
+                  <img v-if="tercerLugar.equipo_local_logo" :src="tercerLugar.equipo_local_logo" class="qn-brk-flag" alt="" />
+                  <span v-else class="qn-brk-ph"></span>
+                  <span class="qn-brk-name ellipsis">{{ tercerLugar.equipo_local || '—' }}</span>
+                  <span v-if="tipo(tercerLugar) !== 'prox' && tercerLugar.goles_local != null" class="qn-brk-score">{{ tercerLugar.goles_local }}</span>
+                </div>
+                <div class="qn-brk-team" :class="{ 'qn-brk-win': ganador(tercerLugar) === 2, 'qn-brk-dim': !tercerLugar.equipo_visita_logo }">
+                  <img v-if="tercerLugar.equipo_visita_logo" :src="tercerLugar.equipo_visita_logo" class="qn-brk-flag" alt="" />
+                  <span v-else class="qn-brk-ph"></span>
+                  <span class="qn-brk-name ellipsis">{{ tercerLugar.equipo_visita || '—' }}</span>
+                  <span v-if="tipo(tercerLugar) !== 'prox' && tercerLugar.goles_visita != null" class="qn-brk-score">{{ tercerLugar.goles_visita }}</span>
                 </div>
               </div>
             </div>
@@ -469,6 +494,31 @@ const KO_ORDER = [
   { ronda: 'Tercer lugar', label: '3er lugar' }
 ]
 const KO_RONDAS = new Set(KO_ORDER.map(r => r.ronda))
+
+const KO_BASE = {
+  Dieciseisavos: 73,
+  'Octavos de final': 89,
+  'Cuartos de final': 97,
+  Semifinal: 101,
+  'Tercer lugar': 103,
+  Final: 104
+}
+const FEEDERS = {
+  89: [73, 75], 90: [74, 77], 91: [76, 78], 92: [79, 80],
+  93: [83, 84], 94: [81, 82], 95: [86, 88], 96: [85, 87],
+  97: [89, 90], 98: [93, 94], 99: [91, 92], 100: [95, 96],
+  101: [97, 98], 102: [99, 100],
+  104: [101, 102]
+}
+const TREE_ROUNDS = [
+  { ronda: 'Dieciseisavos', label: '16avos' },
+  { ronda: 'Octavos de final', label: 'Octavos' },
+  { ronda: 'Cuartos de final', label: 'Cuartos' },
+  { ronda: 'Semifinal', label: 'Semis' },
+  { ronda: 'Final', label: 'Final' }
+]
+const firstLeaf = (num) => { const ch = FEEDERS[num]; return ch ? firstLeaf(ch[0]) : num }
+const leafSeq = () => { const out = []; const rec = (n) => { const ch = FEEDERS[n]; if (!ch) { out.push(n); return } rec(ch[0]); rec(ch[1]) }; rec(104); return out }
 
 const ERROR_MSG = {
   CREDENCIALES: 'Nombre o PIN incorrecto',
@@ -670,16 +720,24 @@ export default defineComponent({
       return (d > 0 ? d + 'd ' : '') + pad(h) + ':' + pad(mn) + ':' + pad(s)
     })
 
-    const bracket = computed(() => {
+    const brkTree = computed(() => {
+      if (!partidos.value.some(m => KO_RONDAS.has(m.ronda))) return []
+      const leaves = leafSeq()
+      const leafIdx = new Map(leaves.map((n, i) => [n, i]))
       const cols = []
-      for (const r of KO_ORDER) {
+      for (const r of TREE_ROUNDS) {
+        const base = KO_BASE[r.ronda]
         const items = partidos.value.filter(m => m.ronda === r.ronda).sort((a, b) => ko(a) - ko(b))
-        if (items.length) cols.push({ key: r.ronda, label: r.label, items })
+        if (!items.length) continue
+        const withNum = items.map((m, i) => ({ m, num: base + i }))
+        withNum.sort((a, b) => (leafIdx.get(firstLeaf(a.num)) ?? 0) - (leafIdx.get(firstLeaf(b.num)) ?? 0))
+        cols.push({ key: r.ronda, label: r.label, items: withNum.map(x => x.m) })
       }
       return cols
     })
+    const tercerLugar = computed(() => partidos.value.find(m => m.ronda === 'Tercer lugar') || null)
     const hayEliminatorias = computed(() => partidos.value.some(m => KO_RONDAS.has(m.ronda)))
-    const eliminatoriasVacias = computed(() => bracket.value.every(c => c.items.every(m => !m.equipo_local_logo && !m.equipo_visita_logo)))
+    const eliminatoriasVacias = computed(() => brkTree.value.every(c => c.items.every(m => !m.equipo_local_logo && !m.equipo_visita_logo)))
 
     const ganador = (m) => {
       if (tipo(m) !== 'fin') return 0
@@ -998,7 +1056,7 @@ export default defineComponent({
       tipo, hora, editable, locked, estadoTexto, lockIcon, lockTexto, grupos, esMio, abrirPron,
       enVivo, proximo, cuenta,
       stickyShow, headerH, sentinel, scrollTop, onRefresh,
-      bracket, hayEliminatorias, eliminatoriasVacias, ganador, brkEstado,
+      brkTree, tercerLugar, hayEliminatorias, eliminatoriasVacias, ganador, brkEstado,
       fechaActiva, calAbierto, fechaCalendario, calendarLocale, fechaLabel,
       toggleFecha, limpiarFecha, alElegirFecha,
       join, salir, guardar, togglePron
@@ -1493,19 +1551,23 @@ export default defineComponent({
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
 }
-.qn-brk {
+.qn-brk2 {
+  --gut: 26px;
+  --line: #c4cfc4;
+  --match-slot: 98px;
   display: flex;
-  gap: 14px;
-  align-items: flex-start;
+  align-items: stretch;
   width: max-content;
   min-width: 100%;
 }
-.qn-brk-col {
+.qn-brk2-round {
   flex: 0 0 auto;
-  width: 168px;
-  scroll-snap-align: start;
+  width: 156px;
+  display: flex;
+  flex-direction: column;
 }
-.qn-brk-round {
+.qn-brk2-round:not(:last-child) { margin-right: var(--gut); }
+.qn-brk2-roundhead {
   font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
@@ -1518,17 +1580,75 @@ export default defineComponent({
   border-radius: 999px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
-.qn-brk-card {
+.qn-brk2-matches {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+.qn-brk2-match {
+  flex: 1 1 0;
+  min-height: var(--match-slot);
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+.qn-brk2-card {
+  width: 100%;
   background: #fff;
   border-radius: 12px;
-  padding: 8px 9px;
-  margin-bottom: 12px;
+  padding: 7px 9px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.07);
   border-left: 4px solid #bdbdbd;
+  position: relative;
+  z-index: 1;
 }
-.qn-brk-card.qn-brk-live { border-left-color: #e53935; }
-.qn-brk-card.qn-brk-fin { border-left-color: #1b5e20; }
-.qn-brk-card.qn-brk-prox { border-left-color: #1e88e5; }
+.qn-brk2-card.qn-brk-live { border-left-color: #e53935; }
+.qn-brk2-card.qn-brk-fin { border-left-color: #1b5e20; }
+.qn-brk2-card.qn-brk-prox { border-left-color: #1e88e5; }
+
+.qn-brk2-round:not(:last-child) .qn-brk2-match::after {
+  content: "";
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  width: calc(var(--gut) / 2);
+  height: 2px;
+  background: var(--line);
+}
+.qn-brk2-round:not(:last-child) .qn-brk2-match:nth-child(odd)::before {
+  content: "";
+  position: absolute;
+  left: calc(100% + var(--gut) / 2 - 1px);
+  top: 50%;
+  width: 2px;
+  height: 100%;
+  background: var(--line);
+}
+.qn-brk2-round:not(:first-child) .qn-brk2-card::before {
+  content: "";
+  position: absolute;
+  right: 100%;
+  top: 50%;
+  width: calc(var(--gut) / 2);
+  height: 2px;
+  background: var(--line);
+}
+
+.qn-brk-3rd {
+  margin-top: 16px;
+  max-width: 320px;
+}
+.qn-brk-3rd-head {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #8d6e00;
+  margin-bottom: 6px;
+}
+.qn-brk-3rd-card { border-left-color: #c9a227 !important; }
 .qn-brk-state {
   font-size: 10px;
   font-weight: 700;
@@ -1568,7 +1688,8 @@ export default defineComponent({
   .qn-calendar-shell { padding: 4px; border-radius: 16px; }
   .qn-calendar-actions { padding-left: 8px; }
   .qn-hide-xs { display: none; }
-  .qn-brk-col { width: 150px; }
+  .qn-brk2 { --gut: 20px; --match-slot: 94px; }
+  .qn-brk2-round { width: 144px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

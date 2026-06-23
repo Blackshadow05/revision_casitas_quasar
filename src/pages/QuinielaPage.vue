@@ -43,7 +43,7 @@
               {{ enVivo.equipo_local }} <span class="qn-next-vs">vs</span> {{ enVivo.equipo_visita }}
               <img v-if="enVivo.equipo_visita_logo" :src="enVivo.equipo_visita_logo" class="qn-next-flag" alt="" />
             </div>
-            <div class="qn-next-sub">{{ enVivo.minuto ? enVivo.minuto + "'" : 'En juego' }} · {{ enVivo.ronda }}</div>
+            <div class="qn-next-sub">{{ estadoTexto(enVivo) }} · {{ enVivo.ronda }}</div>
           </template>
           <template v-else-if="proximo">
             <div class="qn-next-tag"><q-icon name="schedule" size="14px" class="q-mr-xs" />Próximo partido en</div>
@@ -434,10 +434,20 @@ export default defineComponent({
 
     const estadoTexto = (m) => {
       const t = tipo(m)
-      if (t === 'fin') return 'Final'
+      if (t === 'fin') {
+        if (m.estado_corto === 'AET') return 'Final (TE)'
+        if (m.estado_corto === 'PEN') return 'Final (pen)'
+        return 'Final'
+      }
       if (t === 'live') {
-        if (m.estado_corto === 'HT') return 'Medio tiempo'
-        return m.minuto ? m.minuto + "'" : 'En vivo'
+        const s = m.estado_corto
+        if (s === 'HT') return 'Medio tiempo'
+        if (s === 'INT') return 'Interrumpido'
+        if (s === 'SUSP') return 'Suspendido'
+        if (s === 'P') return 'Penales'
+        const label = m.minuto_label || (m.minuto ? String(m.minuto) : '')
+        if (s === 'ET') return label ? "TE " + label + "'" : 'Tiempo extra'
+        return label ? label + "'" : 'En vivo'
       }
       return hora(m)
     }
@@ -660,6 +670,8 @@ export default defineComponent({
       await Promise.all([loadPartidos(), loadRanking(), loadPosiciones()])
       await loadMine()
       loading.value = false
+
+      if (partidos.value.some(m => tipo(m) === 'live')) filtro.value = 'live'
 
       nowTimer = setInterval(() => { now.value = Date.now() }, 30000)
       clockTimer = setInterval(() => { clock.value = Date.now() }, 1000)

@@ -25,7 +25,14 @@
               <div class="text-weight-bold">{{ identity.nombre }}</div>
             </div>
           </div>
-          <q-btn flat dense no-caps size="sm" color="grey-7" icon="logout" label="Salir" @click="salir" />
+          <div class="row items-center no-wrap">
+            <q-btn v-if="pushAvail" flat round dense :color="pushOn ? 'amber-8' : 'grey-6'"
+              :icon="pushOn ? 'notifications_active' : 'notifications_none'"
+              :loading="pushBusy" class="q-mr-xs" @click="togglePush">
+              <q-tooltip>{{ pushOn ? 'Notificaciones activadas' : 'Activar notificaciones' }}</q-tooltip>
+            </q-btn>
+            <q-btn flat dense no-caps size="sm" color="grey-7" icon="logout" label="Salir" @click="salir" />
+          </div>
         </template>
         <template v-else>
           <div class="text-grey-8">Únete para pronosticar</div>
@@ -36,8 +43,8 @@
       <div v-if="proximo || enVivo" class="qn-next">
         <div class="qn-next-body">
           <template v-if="enVivo">
-            <div class="qn-next-tag"><span class="qn-live-dot"></span> En vivo</div>
-            <div class="qn-next-timer">{{ enVivo.goles_local ?? 0 }} <span class="qn-next-vs">-</span> {{ enVivo.goles_visita ?? 0 }}</div>
+            <div class="qn-next-tag qn-shimmer"><span class="qn-live-dot"></span> En vivo</div>
+            <div class="qn-next-timer qn-shimmer">{{ enVivo.goles_local ?? 0 }} <span class="qn-next-vs">-</span> {{ enVivo.goles_visita ?? 0 }}</div>
             <div class="qn-next-match">
               <img v-if="enVivo.equipo_local_logo" :src="enVivo.equipo_local_logo" class="qn-next-flag" alt="" />
               {{ enVivo.equipo_local }} <span class="qn-next-vs">vs</span> {{ enVivo.equipo_visita }}
@@ -149,7 +156,6 @@
                     {{ m.goles_local }} <span class="qn-dash">-</span> {{ m.goles_visita }}
                   </div>
                   <div v-else class="qn-vs">VS</div>
-                  <div class="qn-hora">{{ hora(m) }}</div>
                 </div>
 
                 <div class="qn-team">
@@ -222,9 +228,9 @@
                     <q-icon :name="lockIcon(m)" size="15px" class="q-mr-xs" />{{ lockTexto(m) }}
                   </div>
 
-                  <q-btn v-if="tipo(m) !== 'prox' || locked(m)" flat dense no-caps size="sm" color="green-9"
+                  <q-btn v-if="tipo(m) !== 'prox' || locked(m)" unelevated no-caps rounded size="md" color="green-9"
                     :icon="pubPron[m.id] ? 'expand_less' : 'groups'"
-                    :label="pubPron[m.id] ? 'Ocultar' : 'Ver pronósticos'" class="q-mt-xs"
+                    :label="pubPron[m.id] ? 'Ocultar' : 'Ver pronósticos'" class="q-mt-sm qn-btn-pron"
                     @click="togglePron(m)" />
                   <div v-if="pubPron[m.id]" class="qn-pub">
                     <div v-if="pubPron[m.id].length === 0" class="text-caption text-grey-6 q-pa-sm">Nadie pronosticó este partido.</div>
@@ -247,8 +253,11 @@
             <div class="q-mt-md">Aún no hay puntos en juego</div>
           </div>
           <div v-else class="qn-rank">
-            <div v-for="(r, i) in ranking" :key="r.id" class="qn-rank-row" :class="{ 'qn-me': esMio(r) }" @click="abrirPron(r)">
-              <div class="qn-pos" :class="'qn-pos-' + (i + 1)">{{ i + 1 }}</div>
+            <div v-for="(r, i) in ranking" :key="r.id" class="qn-rank-row" :class="['qn-rank-place-' + (i + 1), { 'qn-me': esMio(r) }]" @click="abrirPron(r)">
+              <div v-if="i < 3" class="qn-medal" :class="'qn-medal-' + (i + 1)">
+                <span>{{ i + 1 }}</span>
+              </div>
+              <div v-else class="qn-pos">{{ i + 1 }}</div>
               <div class="qn-rank-name ellipsis">
                 {{ r.nombre }}
                 <span v-if="esMio(r)" class="qn-yo">tú</span>
@@ -331,6 +340,7 @@ import { defineComponent, ref, reactive, computed, onMounted, onUnmounted } from
 import { useRouter } from 'vue-router'
 import { supabase } from '../supabase'
 import { notify } from '../utils/notify'
+import { pushSupported, pushDenied, isSubscribed, subscribePush, unsubscribePush } from '../utils/push'
 
 const IDENTITY_KEY = 'quiniela_identity'
 const FIN = new Set(['FT', 'AET', 'PEN', 'WO'])
@@ -374,6 +384,9 @@ export default defineComponent({
     const joinData = reactive({ nombre: '', pin: '' })
     const joinLoading = ref(false)
     const savingId = ref(null)
+    const pushAvail = ref(false)
+    const pushOn = ref(false)
+    const pushBusy = ref(false)
     const fechaActiva = ref(false)
     const calAbierto = ref(false)
     const fechaCalendario = ref('2026-01-01')
@@ -606,6 +619,37 @@ export default defineComponent({
       notify({ type: 'info', message: 'Saliste de la quiniela', position: 'top' })
     }
 
+    const togglePush = async () => {
+      if (!identity.value) { showJoin.value = true; return }
+      if (pushDenied()) {
+        notify({ type: 'warning', message: 'Activa las notificaciones del navegador para esta página', position: 'top' })
+        return
+      }
+      pushBusy.value = true
+      try {
+        if (pushOn.value) {
+          await unsubscribePush()
+          pushOn.value = false
+          notify({ type: 'info', message: 'Notificaciones desactivadas', position: 'top' })
+        } else {
+          await subscribePush(identity.value, cfg.value.vapid_public)
+          pushOn.value = true
+          notify({ type: 'positive', message: 'Te avisaremos de tus partidos', position: 'top' })
+        }
+      } catch (e) {
+        const code = (e && e.message) ? e.message : String(e)
+        const map = {
+          PERM_DENIED: 'No diste permiso de notificaciones',
+          NO_VAPID: 'Notificaciones no configuradas aún',
+          UNSUPPORTED: 'Tu navegador no soporta notificaciones',
+          NO_IDENTITY: 'Únete primero a la quiniela'
+        }
+        notify({ type: 'negative', message: map[code] || 'No se pudo cambiar las notificaciones', position: 'top' })
+      } finally {
+        pushBusy.value = false
+      }
+    }
+
     const guardar = async (m) => {
       if (!identity.value) { showJoin.value = true; return }
       const f = form[m.id] || {}
@@ -673,6 +717,11 @@ export default defineComponent({
 
       if (partidos.value.some(m => tipo(m) === 'live')) filtro.value = 'live'
 
+      pushAvail.value = pushSupported()
+      if (pushAvail.value && identity.value) {
+        try { pushOn.value = await isSubscribed() } catch (e) { pushOn.value = false }
+      }
+
       nowTimer = setInterval(() => { now.value = Date.now() }, 30000)
       clockTimer = setInterval(() => { clock.value = Date.now() }, 1000)
       pollTimer = setInterval(refrescar, 60000)
@@ -704,6 +753,7 @@ export default defineComponent({
     return {
       tab, cfg, partidos, ranking, gruposPos, misPron, pubPron, form, identity, loading, filtro, filtros,
       showJoin, joinData, joinLoading, savingId, inicial,
+      pushAvail, pushOn, pushBusy, togglePush,
       tipo, hora, editable, locked, estadoTexto, lockIcon, lockTexto, grupos, esMio, abrirPron,
       enVivo, proximo, cuenta,
       fechaActiva, calAbierto, fechaCalendario, calendarLocale, fechaLabel,
@@ -722,11 +772,12 @@ export default defineComponent({
 
 .qn-banner {
   position: relative;
-  overflow: hidden;
   width: min(100%, 960px);
   aspect-ratio: 16 / 9;
   margin: 0 auto;
   background: #073b20;
+  -webkit-mask-image: linear-gradient(to bottom, #000 62%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 62%, transparent 100%);
 }
 
 .qn-banner-image {
@@ -747,7 +798,7 @@ export default defineComponent({
   border-radius: 16px;
   padding: 10px 14px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
-  margin-top: -28px;
+  margin-top: 14px;
   position: relative;
   z-index: 2;
   border: 1px solid rgba(46, 125, 50, 0.12);
@@ -810,6 +861,24 @@ export default defineComponent({
 .qn-next-vs { color: #ffd54f; font-weight: 700; }
 .qn-next-flag { width: 24px; height: 17px; object-fit: cover; border-radius: 2px; }
 .qn-next-sub { font-size: 12px; opacity: 0.85; margin-top: 3px; }
+
+.qn-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0) 20%,
+    rgba(255, 255, 255, 0.5) 50%,
+    rgba(255, 255, 255, 0) 80%,
+    transparent 100%
+  );
+  background-size: 300% 100%;
+  background-repeat: no-repeat;
+  animation: qn-shimmer-sweep 2s ease-in-out infinite alternate;
+}
+@keyframes qn-shimmer-sweep {
+  0% { background-position: 0% 0; }
+  100% { background-position: 100% 0; }
+}
 
 .qn-goles {
   display: flex;
@@ -911,7 +980,7 @@ export default defineComponent({
 .qn-center { width: 24%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-top: 4px; }
 .qn-score { font-size: 26px; font-weight: 900; color: #1a1a1a; }
 .qn-dash { color: #bbb; }
-.qn-vs { font-size: 16px; font-weight: 900; color: #9e9e9e; }
+.qn-vs { font-size: 16px; font-weight: 900; color: #455a64; }
 .qn-hora { font-size: 12px; color: #757575; margin-top: 2px; font-weight: 600; }
 
 .qn-pred { margin-top: 12px; border-top: 1px dashed #e0e0e0; padding-top: 10px; }
@@ -924,22 +993,80 @@ export default defineComponent({
 .qn-locked { font-size: 12.5px; color: #9e9e9e; display: flex; align-items: center; justify-content: center; font-weight: 600; }
 
 .qn-pub { margin-top: 8px; background: #fafafa; border-radius: 12px; padding: 4px 10px; }
+.qn-btn-pron {
+  min-height: 38px;
+  padding: 0 18px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  box-shadow: 0 4px 12px rgba(27, 94, 32, 0.28);
+}
+.qn-btn-pron :deep(.q-icon) { font-size: 20px; }
+.qn-pred .qn-btn-pron { margin-top: 8px; }
 .qn-pub-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 2px; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
 .qn-pub-row:last-child { border-bottom: none; }
 
 .qn-rank { background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06); }
-.qn-rank-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid #f2f2f2; cursor: pointer; transition: background 0.15s; }
+.qn-rank-row { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 14px; border-bottom: 1px solid #f2f2f2; cursor: pointer; transition: background 0.15s, box-shadow 0.15s; }
 .qn-rank-row:last-child { border-bottom: none; }
 .qn-rank-row:hover { background: rgba(46, 125, 50, 0.06); }
-.qn-me { background: linear-gradient(90deg, rgba(255, 213, 79, 0.18), transparent); }
+.qn-rank-row.qn-me:not(.qn-rank-place-1):not(.qn-rank-place-2):not(.qn-rank-place-3) { background: linear-gradient(90deg, rgba(255, 213, 79, 0.18), transparent); }
+.qn-rank-row.qn-me { box-shadow: inset 3px 0 0 rgba(46, 125, 50, 0.75); }
+.qn-rank-row.qn-rank-place-1 { background: linear-gradient(90deg, #fff1b8 0%, #fff8df 58%, #ffffff 100%); border-bottom-color: #f1cd4f; }
+.qn-rank-row.qn-rank-place-2 { background: linear-gradient(90deg, #e9eef2 0%, #f7f9fa 58%, #ffffff 100%); border-bottom-color: #c7d0d8; }
+.qn-rank-row.qn-rank-place-3 { background: linear-gradient(90deg, #f5d2ad 0%, #fff0df 58%, #ffffff 100%); border-bottom-color: #d59a5d; }
+.qn-rank-row.qn-rank-place-1:hover { background: linear-gradient(90deg, #ffe89a 0%, #fff4ca 58%, #ffffff 100%); }
+.qn-rank-row.qn-rank-place-2:hover { background: linear-gradient(90deg, #dfe6eb 0%, #f1f5f7 58%, #ffffff 100%); }
+.qn-rank-row.qn-rank-place-3:hover { background: linear-gradient(90deg, #efc291 0%, #ffe6cb 58%, #ffffff 100%); }
 .qn-pos { width: 30px; height: 30px; border-radius: 50%; background: #eee; color: #555; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.qn-pos-1 { background: linear-gradient(135deg, #ffd54f, #f9a825); color: #fff; }
-.qn-pos-2 { background: linear-gradient(135deg, #cfd8dc, #90a4ae); color: #fff; }
-.qn-pos-3 { background: linear-gradient(135deg, #d7a87a, #a1664a); color: #fff; }
+.qn-medal {
+  position: relative;
+  width: 44px;
+  height: 52px;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 4px;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+}
+.qn-medal::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 5px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  z-index: 1;
+  box-shadow: inset 0 2px 5px rgba(255, 255, 255, 0.85), inset 0 -4px 7px rgba(87, 56, 0, 0.24), 0 3px 6px rgba(0, 0, 0, 0.16);
+}
+.qn-medal::after {
+  content: "";
+  position: absolute;
+  top: 27px;
+  left: 10px;
+  width: 24px;
+  height: 24px;
+  background:
+    linear-gradient(135deg, #d7192a 0 46%, transparent 47%) left / 50% 100% no-repeat,
+    linear-gradient(225deg, #b71020 0 46%, transparent 47%) right / 50% 100% no-repeat;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.15));
+}
+.qn-medal span { position: relative; z-index: 2; margin-top: 4px; }
+.qn-medal-1::before { background: radial-gradient(circle at 30% 24%, #fff7bd 0 16%, #ffd84d 38%, #f5a900 72%, #d98900 100%); border: 2px solid #ffe27a; }
+.qn-medal-2::before { background: radial-gradient(circle at 30% 24%, #ffffff 0 16%, #dfe5e8 38%, #aeb9c0 72%, #87949d 100%); border: 2px solid #eef3f6; }
+.qn-medal-3::before { background: radial-gradient(circle at 30% 24%, #ffe4ba 0 16%, #d99a5b 38%, #a96228 72%, #804014 100%); border: 2px solid #efc08b; }
 .qn-rank-name { flex: 1; font-weight: 700; min-width: 0; }
 .qn-yo { background: #2e7d32; color: #fff; font-size: 10px; padding: 1px 6px; border-radius: 8px; margin-left: 6px; vertical-align: middle; }
 .qn-rank-pts { font-weight: 900; font-size: 20px; color: #1b5e20; }
 .qn-rank-pts span { font-size: 11px; font-weight: 600; color: #9e9e9e; margin-left: 3px; }
+.qn-rank-place-1 .qn-rank-pts { color: #9a6700; }
+.qn-rank-place-2 .qn-rank-pts { color: #60717d; }
+.qn-rank-place-3 .qn-rank-pts { color: #8b4f1f; }
 
 .qn-grupo { margin-bottom: 18px; }
 .qn-grupo-head {
@@ -1056,5 +1183,6 @@ export default defineComponent({
 
 @media (prefers-reduced-motion: reduce) {
   .qn-calendar-enter-active, .qn-calendar-leave-active { transition: none; }
+  .qn-shimmer { animation: none; }
 }
 </style>

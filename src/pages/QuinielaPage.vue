@@ -25,7 +25,7 @@
     <div class="qn-banner">
       <img
         src="/images/quiniela-mundial-2026-hero.jpg"
-        alt="Quiniela Mundial 2026"
+        alt="Quiniela Mundial 2026 - Altagracia"
         class="qn-banner-image"
         width="1672"
         height="941"
@@ -33,6 +33,10 @@
         decoding="async"
         fetchpriority="high"
       />
+      <div class="qn-banner-place" aria-label="Quiniela de Altagracia">
+        <q-icon name="location_on" size="16px" aria-hidden="true" />
+        <span>Altagracia</span>
+      </div>
     </div>
 
     <div class="qn-wrap">
@@ -1087,6 +1091,39 @@ export default defineComponent({
   height: 100%;
   object-fit: cover;
   object-position: center;
+}
+
+.qn-banner-place {
+  position: absolute;
+  top: clamp(10px, 2.8vw, 20px);
+  left: clamp(12px, 4vw, 32px);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - 24px);
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 213, 79, 0.62);
+  background:
+    radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.16), transparent 34%),
+    linear-gradient(135deg, rgba(7, 59, 32, 0.88), rgba(47, 125, 50, 0.76));
+  color: #fff6d7;
+  box-shadow: 0 8px 20px rgba(2, 28, 14, 0.28);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  font-size: clamp(12px, 2.5vw, 16px);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+}
+
+.qn-banner-place .q-icon {
+  color: #ffd54f;
+  flex-shrink: 0;
 }
 
 .qn-wrap { max-width: 720px; margin: 0 auto; padding: 16px; }

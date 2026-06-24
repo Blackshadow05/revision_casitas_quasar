@@ -1,21 +1,31 @@
-self.addEventListener('push', (event) => {
-  let data = {}
-  try {
-    data = event.data ? event.data.json() : {}
-  } catch (e) {
-    data = { title: 'Quiniela Mundial', body: event.data ? event.data.text() : '' }
-  }
-  const title = data.title || 'Quiniela Mundial 2026'
+importScripts('https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js')
+importScripts('https://www.gstatic.com/firebasejs/12.15.0/firebase-messaging-compat.js')
+
+firebase.initializeApp({
+  apiKey: 'AIzaSyBRpfT9XBzwKuE3jS7qIAtnpESAoEKoo_4',
+  authDomain: 'revision-casitas-fcm.firebaseapp.com',
+  projectId: 'revision-casitas-fcm',
+  storageBucket: 'revision-casitas-fcm.firebasestorage.app',
+  messagingSenderId: '1054627324444',
+  appId: '1:1054627324444:web:25c4b3c21c2404c74075d9',
+  measurementId: 'G-XKDYGJJFYF'
+})
+
+const messaging = firebase.messaging()
+
+messaging.onBackgroundMessage((payload) => {
+  const data = payload.data || {}
+  const title = data.title || (payload.notification && payload.notification.title) || 'Quiniela Mundial 2026'
   const options = {
-    body: data.body || '',
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/icon-128x128.png',
+    body: data.body || (payload.notification && payload.notification.body) || '',
+    icon: data.icon || '/icons/icon-192x192.png',
+    badge: data.badge || '/icons/icon-128x128.png',
     vibrate: [80, 40, 80],
     tag: data.tag || undefined,
     renotify: !!data.tag,
     data: { url: data.url || '/quiniela' }
   }
-  event.waitUntil(self.registration.showNotification(title, options))
+  self.registration.showNotification(title, options)
 })
 
 self.addEventListener('notificationclick', (event) => {

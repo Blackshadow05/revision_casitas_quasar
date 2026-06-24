@@ -1,18 +1,32 @@
+import { deleteToken, getToken } from 'firebase/messaging'
 import { supabase } from '../supabase'
+import { getFirebaseMessaging } from '../firebase'
 
-function urlBase64ToUint8Array (base64String) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4)
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
-  const raw = atob(base64)
-  const out = new Uint8Array(raw.length)
-  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i)
-  return out
+const TOKEN_KEY = 'qn_fcm_token'
+const MIGR_KEY = 'qn_push_mig_fcm'
+
+export async function limpiarPushAntiguo () {
+  if (typeof window === 'undefined') return
+  if (localStorage.getItem(MIGR_KEY) === '1') return
+  try {
+    if (localStorage.getItem(TOKEN_KEY)) { localStorage.setItem(MIGR_KEY, '1'); return }
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      localStorage.setItem(MIGR_KEY, '1')
+      return
+    }
+    const reg = await navigator.serviceWorker.getRegistration()
+    const sub = reg ? await reg.pushManager.getSubscription() : null
+    if (sub) {
+      try { await supabase.rpc('qn_borrar_push_sub', { p_endpoint: sub.endpoint }) } catch (e) {}
+      try { await sub.unsubscribe() } catch (e) {}
+    }
+  } catch (e) {}
+  localStorage.setItem(MIGR_KEY, '1')
 }
 
 export function pushSupported () {
   return typeof window !== 'undefined' &&
     'serviceWorker' in navigator &&
-    'PushManager' in window &&
     'Notification' in window
 }
 
@@ -22,50 +36,56 @@ export function pushDenied () {
 
 export async function getSubscription () {
   if (!pushSupported()) return null
-  const reg = await navigator.serviceWorker.ready
-  return reg.pushManager.getSubscription()
+  return localStorage.getItem(TOKEN_KEY)
 }
 
 export async function isSubscribed () {
-  const sub = await getSubscription()
-  return !!sub
+  return Notification.permission === 'granted' && !!(await getSubscription())
 }
 
 export async function subscribePush (identity, vapidPublic) {
   if (!pushSupported()) throw new Error('UNSUPPORTED')
-  if (!vapidPublic) throw new Error('NO_VAPID')
+  const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY || vapidPublic
+  if (!vapidKey) throw new Error('NO_VAPID')
   if (!identity || !identity.nombre || !identity.pin) throw new Error('NO_IDENTITY')
 
   const perm = await Notification.requestPermission()
   if (perm !== 'granted') throw new Error('PERM_DENIED')
 
-  const reg = await navigator.serviceWorker.ready
-  let sub = await reg.pushManager.getSubscription()
-  if (!sub) {
-    sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidPublic)
-    })
-  }
+  const messaging = await getFirebaseMessaging()
+  if (!messaging) throw new Error('UNSUPPORTED')
 
-  const j = sub.toJSON()
-  const { error } = await supabase.rpc('qn_guardar_push_sub', {
+  const reg = await navigator.serviceWorker.ready
+  const token = await getToken(messaging, {
+    vapidKey,
+    serviceWorkerRegistration: reg
+  })
+  if (!token) throw new Error('NO_TOKEN')
+
+  const { error } = await supabase.rpc('qn_guardar_fcm_token', {
     p_nombre: identity.nombre,
     p_pin: identity.pin,
-    p_endpoint: sub.endpoint,
-    p_p256dh: j.keys.p256dh,
-    p_auth: j.keys.auth,
+    p_token: token,
     p_ua: navigator.userAgent
   })
   if (error) throw error
-  return sub
+
+  localStorage.setItem(TOKEN_KEY, token)
+  return token
 }
 
 export async function unsubscribePush () {
-  const sub = await getSubscription()
-  if (!sub) return
+  const token = await getSubscription()
+  if (!token) return
+
   try {
-    await supabase.rpc('qn_borrar_push_sub', { p_endpoint: sub.endpoint })
+    await supabase.rpc('qn_borrar_fcm_token', { p_token: token })
   } catch (e) {}
-  await sub.unsubscribe()
+
+  try {
+    const messaging = await getFirebaseMessaging()
+    if (messaging) await deleteToken(messaging)
+  } catch (e) {}
+
+  localStorage.removeItem(TOKEN_KEY)
 }

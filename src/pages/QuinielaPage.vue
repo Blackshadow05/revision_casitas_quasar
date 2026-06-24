@@ -62,7 +62,14 @@
         </template>
         <template v-else>
           <div class="text-grey-8">Únete para pronosticar</div>
-          <q-btn unelevated no-caps rounded color="green-8" icon="how_to_reg" label="Unirme" @click="showJoin = true" />
+          <div class="row items-center no-wrap">
+            <q-btn v-if="pushAvail" flat round dense color="grey-6"
+              icon="notifications_none"
+              :loading="pushBusy" class="q-mr-xs" @click="togglePush">
+              <q-tooltip>Activar notificaciones</q-tooltip>
+            </q-btn>
+            <q-btn unelevated no-caps rounded color="green-8" icon="how_to_reg" label="Unirme" @click="showJoin = true" />
+          </div>
         </template>
       </div>
 
@@ -482,7 +489,7 @@ import { defineComponent, ref, reactive, computed, onMounted, onUnmounted, nextT
 import { useRouter } from 'vue-router'
 import { supabase } from '../supabase'
 import { notify } from '../utils/notify'
-import { pushSupported, pushDenied, isSubscribed, subscribePush, unsubscribePush } from '../utils/push'
+import { pushSupported, pushDenied, isSubscribed, subscribePush, unsubscribePush, limpiarPushAntiguo } from '../utils/push'
 
 const IDENTITY_KEY = 'quiniela_identity'
 const CELEB_KEY = 'quiniela_celebrados'
@@ -1012,6 +1019,7 @@ export default defineComponent({
 
       if (partidos.value.some(m => tipo(m) === 'live')) filtro.value = 'live'
 
+      await limpiarPushAntiguo()
       pushAvail.value = pushSupported()
       if (pushAvail.value && identity.value) {
         try { pushOn.value = await isSubscribed() } catch (e) { pushOn.value = false }

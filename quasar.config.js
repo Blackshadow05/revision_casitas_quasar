@@ -87,7 +87,6 @@ export default configure((ctx) => {
       workboxOptions: {
         skipWaiting: true,
         clientsClaim: true,
-        importScripts: ['push-sw.js'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
@@ -118,6 +117,9 @@ export default configure((ctx) => {
             }
           }
         ]
+      },
+      extendGenerateSWOptions (cfg) {
+        cfg.importScripts = ['push-sw.js']
       }
     },
     ssr: {

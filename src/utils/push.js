@@ -57,6 +57,15 @@ export async function subscribePush (identity, vapidPublic) {
   if (!messaging) throw new Error('UNSUPPORTED')
 
   const reg = await navigator.serviceWorker.ready
+  try { await reg.update() } catch (e) {}
+  try {
+    const existing = await reg.pushManager.getSubscription()
+    if (existing) {
+      try { await supabase.rpc('qn_borrar_push_sub', { p_endpoint: existing.endpoint }) } catch (e) {}
+      await existing.unsubscribe()
+    }
+  } catch (e) {}
+
   const token = await getToken(messaging, {
     vapidKey,
     serviceWorkerRegistration: reg

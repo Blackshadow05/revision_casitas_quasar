@@ -491,7 +491,7 @@ import { supabase } from '../supabase'
 import { notify } from '../utils/notify'
 import { pushSupported, pushDenied, isSubscribed, subscribePush, unsubscribePush } from '../utils/push'
 
-const PUSH_HABILITADO = false
+const PUSH_HABILITADO = true
 
 const IDENTITY_KEY = 'quiniela_identity'
 const CELEB_KEY = 'quiniela_celebrados'
@@ -946,7 +946,8 @@ export default defineComponent({
           PERM_DENIED: 'No diste permiso de notificaciones',
           NO_VAPID: 'Notificaciones no configuradas aún',
           UNSUPPORTED: 'Tu navegador no soporta notificaciones',
-          NO_IDENTITY: 'Únete primero a la quiniela'
+          NO_IDENTITY: 'Únete primero a la quiniela',
+          FCM_STALE_DEVICE: 'Limpiamos el registro anterior de este dispositivo. Intenta activar las notificaciones otra vez.'
         }
         notify({ type: 'negative', message: map[code] || ('No se pudo: ' + code), position: 'top', timeout: 8000 })
       } finally {

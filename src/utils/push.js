@@ -1,5 +1,5 @@
 import { deleteToken, getToken } from 'firebase/messaging'
-import { getInstallations, deleteInstallations } from 'firebase/installations'
+import { getInstallations, deleteInstallations, getToken as getInstallationToken } from 'firebase/installations'
 import { supabase } from '../supabase'
 import { getFirebaseMessaging, firebaseApp } from '../firebase'
 
@@ -7,7 +7,52 @@ const TOKEN_KEY = 'qn_fcm_token'
 const MIGR_KEY = 'qn_push_mig_fcm'
 const VAPID_KEY = 'BEVnxviHX1d8x7LKFercuRy2hdzkM0fWq2V8CNAFy47wS92Rst9RLb8koDCWzqhHlYyt2P5eJ5wfJNJ3HJHQRow'
 
-export async function limpiarPushAntiguo () {
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms))
+
+function fcmErrorText (error) {
+  return [
+    error && error.code,
+    error && error.message,
+    error && error.customData && error.customData.serverMessage,
+    error && error.customData && error.customData.errorInfo
+  ].filter(Boolean).join(' ').toLowerCase()
+}
+
+function needsFcmStateReset (error) {
+  const text = fcmErrorText(error)
+  return text.includes('token-subscribe-failed') ||
+    text.includes('missing required authentication credential') ||
+    text.includes('firebase-installations') ||
+    text.includes('fis')
+}
+
+async function borrarPushAntiguo (reg) {
+  if (!reg || !('PushManager' in window)) return false
+  const sub = await reg.pushManager.getSubscription()
+  if (!sub) return false
+  try { await supabase.rpc('qn_borrar_push_sub', { p_endpoint: sub.endpoint }) } catch (e) {}
+  try { await sub.unsubscribe() } catch (e) {}
+  return true
+}
+
+async function resetFcmLocalState ({ messaging, reg }) {
+  const storedToken = localStorage.getItem(TOKEN_KEY)
+  localStorage.removeItem(TOKEN_KEY)
+
+  if (storedToken) {
+    try { await supabase.rpc('qn_borrar_fcm_token', { p_token: storedToken }) } catch (e) {}
+  }
+
+  try { await deleteToken(messaging) } catch (e) {}
+  try { await borrarPushAntiguo(reg) } catch (e) {}
+
+  const installations = getInstallations(firebaseApp)
+  try { await deleteInstallations(installations) } catch (e) {}
+  try { await getInstallationToken(installations, true) } catch (e) {}
+  await wait(300)
+}
+
+export async function limpiarPushAntiguo (registration) {
   if (typeof window === 'undefined') return
   if (localStorage.getItem(MIGR_KEY) === '1') return
   try {
@@ -16,12 +61,8 @@ export async function limpiarPushAntiguo () {
       localStorage.setItem(MIGR_KEY, '1')
       return
     }
-    const reg = await navigator.serviceWorker.getRegistration()
-    const sub = reg ? await reg.pushManager.getSubscription() : null
-    if (sub) {
-      try { await supabase.rpc('qn_borrar_push_sub', { p_endpoint: sub.endpoint }) } catch (e) {}
-      try { await sub.unsubscribe() } catch (e) {}
-    }
+    const reg = registration || await navigator.serviceWorker.getRegistration()
+    await borrarPushAntiguo(reg)
   } catch (e) {}
   localStorage.setItem(MIGR_KEY, '1')
 }
@@ -59,24 +100,19 @@ export async function subscribePush (identity, vapidPublic) {
 
   const reg = await navigator.serviceWorker.ready
   try { await reg.update() } catch (e) {}
-  try {
-    const existing = await reg.pushManager.getSubscription()
-    if (existing) {
-      try { await supabase.rpc('qn_borrar_push_sub', { p_endpoint: existing.endpoint }) } catch (e) {}
-      await existing.unsubscribe()
-    }
-  } catch (e) {}
+  try { await borrarPushAntiguo(reg) } catch (e) {}
 
   let token
   try {
     token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: reg })
   } catch (e) {
-    try { await deleteInstallations(getInstallations(firebaseApp)) } catch (_) {}
+    await resetFcmLocalState({ messaging, reg })
     try {
-      const existing = await reg.pushManager.getSubscription()
-      if (existing) await existing.unsubscribe()
-    } catch (_) {}
-    token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: reg })
+      token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: reg })
+    } catch (retryError) {
+      if (needsFcmStateReset(e) || needsFcmStateReset(retryError)) throw new Error('FCM_STALE_DEVICE')
+      throw retryError
+    }
   }
   if (!token) throw new Error('NO_TOKEN')
 
@@ -89,6 +125,7 @@ export async function subscribePush (identity, vapidPublic) {
   if (error) throw error
 
   localStorage.setItem(TOKEN_KEY, token)
+  localStorage.setItem(MIGR_KEY, '1')
   return token
 }
 

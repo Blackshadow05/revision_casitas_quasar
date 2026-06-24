@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app'
 import { getMessaging, isSupported } from 'firebase/messaging'
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyBRpfT9XBzwKuE3jS7qIAtnpESAoEKoo_4',
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'revision-casitas-fcm.firebaseapp.com',
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'revision-casitas-fcm',

@@ -12,6 +12,7 @@ const FIS_URL = 'https://firebaseinstallations.googleapis.com/v1'
 const FIS_SDK_VERSION = 'w:0.6.22'
 
 const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms))
+const cleanVapidKey = (value) => String(value || '').replace(/\s+/g, '').replace(/^['"`]|['"`]$/g, '')
 
 function withTimeout (promise, ms, code) {
   let timer
@@ -40,8 +41,9 @@ function arrayBufferToBase64Url (buffer) {
 }
 
 function base64UrlToUint8Array (value) {
-  const padding = '='.repeat((4 - value.length % 4) % 4)
-  const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const normalized = cleanVapidKey(value)
+  const padding = '='.repeat((4 - normalized.length % 4) % 4)
+  const base64 = (normalized + padding).replace(/-/g, '+').replace(/_/g, '/')
   const raw = atob(base64)
   return Uint8Array.from([...raw].map(char => char.charCodeAt(0)))
 }
@@ -248,7 +250,7 @@ export async function isSubscribed () {
 
 export async function subscribePush (identity, vapidPublic) {
   if (!pushSupported()) throw new Error('UNSUPPORTED')
-  const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY || vapidPublic || VAPID_KEY
+  const vapidKey = cleanVapidKey(import.meta.env.VITE_FIREBASE_VAPID_KEY || VAPID_KEY || vapidPublic)
   if (!vapidKey) throw new Error('NO_VAPID')
   if (!identity || !identity.nombre || !identity.pin) throw new Error('NO_IDENTITY')
 

@@ -4,6 +4,7 @@ import { getFirebaseMessaging } from '../firebase'
 
 const TOKEN_KEY = 'qn_fcm_token'
 const MIGR_KEY = 'qn_push_mig_fcm'
+const VAPID_KEY = 'BEVnxviHX1d8x7LKFercuRy2hdzkM0fWq2V8CNAFy47wS92Rst9RLb8koDCWzqhHlYyt2P5eJ5wfJNJ3HJHQRow'
 
 export async function limpiarPushAntiguo () {
   if (typeof window === 'undefined') return
@@ -45,7 +46,7 @@ export async function isSubscribed () {
 
 export async function subscribePush (identity, vapidPublic) {
   if (!pushSupported()) throw new Error('UNSUPPORTED')
-  const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY || vapidPublic
+  const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY || vapidPublic || VAPID_KEY
   if (!vapidKey) throw new Error('NO_VAPID')
   if (!identity || !identity.nombre || !identity.pin) throw new Error('NO_IDENTITY')
 

@@ -15,9 +15,11 @@ const messaging = firebase.messaging()
 
 messaging.onBackgroundMessage((payload) => {
   const data = payload.data || {}
-  const title = data.title || (payload.notification && payload.notification.title) || 'Quiniela Mundial 2026'
+  if (payload.notification && !data.forceShow) return
+
+  const title = data.title || 'Quiniela Mundial 2026'
   const options = {
-    body: data.body || (payload.notification && payload.notification.body) || '',
+    body: data.body || '',
     icon: data.icon || '/icons/icon-192x192.png',
     badge: data.badge || '/icons/icon-128x128.png',
     vibrate: [80, 40, 80],

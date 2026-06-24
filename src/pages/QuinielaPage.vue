@@ -489,7 +489,9 @@ import { defineComponent, ref, reactive, computed, onMounted, onUnmounted, nextT
 import { useRouter } from 'vue-router'
 import { supabase } from '../supabase'
 import { notify } from '../utils/notify'
-import { pushSupported, pushDenied, isSubscribed, subscribePush, unsubscribePush, limpiarPushAntiguo } from '../utils/push'
+import { pushSupported, pushDenied, isSubscribed, subscribePush, unsubscribePush } from '../utils/push'
+
+const PUSH_HABILITADO = false
 
 const IDENTITY_KEY = 'quiniela_identity'
 const CELEB_KEY = 'quiniela_celebrados'
@@ -1019,8 +1021,7 @@ export default defineComponent({
 
       if (partidos.value.some(m => tipo(m) === 'live')) filtro.value = 'live'
 
-      await limpiarPushAntiguo()
-      pushAvail.value = pushSupported()
+      pushAvail.value = PUSH_HABILITADO && pushSupported()
       if (pushAvail.value && identity.value) {
         try { pushOn.value = await isSubscribed() } catch (e) { pushOn.value = false }
       }

@@ -1,6 +1,7 @@
 import { deleteToken, getToken } from 'firebase/messaging'
+import { getInstallations, deleteInstallations } from 'firebase/installations'
 import { supabase } from '../supabase'
-import { getFirebaseMessaging } from '../firebase'
+import { getFirebaseMessaging, firebaseApp } from '../firebase'
 
 const TOKEN_KEY = 'qn_fcm_token'
 const MIGR_KEY = 'qn_push_mig_fcm'
@@ -66,10 +67,17 @@ export async function subscribePush (identity, vapidPublic) {
     }
   } catch (e) {}
 
-  const token = await getToken(messaging, {
-    vapidKey,
-    serviceWorkerRegistration: reg
-  })
+  let token
+  try {
+    token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: reg })
+  } catch (e) {
+    try { await deleteInstallations(getInstallations(firebaseApp)) } catch (_) {}
+    try {
+      const existing = await reg.pushManager.getSubscription()
+      if (existing) await existing.unsubscribe()
+    } catch (_) {}
+    token = await getToken(messaging, { vapidKey, serviceWorkerRegistration: reg })
+  }
   if (!token) throw new Error('NO_TOKEN')
 
   const { error } = await supabase.rpc('qn_guardar_fcm_token', {

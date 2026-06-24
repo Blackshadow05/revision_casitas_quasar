@@ -946,7 +946,7 @@ export default defineComponent({
           UNSUPPORTED: 'Tu navegador no soporta notificaciones',
           NO_IDENTITY: 'Únete primero a la quiniela'
         }
-        notify({ type: 'negative', message: map[code] || 'No se pudo cambiar las notificaciones', position: 'top' })
+        notify({ type: 'negative', message: map[code] || ('No se pudo: ' + code), position: 'top', timeout: 8000 })
       } finally {
         pushBusy.value = false
       }

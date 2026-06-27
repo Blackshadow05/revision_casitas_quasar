@@ -120,6 +120,85 @@
         </div>
       </q-expansion-item>
 
+      <div class="qn-champ">
+        <div class="qn-champ-head">
+          <q-icon name="emoji_events" size="20px" />
+          <span>Tu campeón del Mundial</span>
+          <q-badge color="amber-8" class="q-ml-auto">+{{ cfg.pts_campeon }} pts</q-badge>
+        </div>
+
+        <template v-if="!campeonCerrado">
+          <template v-if="identity">
+            <q-select
+              v-model="campeonSel"
+              :options="campeonOptions"
+              use-input
+              input-debounce="0"
+              @filter="filterCampeon"
+              outlined
+              dense
+              emit-value
+              map-options
+              clearable
+              behavior="menu"
+              label="Elige al campeón"
+              class="qn-champ-select">
+              <template v-slot:prepend><q-icon name="search" /></template>
+              <template v-slot:option="scope">
+                <q-item v-bind="scope.itemProps">
+                  <q-item-section avatar>
+                    <img v-if="scope.opt.logo" :src="scope.opt.logo" class="qn-champ-flag" alt="" />
+                    <q-icon v-else name="shield" size="22px" color="grey-5" />
+                  </q-item-section>
+                  <q-item-section>{{ scope.opt.label }}</q-item-section>
+                </q-item>
+              </template>
+              <template v-slot:no-option>
+                <q-item><q-item-section class="text-grey-6">Sin resultados</q-item-section></q-item>
+              </template>
+            </q-select>
+            <div class="qn-champ-actions">
+              <q-btn unelevated no-caps rounded color="green-8" icon="save" label="Guardar campeón"
+                :loading="savingCampeon" :disable="!campeonSel" @click="guardarCampeon" />
+            </div>
+            <div v-if="miCampeon" class="qn-champ-hint">
+              <q-icon name="emoji_events" size="14px" /> Tu campeón: <b>{{ miCampeon.equipo }}</b>
+            </div>
+            <div class="qn-champ-deadline">
+              <q-icon name="schedule" size="14px" /> Puedes cambiarlo hasta el {{ campeonCierraLabel }}
+            </div>
+          </template>
+          <template v-else>
+            <div class="qn-champ-join">
+              <span>Únete para elegir a tu campeón.</span>
+              <q-btn unelevated no-caps rounded color="amber-8" icon="how_to_reg" label="Unirme" @click="showJoin = true" />
+            </div>
+            <div class="qn-champ-deadline">
+              <q-icon name="schedule" size="14px" /> Elige antes del {{ campeonCierraLabel }}
+            </div>
+          </template>
+        </template>
+
+        <template v-else>
+          <div v-if="miCampeon" class="qn-champ-locked">
+            <img v-if="miCampeon.logo" :src="miCampeon.logo" class="qn-champ-flag-lg" alt="" />
+            <q-icon v-else name="shield" size="40px" color="grey-5" />
+            <div class="qn-champ-locked-info">
+              <div class="qn-champ-team">{{ miCampeon.equipo }}</div>
+              <div class="qn-champ-sub">
+                <q-badge v-if="miCampeon.champ_equipo" :color="miCampeon.acerto ? 'green-7' : 'grey-6'">
+                  {{ miCampeon.acerto ? '¡Acertaste! +' + miCampeon.puntos + ' pts' : 'No acertaste' }}
+                </q-badge>
+                <span v-else><q-icon name="lock" size="13px" class="q-mr-xs" />Bloqueado · {{ cfg.pts_campeon }} puntos en juego</span>
+              </div>
+            </div>
+          </div>
+          <div v-else class="qn-champ-locked text-grey-6">
+            <q-icon name="lock" size="18px" class="q-mr-xs" /> Ya cerró la elección de campeón.
+          </div>
+        </template>
+      </div>
+
       <q-tabs v-model="tab" class="qn-tabs" active-color="green-9" indicator-color="amber-8" align="justify" no-caps dense>
         <q-tab name="partidos" icon="sports_soccer" label="Partidos" />
         <q-tab name="posiciones" icon="table_chart" label="Posiciones" />
@@ -404,8 +483,8 @@
             <div class="qn-brk-scrollhint">
               <q-icon name="swipe" size="15px" class="q-mr-xs" />Desliza para ver todo el cuadro
             </div>
-            <div class="qn-brk-scroll">
-              <div class="qn-brk2">
+            <div ref="brkScroll" class="qn-brk-scroll" @scroll="onBrkScroll">
+              <div class="qn-brk2" :class="{ 'qn-brk2-anim': brkReady }" :style="brkH ? { '--brk-h': brkH + 'px' } : null">
                 <div v-for="col in brkTree" :key="col.key" class="qn-brk2-round">
                   <div class="qn-brk2-roundhead">{{ col.label }}</div>
                   <div class="qn-brk2-matches">
@@ -485,8 +564,8 @@
 </template>
 
 <script>
-import { defineComponent, ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { defineComponent, ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { supabase } from '../supabase'
 import { notify } from '../utils/notify'
 import { pushSupported, pushDenied, isSubscribed, subscribePush, unsubscribePush } from '../utils/push'
@@ -554,8 +633,10 @@ export default defineComponent({
   name: 'QuinielaPage',
   setup () {
     const router = useRouter()
-    const tab = ref('partidos')
-    const cfg = ref({ abre_horas_antes: 12, bloquea_minutos_antes: 15, pts_exacto: 3, pts_resultado: 1, pts_bonus_equipo: 1 })
+    const route = useRoute()
+    const VALID_TABS = ['partidos', 'posiciones', 'llaves', 'ranking']
+    const tab = ref(VALID_TABS.includes(route.query.tab) ? route.query.tab : 'partidos')
+    const cfg = ref({ abre_horas_antes: 12, bloquea_minutos_antes: 15, pts_exacto: 3, pts_resultado: 1, pts_bonus_equipo: 1, pts_campeon: 10, campeon_cierra: '2026-07-01T06:00:00+00:00' })
     const partidos = ref([])
     const ranking = ref([])
     const posiciones = ref([])
@@ -571,6 +652,10 @@ export default defineComponent({
     const joinData = reactive({ nombre: '', pin: '' })
     const joinLoading = ref(false)
     const savingId = ref(null)
+    const miCampeon = ref(null)
+    const campeonSel = ref(null)
+    const campeonOptions = ref([])
+    const savingCampeon = ref(false)
     const pushAvail = ref(false)
     const pushOn = ref(false)
     const pushBusy = ref(false)
@@ -580,6 +665,13 @@ export default defineComponent({
     const stickyShow = ref(false)
     const headerH = ref(56)
     const sentinel = ref(null)
+    const brkScroll = ref(null)
+    const brkH = ref(null)
+    const brkReady = ref(false)
+    const brkLastIdx = ref(0)
+    let brkRaf = 0
+    let brkSettleTimer = 0
+    let brkSnapping = false
     const celebrados = new Set((() => { try { return JSON.parse(localStorage.getItem(CELEB_KEY) || '[]') } catch (e) { return [] } })())
     let primeraCargaMine = true
     const fechaCalendario = ref('2026-01-01')
@@ -771,6 +863,74 @@ export default defineComponent({
       return brkFecha(m) + ' · ' + hora(m)
     }
 
+    const calcBrkHeight = () => {
+      const sc = brkScroll.value
+      if (!sc) return
+      const inner = sc.querySelector('.qn-brk2')
+      if (!inner) return
+      const rounds = inner.querySelectorAll('.qn-brk2-round')
+      if (!rounds.length) return
+      const slot = parseFloat(getComputedStyle(inner).getPropertyValue('--match-slot')) || 96
+      const sl = sc.scrollLeft
+      let lead = 0
+      for (let i = 0; i < rounds.length; i++) {
+        if (rounds[i].offsetLeft <= sl + 48) lead = i
+      }
+      const count = (brkTree.value[lead] && brkTree.value[lead].items.length) || 1
+      brkH.value = Math.round(count * slot)
+    }
+
+    const onBrkScroll = () => {
+      if (!brkRaf) brkRaf = requestAnimationFrame(() => { brkRaf = 0; calcBrkHeight() })
+      if (brkSnapping) return
+      if (brkSettleTimer) clearTimeout(brkSettleTimer)
+      brkSettleTimer = setTimeout(brkSettle, 140)
+    }
+
+    const brkRoundEls = () => {
+      const sc = brkScroll.value
+      return sc ? Array.from(sc.querySelectorAll('.qn-brk2-round')) : []
+    }
+    const brkNearestIdx = (left) => {
+      const els = brkRoundEls()
+      let best = 0
+      let bd = Infinity
+      els.forEach((e, i) => { const d = Math.abs(e.offsetLeft - left); if (d < bd) { bd = d; best = i } })
+      return best
+    }
+    const brkSnapTo = (left) => {
+      const sc = brkScroll.value
+      if (!sc) return
+      brkSnapping = true
+      sc.scrollTo({ left, behavior: 'smooth' })
+      setTimeout(() => { brkSnapping = false; calcBrkHeight() }, 420)
+    }
+    const brkSettle = () => {
+      if (brkSnapping) return
+      const sc = brkScroll.value
+      const els = brkRoundEls()
+      if (!sc || !els.length) return
+      const maxScroll = sc.scrollWidth - sc.clientWidth
+      let lastFlush = 0
+      els.forEach((e, i) => { if (e.offsetLeft <= maxScroll + 4) lastFlush = i })
+      const cur = brkNearestIdx(sc.scrollLeft)
+
+      if (cur >= lastFlush && brkLastIdx.value >= lastFlush) {
+        const minLeft = els[lastFlush].offsetLeft
+        if (sc.scrollLeft < minLeft - 4) brkSnapTo(minLeft)
+        brkLastIdx.value = Math.max(lastFlush, cur)
+        return
+      }
+
+      let target = cur
+      if (cur - brkLastIdx.value > 1) target = brkLastIdx.value + 1
+      else if (cur - brkLastIdx.value < -1) target = brkLastIdx.value - 1
+      target = Math.max(0, Math.min(target, els.length - 1))
+      brkLastIdx.value = target
+      const dest = els[target].offsetLeft
+      if (Math.abs(dest - sc.scrollLeft) > 1) brkSnapTo(dest)
+    }
+
     const scrollTop = () => {
       try { window.scrollTo({ top: 0, behavior: 'smooth' }) } catch (e) { window.scrollTo(0, 0) }
     }
@@ -787,7 +947,7 @@ export default defineComponent({
       if (!sentinel.value) { stickyShow.value = false; return }
       stickyShow.value = sentinel.value.getBoundingClientRect().top < headerH.value
     }
-    const onResize = () => { measureHeader(); onScroll() }
+    const onResize = () => { measureHeader(); onScroll(); calcBrkHeight() }
 
     const guardarCelebrados = () => {
       try { localStorage.setItem(CELEB_KEY, JSON.stringify(Array.from(celebrados))) } catch (e) { /* noop */ }
@@ -871,6 +1031,60 @@ export default defineComponent({
       return out.sort((a, b) => a.grupo.localeCompare(b.grupo))
     })
 
+    const equiposBase = computed(() => {
+      const seen = new Map()
+      for (const t of posiciones.value) {
+        if (!seen.has(t.equipo)) seen.set(t.equipo, { label: t.equipo, value: t.equipo, logo: t.logo })
+      }
+      return Array.from(seen.values()).sort((a, b) => a.label.localeCompare(b.label, 'es'))
+    })
+
+    const campeonCerrado = computed(() => {
+      const t = Date.parse(cfg.value.campeon_cierra)
+      return Number.isFinite(t) && now.value >= t
+    })
+
+    const campeonCierraLabel = computed(() => {
+      const t = Date.parse(cfg.value.campeon_cierra)
+      if (!Number.isFinite(t)) return ''
+      return new Intl.DateTimeFormat('es-CR', { day: 'numeric', month: 'long', timeZone: 'America/Costa_Rica' }).format(new Date(t - 86400000))
+    })
+
+    const filterCampeon = (val, update) => {
+      update(() => {
+        const n = (val || '').toLowerCase()
+        campeonOptions.value = n
+          ? equiposBase.value.filter(e => e.label.toLowerCase().includes(n))
+          : equiposBase.value.slice()
+      })
+    }
+
+    const loadMiCampeon = async () => {
+      if (!identity.value) { miCampeon.value = null; campeonSel.value = null; return }
+      const { data, error } = await supabase.rpc('qn_mi_campeon', { p_nombre: identity.value.nombre, p_pin: identity.value.pin })
+      if (error) return
+      const row = (data || [])[0] || null
+      miCampeon.value = row
+      campeonSel.value = row ? row.equipo : null
+    }
+
+    const guardarCampeon = async () => {
+      if (!identity.value) { showJoin.value = true; return }
+      if (!campeonSel.value) { notify({ type: 'warning', message: 'Elige un equipo', position: 'top' }); return }
+      savingCampeon.value = true
+      const { error } = await supabase.rpc('qn_guardar_campeon', { p_nombre: identity.value.nombre, p_pin: identity.value.pin, p_equipo: campeonSel.value })
+      savingCampeon.value = false
+      if (error) {
+        const raw = (error && error.message) ? error.message : String(error)
+        const msg = raw.includes('CAMPEON_CERRADO') ? 'Ya cerró la elección de campeón'
+          : raw.includes('EQUIPO_INVALIDO') ? 'Equipo no válido'
+          : msgFromError(error)
+        notify({ type: 'negative', message: msg, position: 'top' }); return
+      }
+      await loadMiCampeon()
+      notify({ type: 'positive', message: '¡Campeón guardado!', position: 'top' })
+    }
+
     const loadMine = async () => {
       if (!identity.value) return
       const { data, error } = await supabase.rpc('qn_mis_pronosticos', { p_nombre: identity.value.nombre, p_pin: identity.value.pin })
@@ -906,6 +1120,7 @@ export default defineComponent({
       joinData.nombre = ''
       joinData.pin = ''
       await loadMine()
+      await loadMiCampeon()
       notify({ type: 'positive', message: '¡Listo, ' + nombre + '!', position: 'top' })
     }
 
@@ -913,6 +1128,8 @@ export default defineComponent({
       identity.value = null
       localStorage.removeItem(IDENTITY_KEY)
       for (const k in misPron) delete misPron[k]
+      miCampeon.value = null
+      campeonSel.value = null
       primeraCargaMine = true
       seedForm()
       notify({ type: 'info', message: 'Saliste de la quiniela', position: 'top' })
@@ -982,6 +1199,7 @@ export default defineComponent({
     const refrescar = async () => {
       await Promise.all([loadPartidos(), loadRanking(), loadPosiciones()])
       await loadMine()
+      await loadMiCampeon()
     }
 
     const toggleFecha = () => {
@@ -1011,6 +1229,18 @@ export default defineComponent({
       calAbierto.value = false
     }
 
+    watch(tab, (t) => {
+      if (t === 'llaves') {
+        brkLastIdx.value = 0
+        nextTick(() => {
+          calcBrkHeight()
+          requestAnimationFrame(() => { brkReady.value = true })
+        })
+      }
+    })
+    watch(brkTree, () => { nextTick(calcBrkHeight) })
+    watch(equiposBase, (v) => { campeonOptions.value = v.slice() }, { immediate: true })
+
     onMounted(async () => {
       const saved = localStorage.getItem(IDENTITY_KEY)
       if (saved) { try { identity.value = JSON.parse(saved) } catch (e) { identity.value = null } }
@@ -1018,6 +1248,7 @@ export default defineComponent({
       await loadConfig()
       await Promise.all([loadPartidos(), loadRanking(), loadPosiciones()])
       await loadMine()
+      await loadMiCampeon()
       loading.value = false
 
       if (partidos.value.some(m => tipo(m) === 'live')) filtro.value = 'live'
@@ -1059,6 +1290,8 @@ export default defineComponent({
       if (clockTimer) clearInterval(clockTimer)
       if (pollTimer) clearInterval(pollTimer)
       if (channel) supabase.removeChannel(channel)
+      if (brkRaf) cancelAnimationFrame(brkRaf)
+      if (brkSettleTimer) clearTimeout(brkSettleTimer)
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onResize)
     })
@@ -1066,10 +1299,12 @@ export default defineComponent({
     return {
       tab, cfg, partidos, ranking, gruposPos, misPron, pubPron, form, identity, loading, filtro, filtros,
       showJoin, joinData, joinLoading, savingId, inicial,
+      miCampeon, campeonSel, campeonOptions, savingCampeon, campeonCerrado, campeonCierraLabel, filterCampeon, guardarCampeon,
       pushAvail, pushOn, pushBusy, pushHintDismissed, togglePush, dismissPushHint,
       tipo, hora, editable, locked, estadoTexto, lockIcon, lockTexto, grupos, esMio, abrirPron,
       enVivo, proximo, cuenta,
       stickyShow, headerH, sentinel, scrollTop, onRefresh,
+      brkScroll, brkH, brkReady, onBrkScroll,
       brkTree, tercerLugar, hayEliminatorias, eliminatoriasVacias, ganador, brkEstado,
       fechaActiva, calAbierto, fechaCalendario, calendarLocale, fechaLabel,
       toggleFecha, limpiarFecha, alElegirFecha,
@@ -1154,6 +1389,35 @@ export default defineComponent({
 
 .qn-rules { margin-top: 12px; background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05); }
 .qn-rules-body { padding: 4px 16px 14px; font-size: 13px; color: #333; }
+
+.qn-champ {
+  margin-top: 12px;
+  background: #fff;
+  border-radius: 14px;
+  padding: 14px 16px 16px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(249, 168, 37, 0.28);
+}
+.qn-champ-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  color: #14532d;
+  margin-bottom: 12px;
+}
+.qn-champ-head .q-icon { color: #f9a825; }
+.qn-champ-select { margin-bottom: 10px; }
+.qn-champ-flag { width: 28px; height: 20px; object-fit: cover; border-radius: 3px; }
+.qn-champ-flag-lg { width: 46px; height: 33px; object-fit: cover; border-radius: 4px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18); }
+.qn-champ-actions { display: flex; justify-content: flex-end; }
+.qn-champ-hint { margin-top: 8px; font-size: 13px; color: #2e7d32; display: flex; align-items: center; gap: 4px; }
+.qn-champ-deadline { margin-top: 6px; font-size: 12px; color: #777; display: flex; align-items: center; gap: 4px; }
+.qn-champ-join { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 14px; color: #444; }
+.qn-champ-locked { display: flex; align-items: center; gap: 12px; }
+.qn-champ-locked-info { min-width: 0; }
+.qn-champ-team { font-weight: 800; font-size: 16px; color: #14532d; }
+.qn-champ-sub { margin-top: 3px; font-size: 12px; color: #777; display: flex; align-items: center; }
 
 .qn-next {
   margin-top: 12px;
@@ -1628,9 +1892,13 @@ export default defineComponent({
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 .qn-brk2-matches {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
+  height: var(--brk-h, calc(var(--match-slot) * 16));
+}
+.qn-brk2-anim .qn-brk2-matches {
+  transition: height 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 .qn-brk2-match {
   flex: 1 1 0;
@@ -1743,6 +2011,7 @@ export default defineComponent({
   .qn-calendar-enter-active, .qn-calendar-leave-active { transition: none; }
   .qn-shimmer { animation: none; }
   .qn-sticky-enter-active, .qn-sticky-leave-active { transition: none; }
+  .qn-brk2-anim .qn-brk2-matches { transition: none; }
 }
 </style>
 

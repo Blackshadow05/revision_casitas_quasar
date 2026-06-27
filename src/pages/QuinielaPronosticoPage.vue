@@ -30,6 +30,13 @@
         </div>
       </div>
 
+      <div v-if="nombre && campeon" class="qn-det-champ">
+        <q-icon name="emoji_events" size="20px" class="qn-det-champ-trophy" />
+        <span class="qn-det-champ-lbl">Campeón elegido</span>
+        <img v-if="campeon.logo" :src="campeon.logo" class="qn-det-champ-flag" alt="" />
+        <span class="qn-det-champ-team">{{ campeon.equipo }}</span>
+      </div>
+
       <div v-if="loading" class="flex flex-center q-my-xl">
         <q-spinner-dots color="green-8" size="40px" />
       </div>
@@ -130,6 +137,7 @@ export default defineComponent({
     const partidos = ref([])
     const pronos = ref([])
     const rankingRow = ref(null)
+    const campeon = ref(null)
     const loading = ref(true)
 
     const inicial = computed(() => (nombre.value || '?').trim().charAt(0).toUpperCase())
@@ -228,8 +236,7 @@ export default defineComponent({
     })
 
     const volver = () => {
-      if (window.history.length > 1) router.back()
-      else router.push('/quiniela')
+      router.push({ path: '/quiniela', query: { tab: 'ranking' } })
     }
 
     onMounted(async () => {
@@ -241,13 +248,16 @@ export default defineComponent({
         supabase.from('qn_pronosticos_publicos').select('*').eq('nombre', nombre.value).then(({ data }) => { pronos.value = data || [] }),
         supabase.from('qn_ranking').select('*').then(({ data }) => {
           rankingRow.value = (data || []).find(r => (r.nombre || '').toLowerCase() === nombre.value.toLowerCase()) || null
+        }),
+        supabase.from('qn_campeones_publicos').select('*').eq('nombre', nombre.value).limit(1).then(({ data }) => {
+          campeon.value = (data || [])[0] || null
         })
       ]
       await Promise.all(tasks.map(p => p.catch(() => {})))
       loading.value = false
     })
 
-    return { nombre, inicial, loading, items, grupos, resumen, tipo, hora, estadoTexto, volver }
+    return { nombre, inicial, loading, items, grupos, resumen, campeon, tipo, hora, estadoTexto, volver }
   }
 })
 </script>
@@ -328,6 +338,22 @@ export default defineComponent({
 .qn-det-stat { flex: 1; text-align: center; }
 .qn-det-num { font-size: 22px; font-weight: 900; color: #1b5e20; line-height: 1.1; }
 .qn-det-lbl { font-size: 11px; color: #757575; text-transform: uppercase; letter-spacing: 0.4px; margin-top: 2px; }
+
+.qn-det-champ {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-top: 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(249, 168, 37, 0.32);
+}
+.qn-det-champ-trophy { color: #f9a825; }
+.qn-det-champ-lbl { font-size: 13px; font-weight: 700; color: #757575; }
+.qn-det-champ-flag { width: 30px; height: 21px; object-fit: cover; border-radius: 3px; margin-left: auto; }
+.qn-det-champ-team { font-size: 15px; font-weight: 900; color: #14532d; }
 
 .qn-fecha {
   font-weight: 800;

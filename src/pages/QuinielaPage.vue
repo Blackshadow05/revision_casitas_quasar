@@ -114,9 +114,66 @@
 
       <q-expansion-item dense class="qn-rules" icon="help_outline" label="Cómo se puntúa">
         <div class="qn-rules-body">
-          <div class="row no-wrap items-start q-mb-xs"><q-icon name="check_circle" color="green-7" size="18px" class="q-mr-sm" /><span>Acertar el marcador exacto: <b class="q-ml-xs">{{ cfg.pts_exacto }} pts</b></span></div>
-          <div class="row no-wrap items-start q-mb-xs"><q-icon name="check_circle" color="blue-7" size="18px" class="q-mr-sm" /><span>Acertar solo el resultado (quién gana o si empata), sin el marcador: <b class="q-ml-xs">{{ cfg.pts_resultado }} pt</b></span></div>
-          <div class="row no-wrap items-start text-grey-7"><q-icon name="schedule" size="16px" class="q-mr-sm" /><span>Los pronósticos se abren {{ cfg.abre_horas_antes }} h antes y se bloquean {{ cfg.bloquea_minutos_antes }} min antes del partido. Después del bloqueo ya puedes ver los pronósticos de los demás.</span></div>
+          <div class="qn-rules-tag">Fase de grupos</div>
+          <div class="row no-wrap items-start q-mb-xs"><q-icon name="check_circle" color="green-7" size="18px" class="q-mr-sm" /><span>Si pegas el marcador exacto, ganas <b class="q-ml-xs">{{ cfg.pts_exacto }} pts</b>. Ejemplo: pusiste 2-1 y quedó 2-1.</span></div>
+          <div class="row no-wrap items-start q-mb-sm"><q-icon name="check_circle" color="blue-7" size="18px" class="q-mr-sm" /><span>Si no pegas el marcador, pero sí quién ganó o si empató, ganas <b class="q-ml-xs">{{ cfg.pts_resultado }} pt</b>. Ejemplo: pusiste 2-1 y quedó 1-0.</span></div>
+          <div class="qn-rules-tag">Eliminatorias</div>
+          <div class="row no-wrap items-start q-mb-xs"><q-icon name="check_circle" color="green-7" size="18px" class="q-mr-sm" /><span>Si pegas el marcador exacto antes de penales, ganas <b class="q-ml-xs">{{ cfg.pts_ko_exacto }} pts</b>. También vale si pusiste empate.</span></div>
+          <div class="row no-wrap items-start q-mb-sm qn-rules-note"><span class="qn-rules-note-dot">!</span><span>Si hay penales, no se cuenta la tanda. Ejemplo: quedó 1-1 y luego hubo penales; el marcador que vale es 1-1.</span></div>
+          <div class="row no-wrap items-start q-mb-xs"><q-icon name="check_circle" color="blue-7" size="18px" class="q-mr-sm" /><span>Si no pegas el marcador, pero tu marcador daba ganador al equipo que pasó, ganas <b class="q-ml-xs">{{ cfg.pts_ko_resultado }} pts</b>. Vale aunque pase por penales.</span></div>
+          <div class="row no-wrap items-start q-mb-xs"><q-icon name="add_circle" color="amber-8" size="18px" class="q-mr-sm" /><span>Bonus <b>+{{ cfg.pts_ko_bonus }} pt</b>: eliges si termina en 90 minutos o si llega a tiempo extra/penales. Si aciertas eso, sumas 1 punto más.</span></div>
+          <div class="row no-wrap items-start q-mb-sm qn-rules-note"><span class="qn-rules-note-dot">+</span><span>Máximo en eliminatorias: {{ cfg.pts_ko_exacto + cfg.pts_ko_bonus }} pts si pegas marcador y bonus, o {{ cfg.pts_ko_resultado + cfg.pts_ko_bonus }} pts si pegas quién pasa y bonus.</span></div>
+          <div class="row no-wrap items-start text-grey-7"><q-icon name="schedule" size="16px" class="q-mr-sm" /><span>Todo se responde antes del partido. Se bloquea {{ cfg.bloquea_minutos_antes }} minutos antes de que empiece.</span></div>
+        </div>
+      </q-expansion-item>
+
+      <q-expansion-item v-if="esAdmin" dense class="qn-rules qn-preview-exp" icon="visibility" label="Vista previa (solo tú)" default-opened>
+        <div class="qn-preview">
+          <div class="text-caption text-grey-6 q-mb-sm">Así se ven los controles nuevos. Es solo una muestra: no guarda nada.</div>
+
+          <div class="qn-preview-h">Pronóstico de eliminatoria (selector de bonus)</div>
+          <div class="qn-card">
+            <div class="qn-pred">
+              <div class="qn-pred-row">
+                <q-input v-model="demo.gl" type="number" dense outlined min="0" max="30" input-class="text-center text-weight-bold" class="qn-num" inputmode="numeric" />
+                <span class="qn-pred-x">:</span>
+                <q-input v-model="demo.gv" type="number" dense outlined min="0" max="30" input-class="text-center text-weight-bold" class="qn-num" inputmode="numeric" />
+              </div>
+              <div class="qn-pred-def">
+                <div class="qn-pred-def-q">¿Hasta dónde llega? <b class="text-amber-9">+{{ cfg.pts_ko_bonus }} si aciertas</b></div>
+                <q-btn-toggle v-model="demo.def" spread no-caps dense unelevated
+                  toggle-color="amber-8" color="grey-3" text-color="grey-8"
+                  :options="[{ label: 'Termina en 90 min', value: 'reg' }, { label: 'Tiempo extra / Penales', value: 'ext' }]"
+                  class="qn-def-toggle" />
+              </div>
+              <div class="qn-pred-hint"><q-icon name="bookmark" size="14px" /> Ejemplo: {{ demo.gl }} - {{ demo.gv }}<span v-if="demo.def"> · {{ defLabel(demo.def) }}</span></div>
+            </div>
+          </div>
+
+          <div class="qn-preview-h">Tanda de penales (admin)</div>
+          <div class="qn-card">
+            <div class="qn-penales">
+              <q-icon name="sports_soccer" size="13px" class="q-mr-xs" />
+              Penales: <b class="q-mx-xs">{{ demo.pl || 0 }} - {{ demo.pv || 0 }}</b>
+              <span class="qn-penales-fall">(fallados {{ demo.plf || 0 }} - {{ demo.pvf || 0 }})</span>
+            </div>
+            <div class="qn-pred">
+              <div class="qn-admin-pen">
+                <div class="qn-admin-pen-q"><q-icon name="admin_panel_settings" size="14px" /> Tanda de penales (admin)</div>
+                <div class="qn-admin-pen-row">
+                  <span class="qn-admin-pen-team ellipsis">Equipo A</span>
+                  <q-input v-model.number="demo.pl" type="number" min="0" max="20" dense outlined label="Anotó" inputmode="numeric" class="qn-admin-pen-in" />
+                  <q-input v-model.number="demo.plf" type="number" min="0" max="20" dense outlined label="Falló" inputmode="numeric" class="qn-admin-pen-in" />
+                </div>
+                <div class="qn-admin-pen-row">
+                  <span class="qn-admin-pen-team ellipsis">Equipo B</span>
+                  <q-input v-model.number="demo.pv" type="number" min="0" max="20" dense outlined label="Anotó" inputmode="numeric" class="qn-admin-pen-in" />
+                  <q-input v-model.number="demo.pvf" type="number" min="0" max="20" dense outlined label="Falló" inputmode="numeric" class="qn-admin-pen-in" />
+                </div>
+                <q-btn no-caps unelevated rounded color="green-8" icon="save" label="Guardar penales" class="full-width q-mt-xs" @click="demoNoop" />
+              </div>
+            </div>
+          </div>
         </div>
       </q-expansion-item>
 
@@ -309,6 +366,12 @@
                 </div>
               </div>
 
+              <div v-if="tipo(m) !== 'prox' && m.estado_corto === 'PEN' && m.pen_local != null" class="qn-penales">
+                <q-icon name="sports_soccer" size="13px" class="q-mr-xs" />
+                Penales: <b class="q-mx-xs">{{ m.pen_local }} - {{ m.pen_visita }}</b>
+                <span class="qn-penales-fall" v-if="m.pen_local_fall || m.pen_visita_fall">(fallados {{ m.pen_local_fall || 0 }} - {{ m.pen_visita_fall || 0 }})</span>
+              </div>
+
               <div v-if="tipo(m) !== 'prox' && ((m.goleadores_local && m.goleadores_local.length) || (m.goleadores_visita && m.goleadores_visita.length))" class="qn-goles">
                 <div class="qn-goles-col">
                   <div v-for="(g, i) in (m.goleadores_local || [])" :key="'l' + i" class="qn-gol">
@@ -356,14 +419,40 @@
                     <q-btn v-else unelevated no-caps rounded color="amber-8" icon="how_to_reg"
                       label="Unirme" class="q-ml-sm" @click="showJoin = true" />
                   </div>
+                  <div v-if="esKo(m)" class="qn-pred-def">
+                    <div class="qn-pred-def-q">¿Hasta dónde llega? <b class="text-amber-9">+{{ cfg.pts_ko_bonus }} si aciertas</b></div>
+                    <q-btn-toggle v-model="form[m.id].def" spread no-caps dense unelevated
+                      toggle-color="amber-8" color="grey-3" text-color="grey-8"
+                      :options="[{ label: 'Termina en 90 min', value: 'reg' }, { label: 'Tiempo extra / Penales', value: 'ext' }]"
+                      class="qn-def-toggle" />
+                  </div>
                   <div v-if="misPron[m.id]" class="qn-pred-hint">
-                    <q-icon name="bookmark" size="14px" /> Tu pronóstico actual: {{ misPron[m.id].goles_local }} - {{ misPron[m.id].goles_visita }}
+                    <q-icon name="bookmark" size="14px" /> Tu pronóstico actual: {{ misPron[m.id].goles_local }} - {{ misPron[m.id].goles_visita }}<span v-if="esKo(m) && misPron[m.id].def_pred"> · {{ defLabel(misPron[m.id].def_pred) }}</span>
                   </div>
                 </template>
 
                 <template v-else>
+                  <div v-if="esAdmin && esKo(m) && m.estado_corto === 'PEN'" class="qn-admin-pen">
+                    <div class="qn-admin-pen-q"><q-icon name="admin_panel_settings" size="14px" /> Tanda de penales (admin)</div>
+                    <div class="qn-admin-pen-row">
+                      <span class="qn-admin-pen-team ellipsis">{{ m.equipo_local }}</span>
+                      <q-input v-model.number="penForm[m.id].pl" type="number" min="0" max="20" dense outlined
+                        label="Anotó" inputmode="numeric" class="qn-admin-pen-in" />
+                      <q-input v-model.number="penForm[m.id].plf" type="number" min="0" max="20" dense outlined
+                        label="Falló" inputmode="numeric" class="qn-admin-pen-in" />
+                    </div>
+                    <div class="qn-admin-pen-row">
+                      <span class="qn-admin-pen-team ellipsis">{{ m.equipo_visita }}</span>
+                      <q-input v-model.number="penForm[m.id].pv" type="number" min="0" max="20" dense outlined
+                        label="Anotó" inputmode="numeric" class="qn-admin-pen-in" />
+                      <q-input v-model.number="penForm[m.id].pvf" type="number" min="0" max="20" dense outlined
+                        label="Falló" inputmode="numeric" class="qn-admin-pen-in" />
+                    </div>
+                    <q-btn no-caps unelevated rounded color="green-8" icon="save" label="Guardar penales"
+                      class="full-width q-mt-xs" :loading="penBusy === m.id" @click="setPenales(m)" />
+                  </div>
                   <div v-if="misPron[m.id]" class="qn-mine">
-                    <span>Tu pronóstico: <b>{{ misPron[m.id].goles_local }} - {{ misPron[m.id].goles_visita }}</b></span>
+                    <span>Tu pronóstico: <b>{{ misPron[m.id].goles_local }} - {{ misPron[m.id].goles_visita }}</b><span v-if="esKo(m) && misPron[m.id].def_pred" class="qn-mine-def"><q-icon name="schedule" size="12px" /> {{ defLabel(misPron[m.id].def_pred) }}</span></span>
                     <q-badge v-if="misPron[m.id].scored" :color="misPron[m.id].puntos > 0 ? 'green-7' : 'grey-6'" class="q-ml-sm">
                       +{{ misPron[m.id].puntos }} pts
                     </q-badge>
@@ -620,7 +709,15 @@ const ERROR_MSG = {
   BLOQUEADO: 'Ya no se puede cambiar: falta menos de 15 minutos',
   AUN_NO_ABRE: 'Aún no se habilita (abre 12 h antes)',
   PARTIDO_NO_EXISTE: 'Partido no encontrado',
-  MARCADOR_INVALIDO: 'Marcador inválido'
+  MARCADOR_INVALIDO: 'Marcador inválido',
+  EMPATE_NO_PERMITIDO: 'En eliminatorias se permiten empates',
+  CLASIFICADO_REQUERIDO: 'En eliminatorias se permiten empates',
+  DEFINICION_REQUERIDA: 'Elige si termina en 90 min o si llega a tiempo extra/penales',
+  NO_AUTORIZADO: 'No tienes permiso para esta acción',
+  NO_ES_KO: 'Solo aplica a partidos de eliminatoria',
+  LADO_INVALIDO: 'Lado inválido',
+  PENALES_EMPATE: 'En penales debe haber un ganador (anotados distintos)',
+  PENALES_INVALIDO: 'Penales inválidos'
 }
 
 function msgFromError (e) {
@@ -636,13 +733,15 @@ export default defineComponent({
     const route = useRoute()
     const VALID_TABS = ['partidos', 'posiciones', 'llaves', 'ranking']
     const tab = ref(VALID_TABS.includes(route.query.tab) ? route.query.tab : 'partidos')
-    const cfg = ref({ abre_horas_antes: 12, bloquea_minutos_antes: 15, pts_exacto: 3, pts_resultado: 1, pts_bonus_equipo: 1, pts_campeon: 10, campeon_cierra: '2026-07-01T06:00:00+00:00' })
+    const cfg = ref({ abre_horas_antes: 12, bloquea_minutos_antes: 15, pts_exacto: 3, pts_resultado: 1, pts_bonus_equipo: 1, pts_ko_exacto: 5, pts_ko_resultado: 3, pts_ko_bonus: 1, pts_campeon: 10, campeon_cierra: '2026-07-01T06:00:00+00:00' })
     const partidos = ref([])
     const ranking = ref([])
     const posiciones = ref([])
     const misPron = reactive({})
     const pubPron = reactive({})
     const form = reactive({})
+    const penForm = reactive({})
+    const demo = reactive({ gl: 1, gv: 1, def: 'ext', pl: 4, plf: 1, pv: 3, pvf: 2 })
     const identity = ref(null)
     const now = ref(Date.now())
     const clock = ref(Date.now())
@@ -652,6 +751,8 @@ export default defineComponent({
     const joinData = reactive({ nombre: '', pin: '' })
     const joinLoading = ref(false)
     const savingId = ref(null)
+    const esAdmin = ref(false)
+    const penBusy = ref(null)
     const miCampeon = ref(null)
     const campeonSel = ref(null)
     const campeonOptions = ref([])
@@ -723,6 +824,8 @@ export default defineComponent({
     const locked = (m) => now.value >= ko(m) - cfg.value.bloquea_minutos_antes * 60000
     const abierto = (m) => now.value >= ko(m) - cfg.value.abre_horas_antes * 3600000
     const editable = (m) => tipo(m) === 'prox' && abierto(m) && !locked(m)
+    const esKo = (m) => KO_RONDAS.has(m.ronda)
+    const defLabel = (d) => d === 'reg' ? "90 minutos" : d === 'ext' ? 'tiempo extra/penales' : ''
 
     const hora = (m) => {
       try {
@@ -846,6 +949,7 @@ export default defineComponent({
 
     const ganador = (m) => {
       if (tipo(m) !== 'fin') return 0
+      if (m.estado_corto === 'PEN' && m.ganador_ko) return m.ganador_ko
       if (m.goles_local == null || m.goles_visita == null) return 0
       if (m.goles_local > m.goles_visita) return 1
       if (m.goles_visita > m.goles_local) return 2
@@ -991,9 +1095,14 @@ export default defineComponent({
 
     const seedForm = () => {
       for (const m of partidos.value) {
-        if (!form[m.id]) form[m.id] = { gl: null, gv: null }
+        if (!form[m.id]) form[m.id] = { gl: null, gv: null, def: null }
         const mp = misPron[m.id]
-        if (mp) { form[m.id].gl = mp.goles_local; form[m.id].gv = mp.goles_visita }
+        if (mp) { form[m.id].gl = mp.goles_local; form[m.id].gv = mp.goles_visita; form[m.id].def = mp.def_pred || null }
+        if (esKo(m)) {
+          if (!penForm[m.id]) penForm[m.id] = { pl: null, plf: null, pv: null, pvf: null }
+          penForm[m.id].pl = m.pen_local; penForm[m.id].plf = m.pen_local_fall
+          penForm[m.id].pv = m.pen_visita; penForm[m.id].pvf = m.pen_visita_fall
+        }
       }
     }
 
@@ -1093,7 +1202,7 @@ export default defineComponent({
       const exacto = cfg.value.pts_exacto
       const nuevos = []
       for (const r of (data || [])) {
-        misPron[r.match_id] = { goles_local: r.goles_local, goles_visita: r.goles_visita, puntos: r.puntos, scored: r.scored }
+        misPron[r.match_id] = { goles_local: r.goles_local, goles_visita: r.goles_visita, puntos: r.puntos, scored: r.scored, def_pred: r.def_pred }
         if (r.scored && r.puntos === exacto && !celebrados.has(r.match_id)) {
           nuevos.push(r.match_id)
           celebrados.add(r.match_id)
@@ -1121,12 +1230,14 @@ export default defineComponent({
       joinData.pin = ''
       await loadMine()
       await loadMiCampeon()
+      await checkAdmin()
       notify({ type: 'positive', message: '¡Listo, ' + nombre + '!', position: 'top' })
     }
 
     const salir = () => {
       identity.value = null
       localStorage.removeItem(IDENTITY_KEY)
+      esAdmin.value = false
       for (const k in misPron) delete misPron[k]
       miCampeon.value = null
       campeonSel.value = null
@@ -1180,14 +1291,65 @@ export default defineComponent({
       if (!Number.isInteger(gl) || !Number.isInteger(gv) || gl < 0 || gv < 0 || gl > 30 || gv > 30) {
         notify({ type: 'warning', message: 'Ingresa un marcador válido (0-30)', position: 'top' }); return
       }
+      const ko = esKo(m)
+      const def = ko ? (f.def || null) : null
+      if (ko && !def) {
+        notify({ type: 'warning', message: 'Elige si termina en 90 min o si llega a tiempo extra/penales', position: 'top' }); return
+      }
       savingId.value = m.id
       const { error } = await supabase.rpc('qn_guardar_pronostico', {
-        p_nombre: identity.value.nombre, p_pin: identity.value.pin, p_match_id: m.id, p_gl: gl, p_gv: gv
+        p_nombre: identity.value.nombre, p_pin: identity.value.pin, p_match_id: m.id, p_gl: gl, p_gv: gv, p_def: def
       })
       savingId.value = null
       if (error) { notify({ type: 'negative', message: msgFromError(error), position: 'top' }); return }
-      misPron[m.id] = { goles_local: gl, goles_visita: gv, puntos: 0, scored: false }
+      misPron[m.id] = { goles_local: gl, goles_visita: gv, puntos: 0, scored: false, def_pred: def }
       notify({ type: 'positive', message: 'Pronóstico guardado', position: 'top' })
+    }
+
+    const checkAdmin = async () => {
+      if (!identity.value) { esAdmin.value = false; return }
+      const { data } = await supabase.rpc('qn_es_admin', { p_nombre: identity.value.nombre, p_pin: identity.value.pin })
+      esAdmin.value = !!data
+    }
+
+    const setGanadorKo = async (m, lado) => {
+      if (!identity.value) return
+      penBusy.value = m.id
+      const { error } = await supabase.rpc('qn_set_ganador_ko_user', {
+        p_nombre: identity.value.nombre, p_pin: identity.value.pin, p_match_id: m.id, p_lado: lado
+      })
+      penBusy.value = null
+      if (error) { notify({ type: 'negative', message: msgFromError(error), position: 'top' }); return }
+      await refrescar()
+      notify({ type: 'positive', message: 'Ganador por penales guardado', position: 'top' })
+    }
+
+    const demoNoop = () => {
+      notify({ type: 'info', message: 'Es solo una vista previa: no se guarda nada', position: 'top' })
+    }
+
+    const setPenales = async (m) => {
+      if (!identity.value) return
+      const f = penForm[m.id] || {}
+      const pl = parseInt(f.pl, 10)
+      const pv = parseInt(f.pv, 10)
+      const plf = Number.isInteger(parseInt(f.plf, 10)) ? parseInt(f.plf, 10) : 0
+      const pvf = Number.isInteger(parseInt(f.pvf, 10)) ? parseInt(f.pvf, 10) : 0
+      if (!Number.isInteger(pl) || !Number.isInteger(pv) || pl < 0 || pv < 0) {
+        notify({ type: 'warning', message: 'Ingresa los penales anotados de cada equipo', position: 'top' }); return
+      }
+      if (pl === pv) {
+        notify({ type: 'warning', message: 'En penales debe haber un ganador (anotados distintos)', position: 'top' }); return
+      }
+      penBusy.value = m.id
+      const { error } = await supabase.rpc('qn_set_penales_user', {
+        p_nombre: identity.value.nombre, p_pin: identity.value.pin, p_match_id: m.id,
+        p_pl: pl, p_plf: plf, p_pv: pv, p_pvf: pvf
+      })
+      penBusy.value = null
+      if (error) { notify({ type: 'negative', message: msgFromError(error), position: 'top' }); return }
+      await refrescar()
+      notify({ type: 'positive', message: 'Penales guardados', position: 'top' })
     }
 
     const togglePron = async (m) => {
@@ -1249,6 +1411,7 @@ export default defineComponent({
       await Promise.all([loadPartidos(), loadRanking(), loadPosiciones()])
       await loadMine()
       await loadMiCampeon()
+      await checkAdmin()
       loading.value = false
 
       if (partidos.value.some(m => tipo(m) === 'live')) filtro.value = 'live'
@@ -1299,9 +1462,10 @@ export default defineComponent({
     return {
       tab, cfg, partidos, ranking, gruposPos, misPron, pubPron, form, identity, loading, filtro, filtros,
       showJoin, joinData, joinLoading, savingId, inicial,
+      esAdmin, penBusy, penForm, defLabel, setGanadorKo, setPenales, demo, demoNoop,
       miCampeon, campeonSel, campeonOptions, savingCampeon, campeonCerrado, campeonCierraLabel, filterCampeon, guardarCampeon,
       pushAvail, pushOn, pushBusy, pushHintDismissed, togglePush, dismissPushHint,
-      tipo, hora, editable, locked, estadoTexto, lockIcon, lockTexto, grupos, esMio, abrirPron,
+      tipo, hora, editable, esKo, locked, estadoTexto, lockIcon, lockTexto, grupos, esMio, abrirPron,
       enVivo, proximo, cuenta,
       stickyShow, headerH, sentinel, scrollTop, onRefresh,
       brkScroll, brkH, brkReady, onBrkScroll,
@@ -1389,6 +1553,13 @@ export default defineComponent({
 
 .qn-rules { margin-top: 12px; background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05); }
 .qn-rules-body { padding: 4px 16px 14px; font-size: 13px; color: #333; }
+.qn-rules-tag { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #1b5e20; margin: 8px 0 4px; }
+.qn-rules-tag:first-child { margin-top: 0; }
+.qn-rules-note { font-size: 12px; color: #6b6b6b; padding-left: 2px; }
+.qn-rules-note-dot { flex: 0 0 18px; width: 18px; height: 18px; margin-right: 8px; border-radius: 50%; background: #f3e2b3; color: #8a6d1a; font-weight: 800; font-size: 12px; line-height: 18px; text-align: center; }
+.qn-preview-exp { border: 1px dashed #c8a14a; }
+.qn-preview { padding: 4px 12px 14px; }
+.qn-preview-h { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #1b5e20; margin: 12px 0 6px; }
 
 .qn-champ {
   margin-top: 12px;
@@ -1600,6 +1771,17 @@ export default defineComponent({
 .qn-num { width: 62px; }
 .qn-pred-x { font-size: 20px; font-weight: 900; margin: 0 8px; color: #757575; }
 .qn-pred-hint { text-align: center; font-size: 12px; color: #2e7d32; margin-top: 6px; }
+.qn-pred-def { margin-top: 10px; }
+.qn-pred-def-q { font-size: 12px; color: #555; text-align: center; margin-bottom: 4px; }
+.qn-def-toggle { border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; font-size: 12px; }
+.qn-mine-def { font-size: 11px; color: #b06f00; margin-left: 6px; white-space: nowrap; }
+.qn-admin-pen { margin-bottom: 10px; padding: 8px; border: 1px dashed #c8a14a; border-radius: 8px; background: #fff8e8; }
+.qn-admin-pen-q { font-size: 12px; color: #8a6d1a; font-weight: 600; text-align: center; margin-bottom: 6px; }
+.qn-admin-pen-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.qn-admin-pen-team { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 600; color: #5a4a14; }
+.qn-admin-pen-in { width: 78px; flex: 0 0 78px; }
+.qn-penales { text-align: center; font-size: 12.5px; color: #444; margin-top: 8px; display: flex; align-items: center; justify-content: center; }
+.qn-penales-fall { color: #999; margin-left: 6px; font-size: 11.5px; }
 
 .qn-mine { font-size: 13px; color: #333; display: flex; align-items: center; justify-content: center; }
 .qn-locked { font-size: 12.5px; color: #9e9e9e; display: flex; align-items: center; justify-content: center; font-weight: 600; }

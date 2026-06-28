@@ -126,6 +126,7 @@ import { supabase } from '../supabase'
 
 const FIN = new Set(['FT', 'AET', 'PEN', 'WO'])
 const LIVE = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE', 'INT', 'SUSP'])
+const KO_RONDAS = new Set(['Dieciseisavos', 'Octavos de final', 'Cuartos de final', 'Semifinal', 'Final', 'Tercer lugar'])
 
 export default defineComponent({
   name: 'QuinielaPronosticoPage',
@@ -133,7 +134,7 @@ export default defineComponent({
     const route = useRoute()
     const router = useRouter()
     const nombre = ref('')
-    const cfg = ref({ pts_exacto: 3, pts_resultado: 1, pts_bonus_equipo: 1 })
+    const cfg = ref({ pts_exacto: 3, pts_resultado: 1, pts_bonus_equipo: 1, pts_ko_exacto: 5, pts_ko_resultado: 3, pts_ko_bonus: 1 })
     const partidos = ref([])
     const pronos = ref([])
     const rankingRow = ref(null)
@@ -170,11 +171,16 @@ export default defineComponent({
       const r = (a, b) => (a > b ? 1 : a < b ? -1 : 0)
       return r(p.goles_local, p.goles_visita) === r(m.goles_local, m.goles_visita)
     }
-
     const etiqueta = (p, m) => {
       if (!p || !p.scored) return { text: 'Por puntuar', color: 'blue-grey-4' }
       if (m.goles_local == null || m.goles_visita == null) return { text: 'Por puntuar', color: 'blue-grey-4' }
       if (esExacto(p, m)) return { text: 'Marcador exacto', color: 'green-7' }
+      if (KO_RONDAS.has(m.ronda)) {
+        const re = cfg.value.pts_ko_resultado || 3
+        if (p.puntos >= re) return { text: 'Pasó de ronda', color: 'blue-7' }
+        if (p.puntos > 0) return { text: 'Acertó la definición', color: 'amber-8' }
+        return { text: 'Sin acierto', color: 'grey-6' }
+      }
       if (esResultado(p, m)) return { text: 'Resultado correcto', color: 'blue-7' }
       return { text: 'Sin acierto', color: 'grey-6' }
     }

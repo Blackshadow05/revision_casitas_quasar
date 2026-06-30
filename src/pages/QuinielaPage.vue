@@ -127,56 +127,6 @@
         </div>
       </q-expansion-item>
 
-      <q-expansion-item v-if="esAdmin" dense class="qn-rules qn-preview-exp" icon="visibility" label="Vista previa (solo tú)" default-opened>
-        <div class="qn-preview">
-          <div class="text-caption text-grey-6 q-mb-sm">Así se ven los controles nuevos. Es solo una muestra: no guarda nada.</div>
-
-          <div class="qn-preview-h">Pronóstico de eliminatoria (selector de bonus)</div>
-          <div class="qn-card">
-            <div class="qn-pred">
-              <div class="qn-pred-row">
-                <q-input v-model="demo.gl" type="number" dense outlined min="0" max="30" input-class="text-center text-weight-bold" class="qn-num" inputmode="numeric" />
-                <span class="qn-pred-x">:</span>
-                <q-input v-model="demo.gv" type="number" dense outlined min="0" max="30" input-class="text-center text-weight-bold" class="qn-num" inputmode="numeric" />
-              </div>
-              <div class="qn-pred-def">
-                <div class="qn-pred-def-q">¿Hasta dónde llega? <b class="text-amber-9">+{{ cfg.pts_ko_bonus }} si aciertas</b></div>
-                <q-btn-toggle v-model="demo.def" spread no-caps dense unelevated
-                  toggle-color="amber-8" color="grey-3" text-color="grey-8"
-                  :options="[{ label: 'Termina en 90 min', value: 'reg' }, { label: 'Tiempo extra / Penales', value: 'ext' }]"
-                  class="qn-def-toggle" />
-              </div>
-              <div class="qn-pred-hint"><q-icon name="bookmark" size="14px" /> Ejemplo: {{ demo.gl }} - {{ demo.gv }}<span v-if="demo.def"> · {{ defLabel(demo.def) }}</span></div>
-            </div>
-          </div>
-
-          <div class="qn-preview-h">Tanda de penales (admin)</div>
-          <div class="qn-card">
-            <div class="qn-penales">
-              <q-icon name="sports_soccer" size="13px" class="q-mr-xs" />
-              Penales: <b class="q-mx-xs">{{ demo.pl || 0 }} - {{ demo.pv || 0 }}</b>
-              <span class="qn-penales-fall">(fallados {{ demo.plf || 0 }} - {{ demo.pvf || 0 }})</span>
-            </div>
-            <div class="qn-pred">
-              <div class="qn-admin-pen">
-                <div class="qn-admin-pen-q"><q-icon name="admin_panel_settings" size="14px" /> Tanda de penales (admin)</div>
-                <div class="qn-admin-pen-row">
-                  <span class="qn-admin-pen-team ellipsis">Equipo A</span>
-                  <q-input v-model.number="demo.pl" type="number" min="0" max="20" dense outlined label="Anotó" inputmode="numeric" class="qn-admin-pen-in" />
-                  <q-input v-model.number="demo.plf" type="number" min="0" max="20" dense outlined label="Falló" inputmode="numeric" class="qn-admin-pen-in" />
-                </div>
-                <div class="qn-admin-pen-row">
-                  <span class="qn-admin-pen-team ellipsis">Equipo B</span>
-                  <q-input v-model.number="demo.pv" type="number" min="0" max="20" dense outlined label="Anotó" inputmode="numeric" class="qn-admin-pen-in" />
-                  <q-input v-model.number="demo.pvf" type="number" min="0" max="20" dense outlined label="Falló" inputmode="numeric" class="qn-admin-pen-in" />
-                </div>
-                <q-btn no-caps unelevated rounded color="green-8" icon="save" label="Guardar penales" class="full-width q-mt-xs" @click="demoNoop" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </q-expansion-item>
-
       <div class="qn-champ">
         <div class="qn-champ-head">
           <q-icon name="emoji_events" size="20px" />
@@ -368,14 +318,21 @@
 
               <div v-if="tipo(m) !== 'prox' && m.estado_corto === 'PEN' && m.pen_local != null" class="qn-penales">
                 <q-icon name="sports_soccer" size="13px" class="q-mr-xs" />
-                Penales: <b class="q-mx-xs">{{ m.pen_local }} - {{ m.pen_visita }}</b>
-                <span class="qn-penales-fall" v-if="m.pen_local_fall || m.pen_visita_fall">(fallados {{ m.pen_local_fall || 0 }} - {{ m.pen_visita_fall || 0 }})</span>
+                <span class="qn-pen-dots">
+                  <span v-for="n in (m.pen_local_fall || 0)" :key="'plf' + n" class="qn-pen-dot qn-pen-miss"></span>
+                  <span v-for="n in (m.pen_local || 0)" :key="'pl' + n" class="qn-pen-dot qn-pen-ok"></span>
+                </span>
+                <b class="qn-penales-num">{{ m.pen_local }} - {{ m.pen_visita }}</b>
+                <span class="qn-pen-dots">
+                  <span v-for="n in (m.pen_visita || 0)" :key="'pv' + n" class="qn-pen-dot qn-pen-ok"></span>
+                  <span v-for="n in (m.pen_visita_fall || 0)" :key="'pvf' + n" class="qn-pen-dot qn-pen-miss"></span>
+                </span>
               </div>
 
               <div v-if="tipo(m) !== 'prox' && ((m.goleadores_local && m.goleadores_local.length) || (m.goleadores_visita && m.goleadores_visita.length))" class="qn-goles">
                 <div class="qn-goles-col">
                   <div v-for="(g, i) in (m.goleadores_local || [])" :key="'l' + i" class="qn-gol">
-                    <q-icon name="sports_soccer" size="11px" :color="g.owngoal ? 'red-6' : 'grey-7'" class="q-mr-xs" />
+                    <qn-soccer-ball :own="!!g.owngoal" class="q-mr-xs" />
                     <span class="qn-gol-name ellipsis">{{ g.name }}</span>
                     <span class="qn-gol-min">&nbsp;{{ g.minute }}'{{ g.penalty ? ' (P)' : '' }}{{ g.owngoal ? ' (ag)' : '' }}</span>
                   </div>
@@ -384,7 +341,7 @@
                   <div v-for="(g, i) in (m.goleadores_visita || [])" :key="'v' + i" class="qn-gol qn-gol-r">
                     <span class="qn-gol-min">{{ g.minute }}'{{ g.penalty ? ' (P)' : '' }}{{ g.owngoal ? ' (ag)' : '' }}&nbsp;</span>
                     <span class="qn-gol-name ellipsis">{{ g.name }}</span>
-                    <q-icon name="sports_soccer" size="11px" :color="g.owngoal ? 'red-6' : 'grey-7'" class="q-ml-xs" />
+                    <qn-soccer-ball :own="!!g.owngoal" class="q-ml-xs" />
                   </div>
                 </div>
               </div>
@@ -658,6 +615,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { supabase } from '../supabase'
 import { notify } from '../utils/notify'
 import { pushSupported, pushDenied, isSubscribed, subscribePush, unsubscribePush } from '../utils/push'
+import QnSoccerBall from '../components/QnSoccerBall.vue'
 
 const PUSH_HABILITADO = true
 
@@ -676,16 +634,8 @@ const KO_ORDER = [
 ]
 const KO_RONDAS = new Set(KO_ORDER.map(r => r.ronda))
 
-const KO_BASE = {
-  Dieciseisavos: 73,
-  'Octavos de final': 89,
-  'Cuartos de final': 97,
-  Semifinal: 101,
-  'Tercer lugar': 103,
-  Final: 104
-}
 const FEEDERS = {
-  89: [73, 75], 90: [74, 77], 91: [76, 78], 92: [79, 80],
+  89: [74, 77], 90: [73, 75], 91: [76, 78], 92: [79, 80],
   93: [83, 84], 94: [81, 82], 95: [86, 88], 96: [85, 87],
   97: [89, 90], 98: [93, 94], 99: [91, 92], 100: [95, 96],
   101: [97, 98], 102: [99, 100],
@@ -728,6 +678,7 @@ function msgFromError (e) {
 
 export default defineComponent({
   name: 'QuinielaPage',
+  components: { QnSoccerBall },
   setup () {
     const router = useRouter()
     const route = useRoute()
@@ -741,7 +692,6 @@ export default defineComponent({
     const pubPron = reactive({})
     const form = reactive({})
     const penForm = reactive({})
-    const demo = reactive({ gl: 1, gv: 1, def: 'ext', pl: 4, plf: 1, pv: 3, pvf: 2 })
     const identity = ref(null)
     const now = ref(Date.now())
     const clock = ref(Date.now())
@@ -934,10 +884,9 @@ export default defineComponent({
       const leafIdx = new Map(leaves.map((n, i) => [n, i]))
       const cols = []
       for (const r of TREE_ROUNDS) {
-        const base = KO_BASE[r.ronda]
-        const items = partidos.value.filter(m => m.ronda === r.ronda).sort((a, b) => ko(a) - ko(b))
+        const items = partidos.value.filter(m => m.ronda === r.ronda)
         if (!items.length) continue
-        const withNum = items.map((m, i) => ({ m, num: base + i }))
+        const withNum = items.map(m => ({ m, num: m.match_no }))
         withNum.sort((a, b) => (leafIdx.get(firstLeaf(a.num)) ?? 0) - (leafIdx.get(firstLeaf(b.num)) ?? 0))
         cols.push({ key: r.ronda, label: r.label, items: withNum.map(x => x.m) })
       }
@@ -1324,9 +1273,6 @@ export default defineComponent({
       notify({ type: 'positive', message: 'Ganador por penales guardado', position: 'top' })
     }
 
-    const demoNoop = () => {
-      notify({ type: 'info', message: 'Es solo una vista previa: no se guarda nada', position: 'top' })
-    }
 
     const setPenales = async (m) => {
       if (!identity.value) return
@@ -1462,7 +1408,7 @@ export default defineComponent({
     return {
       tab, cfg, partidos, ranking, gruposPos, misPron, pubPron, form, identity, loading, filtro, filtros,
       showJoin, joinData, joinLoading, savingId, inicial,
-      esAdmin, penBusy, penForm, defLabel, setGanadorKo, setPenales, demo, demoNoop,
+      esAdmin, penBusy, penForm, defLabel, setGanadorKo, setPenales,
       miCampeon, campeonSel, campeonOptions, savingCampeon, campeonCerrado, campeonCierraLabel, filterCampeon, guardarCampeon,
       pushAvail, pushOn, pushBusy, pushHintDismissed, togglePush, dismissPushHint,
       tipo, hora, editable, esKo, locked, estadoTexto, lockIcon, lockTexto, grupos, esMio, abrirPron,
@@ -1781,7 +1727,11 @@ export default defineComponent({
 .qn-admin-pen-team { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 600; color: #5a4a14; }
 .qn-admin-pen-in { width: 78px; flex: 0 0 78px; }
 .qn-penales { text-align: center; font-size: 12.5px; color: #444; margin-top: 8px; display: flex; align-items: center; justify-content: center; }
-.qn-penales-fall { color: #999; margin-left: 6px; font-size: 11.5px; }
+.qn-penales-num { margin: 0 8px; font-size: 13px; color: #333; }
+.qn-pen-dots { display: inline-flex; align-items: center; gap: 3px; }
+.qn-pen-dot { width: 9px; height: 9px; border-radius: 50%; box-sizing: border-box; flex-shrink: 0; }
+.qn-pen-ok { background: #2e7d32; }
+.qn-pen-miss { background: #fff; border: 1.5px solid #c62828; }
 
 .qn-mine { font-size: 13px; color: #333; display: flex; align-items: center; justify-content: center; }
 .qn-locked { font-size: 12.5px; color: #9e9e9e; display: flex; align-items: center; justify-content: center; font-weight: 600; }

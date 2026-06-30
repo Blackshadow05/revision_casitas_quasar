@@ -3,6 +3,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 const RAPID_HOST = "flashscore4.p.rapidapi.com";
 const BASE = `https://${RAPID_HOST}/api/flashscore/v2`;
 const TOURNAMENT_ID = "sblsx4y7";
+const TOURNAMENT_IDS = new Set([TOURNAMENT_ID, "6kkowojd"]);
 const WINDOW_MIN = 360;
 const PRE_ROLL_MS = 2 * 60000;
 const HEAVY_DAY_MIN = 5;
@@ -25,6 +26,18 @@ const KO_ROUNDS = new Set(["Dieciseisavos", "Octavos de final", "Cuartos de fina
 const LIVE_CODES = new Set(["LIVE", "1H", "HT", "2H", "ET", "BT", "P"]);
 const KNOCKOUT_LIVE_CODES = new Set(["ET", "P"]);
 const FIN_CODES = new Set(["FT", "AET", "PEN"]);
+const FLASH_KO_PROVIDER = "flashscore-ko";
+const FLASH_KO_LOOKAHEAD_DAYS = 7;
+const FLASH_KO_SYNC_INTERVAL_MS = 30 * 60000;
+const FLASH_KO_MATCH_TOLERANCE_MS = 8 * 3600000;
+const KO_FEEDERS: Record<number, [number, number]> = {
+  89: [74, 77], 90: [73, 75], 91: [76, 78], 92: [79, 80],
+  93: [83, 84], 94: [81, 82], 95: [86, 88], 96: [85, 87],
+  97: [89, 90], 98: [93, 94], 99: [91, 92], 100: [95, 96],
+  101: [97, 98], 102: [99, 100],
+  104: [101, 102],
+};
+const THIRD_PLACE_FEEDERS: [number, number] = [101, 102];
 
 const ENES: Record<string, string> = {
   "Algeria": "Argelia", "Argentina": "Argentina", "Australia": "Australia", "Austria": "Austria",
@@ -119,8 +132,71 @@ async function rapid(path: string, key: string): Promise<any> {
 }
 function tournamentMatches(list: any): any[] {
   if (!Array.isArray(list)) return [];
-  const t = list.find((x: any) => x?.tournament_id === TOURNAMENT_ID);
-  return t?.matches ?? [];
+  return list.filter((x: any) => TOURNAMENT_IDS.has(x?.tournament_id)).flatMap((t: any) => t?.matches ?? []);
+}
+function concreteTeam(name: string | null | undefined): boolean {
+  const v = String(name ?? "").trim();
+  return !!v && !/^(ganador|perdedor|3[ºo]|\d+[ºo]|\-)/i.test(v);
+}
+function fsTeam(fm: any, side: "home" | "away"): { id: number | null; name: string | null; logo: string | null } {
+  const team = side === "home" ? fm?.home_team : fm?.away_team;
+  const rawName = String(team?.name ?? "");
+  const id = Number(team?.team_id);
+  return {
+    id: Number.isFinite(id) ? id : null,
+    name: es(rawName),
+    logo: team?.small_image_path ?? team?.image_path ?? null,
+  };
+}
+function fsKickoffMs(fm: any): number | null {
+  const ts = Number(fm?.timestamp);
+  if (!Number.isFinite(ts) || ts <= 0) return null;
+  return ts * 1000;
+}
+function rowKnownTeamScore(row: any, home: string | null, away: string | null): number {
+  let score = 0;
+  if (concreteTeam(row.equipo_local) && (row.equipo_local === home || row.equipo_local === away)) score += 2;
+  if (concreteTeam(row.equipo_visita) && (row.equipo_visita === home || row.equipo_visita === away)) score += 2;
+  return score;
+}
+function buildKoNumberMap(rows: any[]): Map<number, any> {
+  const byNum = new Map<number, any>();
+  for (const m of rows) {
+    const n = Number(m.match_no);
+    if (Number.isFinite(n)) byNum.set(n, m);
+  }
+  return byNum;
+}
+function winnerTeam(row: any): any | null {
+  if (!row || !row.finalizado || !row.ganador_ko) return null;
+  if (row.ganador_ko === 1 && concreteTeam(row.equipo_local)) {
+    return { name: row.equipo_local, id: row.equipo_local_id ?? null, logo: row.equipo_local_logo ?? null };
+  }
+  if (row.ganador_ko === 2 && concreteTeam(row.equipo_visita)) {
+    return { name: row.equipo_visita, id: row.equipo_visita_id ?? null, logo: row.equipo_visita_logo ?? null };
+  }
+  return null;
+}
+function loserTeam(row: any): any | null {
+  if (!row || !row.finalizado || !row.ganador_ko) return null;
+  if (row.ganador_ko === 1 && concreteTeam(row.equipo_visita)) {
+    return { name: row.equipo_visita, id: row.equipo_visita_id ?? null, logo: row.equipo_visita_logo ?? null };
+  }
+  if (row.ganador_ko === 2 && concreteTeam(row.equipo_local)) {
+    return { name: row.equipo_local, id: row.equipo_local_id ?? null, logo: row.equipo_local_logo ?? null };
+  }
+  return null;
+}
+function teamPatch(prefix: "equipo_local" | "equipo_visita", team: any): Record<string, unknown> {
+  return {
+    [prefix]: team.name,
+    [`${prefix}_id`]: team.id ?? null,
+    [`${prefix}_logo`]: team.logo ?? null,
+  };
+}
+function needsTeamUpdate(row: any, side: "local" | "visita", team: any): boolean {
+  const name = side === "local" ? row.equipo_local : row.equipo_visita;
+  return team?.name && name !== team.name;
 }
 function parseSummary(events: any[], localIsHome: boolean) {
   const golL: any[] = [], golV: any[] = [], tarL: any[] = [], tarV: any[] = [];
@@ -404,6 +480,137 @@ async function runApiFootballBackup(supabase: any, rows: any[], nowMs: number, c
   return { enabled: true, candidates: candidates.length, due: due.length, apiCalls, updates, anyFinished: finished };
 }
 
+async function syncFlashscoreKnockoutTeams(supabase: any, rapidKey: string, nowMs: number, cfg: any): Promise<any> {
+  const last = cfg?.last_full_sync ? Date.parse(cfg.last_full_sync) : 0;
+  if (last && nowMs - last < FLASH_KO_SYNC_INTERVAL_MS) {
+    return { skipped: true, reason: "throttled", nextInMs: FLASH_KO_SYNC_INTERVAL_MS - (nowMs - last) };
+  }
+
+  const { data: rows, error } = await supabase
+    .from("qn_partidos")
+    .select("id, kickoff, ronda, equipo_local, equipo_visita, equipo_local_id, equipo_visita_id, equipo_local_logo, equipo_visita_logo, finalizado")
+    .in("ronda", Array.from(KO_ROUNDS))
+    .gte("kickoff", new Date(nowMs - 12 * 3600000).toISOString())
+    .order("kickoff", { ascending: true });
+  if (error) return { error: error.message };
+  if (!rows || rows.length === 0) return { skipped: true, reason: "no_ko_rows" };
+
+  const fetched: any[] = [];
+  const fetchErrors: any[] = [];
+  for (let day = -1; day <= FLASH_KO_LOOKAHEAD_DAYS; day++) {
+    try {
+      const list = await rapid(`matches/list?sport_id=1&day=${day}`, rapidKey);
+      for (const fm of tournamentMatches(list)) {
+        const koMs = fsKickoffMs(fm);
+        const home = fsTeam(fm, "home");
+        const away = fsTeam(fm, "away");
+        if (!koMs || !concreteTeam(home.name) || !concreteTeam(away.name)) continue;
+        fetched.push({ matchId: fm.match_id ?? null, koMs, home, away, rawStatus: fm.match_status ?? null });
+      }
+    } catch (e) {
+      fetchErrors.push({ day, error: String(e) });
+    }
+  }
+
+  const used = new Set<number>();
+  const updates: any[] = [];
+  const sortedRows = [...rows].sort((a, b) => Date.parse(a.kickoff) - Date.parse(b.kickoff) || Number(a.id) - Number(b.id));
+  for (const row of sortedRows) {
+    if (row.finalizado) continue;
+    const rowMs = Date.parse(row.kickoff);
+    let bestIdx = -1;
+    let bestScore = -Infinity;
+    for (let i = 0; i < fetched.length; i++) {
+      if (used.has(i)) continue;
+      const fm = fetched[i];
+      const diff = Math.abs(fm.koMs - rowMs);
+      if (diff > FLASH_KO_MATCH_TOLERANCE_MS) continue;
+      const knownScore = rowKnownTeamScore(row, fm.home.name, fm.away.name);
+      if (concreteTeam(row.equipo_local) && concreteTeam(row.equipo_visita) && knownScore < 4) continue;
+      const score = knownScore * 100000000 - diff;
+      if (score > bestScore) { bestScore = score; bestIdx = i; }
+    }
+    if (bestIdx < 0) continue;
+
+    const fm = fetched[bestIdx];
+    used.add(bestIdx);
+    const patch: any = {};
+    if (row.equipo_local !== fm.home.name) Object.assign(patch, teamPatch("equipo_local", fm.home));
+    if (row.equipo_visita !== fm.away.name) Object.assign(patch, teamPatch("equipo_visita", fm.away));
+    if (Object.keys(patch).length === 0) continue;
+    patch.updated_at = new Date(nowMs).toISOString();
+    const { error: uerr } = await supabase.from("qn_partidos").update(patch).eq("id", row.id);
+    if (!uerr) {
+      await supabase.from("qn_provider_checks").upsert({
+        match_id: row.id,
+        provider: FLASH_KO_PROVIDER,
+        checked_at: new Date(nowMs).toISOString(),
+        status_corto: fm.rawStatus?.stage ?? null,
+        fixture_id: null,
+        raw: {
+          match_id: fm.matchId,
+          kickoff: new Date(fm.koMs).toISOString(),
+          home: fm.home,
+          away: fm.away,
+          source: "matches/list",
+        },
+      }, { onConflict: "match_id,provider" });
+      updates.push({ id: row.id, local: fm.home.name, visita: fm.away.name });
+    }
+  }
+
+  await supabase.from("qn_config").update({ last_full_sync: new Date(nowMs).toISOString() }).eq("id", 1);
+  return {
+    skipped: false,
+    apiCalls: FLASH_KO_LOOKAHEAD_DAYS + 2,
+    fetched: fetched.length,
+    sample: fetched.slice(0, 12).map((m) => ({
+      matchId: m.matchId,
+      kickoff: new Date(m.koMs).toISOString(),
+      local: m.home.name,
+      visita: m.away.name,
+    })),
+    updated: updates.length,
+    updates,
+    fetchErrors,
+  };
+}
+
+async function propagateKnockoutWinners(supabase: any, nowMs: number): Promise<any> {
+  const { data: rows, error } = await supabase
+    .from("qn_partidos")
+    .select("id, match_no, kickoff, ronda, equipo_local, equipo_visita, equipo_local_id, equipo_visita_id, equipo_local_logo, equipo_visita_logo, finalizado, ganador_ko")
+    .in("ronda", Array.from(KO_ROUNDS))
+    .order("kickoff", { ascending: true });
+  if (error) return { error: error.message };
+  const byNum = buildKoNumberMap(rows ?? []);
+  const updates: any[] = [];
+  const applyTarget = async (targetNum: number, side: "local" | "visita", team: any) => {
+    const target = byNum.get(targetNum);
+    if (!target || !team?.name || !needsTeamUpdate(target, side, team)) return;
+    const prefix = side === "local" ? "equipo_local" : "equipo_visita";
+    const patch = { ...teamPatch(prefix, team), updated_at: new Date(nowMs).toISOString() };
+    const { error: uerr } = await supabase.from("qn_partidos").update(patch).eq("id", target.id);
+    if (!uerr) {
+      Object.assign(target, patch);
+      updates.push({ target: target.id, targetNum, side, team: team.name });
+    }
+  };
+
+  for (const [targetStr, children] of Object.entries(KO_FEEDERS)) {
+    const targetNum = Number(targetStr);
+    await applyTarget(targetNum, "local", winnerTeam(byNum.get(children[0])));
+    await applyTarget(targetNum, "visita", winnerTeam(byNum.get(children[1])));
+  }
+  const third = byNum.get(103);
+  if (third) {
+    await applyTarget(103, "local", loserTeam(byNum.get(THIRD_PLACE_FEEDERS[0])));
+    await applyTarget(103, "visita", loserTeam(byNum.get(THIRD_PLACE_FEEDERS[1])));
+  }
+
+  return { updated: updates.length, updates };
+}
+
 Deno.serve(async (req: Request) => {
   const cronSecret = Deno.env.get("CRON_SECRET");
   if (cronSecret && req.headers.get("x-cron-secret") !== cronSecret) return json({ error: "unauthorized" }, 401);
@@ -412,7 +619,12 @@ Deno.serve(async (req: Request) => {
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const nowMs = Date.now();
-  const { data: cfg } = await supabase.from("qn_config").select("season").eq("id", 1).single();
+  const { data: cfg } = await supabase.from("qn_config").select("season, last_full_sync").eq("id", 1).single();
+
+  let koSync: any = null;
+  try { koSync = await syncFlashscoreKnockoutTeams(supabase, rapidKey, nowMs, cfg); } catch (e) { koSync = { error: String(e) }; }
+  let koAdvance: any = null;
+  try { koAdvance = await propagateKnockoutWinners(supabase, nowMs); } catch (e) { koAdvance = { error: String(e) }; }
 
   let penResolve: any = null;
   try { penResolve = await resolvePenalesPendientes(supabase, nowMs); } catch (e) { penResolve = { error: String(e) }; }
@@ -427,16 +639,7 @@ Deno.serve(async (req: Request) => {
     .gte("kickoff", new Date(nowMs - WINDOW_MIN * 60000).toISOString());
 
   if (qerr) return json({ error: qerr.message }, 500);
-  if (!live || live.length === 0) return json({ ok: true, ventana: 0, apiCalls: 0, summaryCalls: 0, summarySkipped: 0, penResolve, backup: { enabled: !!apiFootballKey(), candidates: 0 }, note: "sin partidos en ventana" });
-
-  const cr = new Date(nowMs - CR_OFFSET_MS);
-  const dayStart = new Date(Date.UTC(cr.getUTCFullYear(), cr.getUTCMonth(), cr.getUTCDate(), 6, 0, 0));
-  const dayEnd = new Date(dayStart.getTime() + 86400000);
-  const { count: partidosHoy } = await supabase.from("qn_partidos").select("id", { count: "exact", head: true }).gte("kickoff", dayStart.toISOString()).lt("kickoff", dayEnd.toISOString());
-  const heavy = (partidosHoy ?? 0) >= HEAVY_DAY_MIN;
-  if (heavy && new Date(nowMs).getUTCMinutes() % THROTTLE_EVERY !== 0) {
-    return json({ ok: true, ventana: live.length, apiCalls: 0, summaryCalls: 0, summarySkipped: 0, throttled: true, partidosHoy, penResolve, note: `dia cargado (${partidosHoy}): solo cada ${THROTTLE_EVERY} min` });
-  }
+  if (!live || live.length === 0) return json({ ok: true, ventana: 0, apiCalls: 0, summaryCalls: 0, summarySkipped: 0, koSync, koAdvance, penResolve, backup: { enabled: !!apiFootballKey(), candidates: 0 }, note: "sin partidos en ventana" });
 
   const backoffMs = (estado: string): number => estado === "SUSP" ? SUSP_BACKOFF_MS : estado === "INT" ? INT_BACKOFF_MS : 0;
   const isDue = (m: any): boolean => {
@@ -447,7 +650,7 @@ Deno.serve(async (req: Request) => {
   };
   const dueRows = live.filter(isDue);
   const enBackoff = live.length - dueRows.length;
-  if (dueRows.length === 0) return json({ ok: true, ventana: live.length, apiCalls: 0, summaryCalls: 0, summarySkipped: 0, enBackoff, penResolve, note: "todos interrumpidos/suspendidos en backoff" });
+  if (dueRows.length === 0) return json({ ok: true, ventana: live.length, apiCalls: 0, summaryCalls: 0, summarySkipped: 0, enBackoff, koSync, koAdvance, penResolve, note: "todos interrumpidos/suspendidos en backoff" });
 
   let apiCalls = 0;
   let summaryCalls = 0;
@@ -547,8 +750,13 @@ Deno.serve(async (req: Request) => {
     if (backup?.anyFinished) anyFinished = true;
   } catch (e) { backup = { enabled: true, error: String(e) }; }
 
+  try {
+    const afterLiveAdvance = await propagateKnockoutWinners(supabase, nowMs);
+    if (afterLiveAdvance?.updated) koAdvance = afterLiveAdvance;
+  } catch (e) { koAdvance = { error: String(e) }; }
+
   let scored: any = null;
   if (anyFinished) { const { data } = await supabase.rpc("qn_calcular_pendientes"); scored = data; }
   await supabase.from("qn_config").update({ last_live_sync: new Date().toISOString() }).eq("id", 1);
-  return json({ ok: true, ventana: live.length, due: dueRows.length, enBackoff, matched: updates.length, apiCalls, summaryCalls, summarySkipped, partidosHoy, heavy, penResolve, backup, scored, updates });
+  return json({ ok: true, ventana: live.length, due: dueRows.length, enBackoff, matched: updates.length, apiCalls, summaryCalls, summarySkipped, koSync, koAdvance, penResolve, backup, scored, updates });
 });

@@ -144,7 +144,7 @@
     </q-header>
 
     <!-- Mobile/Tablet: Bottom tabs -->
-    <q-footer class="custom-footer" v-if="!$q.screen.gt.md">
+    <q-footer ref="footerRef" class="custom-footer" v-if="!$q.screen.gt.md">
       <q-tabs
         v-model="tab"
         dense
@@ -169,7 +169,7 @@
 </template>
 
 <script>
-import { ref, computed, defineComponent, watch, onUnmounted } from "vue";
+import { ref, computed, defineComponent, watch, onMounted, onUnmounted } from "vue";
 import { notify } from '../utils/notify'
 import { useRouter, useRoute } from "vue-router";
 import { useQuasar } from "quasar";
@@ -194,6 +194,29 @@ export default defineComponent({
     // Puesto 01 solo visible para el usuario Esteban B
     const isEstebanB = computed(() => authStore.user?.Usuario === "Esteban B");
     let stopHomeUpdates = null;
+    const footerRef = ref(null);
+    let syncFooterFrame = null;
+
+    const syncFooter = () => {
+      const el = footerRef.value?.$el;
+      const vv = window.visualViewport;
+      if (!el || !vv) return;
+      const offset = window.innerHeight - vv.height - vv.offsetTop;
+      el.style.transform = offset > 1 ? `translateY(-${offset}px)` : "";
+    };
+
+    const scheduleSyncFooter = () => {
+      if (syncFooterFrame) cancelAnimationFrame(syncFooterFrame);
+      syncFooterFrame = requestAnimationFrame(syncFooter);
+    };
+
+    onMounted(() => {
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", scheduleSyncFooter);
+        window.visualViewport.addEventListener("scroll", scheduleSyncFooter);
+        window.addEventListener("focusout", scheduleSyncFooter);
+      }
+    });
 
     const detachHomeUpdates = () => {
       if (typeof stopHomeUpdates === 'function') {
@@ -255,6 +278,12 @@ export default defineComponent({
 
     onUnmounted(() => {
       detachHomeUpdates()
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener("resize", scheduleSyncFooter);
+        window.visualViewport.removeEventListener("scroll", scheduleSyncFooter);
+        window.removeEventListener("focusout", scheduleSyncFooter);
+      }
+      if (syncFooterFrame) cancelAnimationFrame(syncFooterFrame);
     });
 
     const goToHome = () => {
@@ -284,6 +313,7 @@ export default defineComponent({
     return {
       q,
       tab,
+      footerRef,
       authStore,
       isEstebanB,
       desktopSecurityLinks,

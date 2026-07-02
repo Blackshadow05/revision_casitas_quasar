@@ -68,7 +68,7 @@
               :loading="pushBusy" class="q-mr-xs" @click="togglePush">
               <q-tooltip>Activar notificaciones</q-tooltip>
             </q-btn>
-            <q-btn unelevated no-caps rounded color="green-8" icon="how_to_reg" label="Unirme" @click="showJoin = true" />
+            <q-btn unelevated no-caps rounded color="green-8" icon="how_to_reg" label="Unirme" class="qn-btn-cta" @click="showJoin = true" />
           </div>
         </template>
       </div>
@@ -88,8 +88,8 @@
       <div v-if="proximo || enVivo" class="qn-next">
         <div class="qn-next-body">
           <template v-if="enVivo">
-            <div class="qn-next-tag qn-shimmer"><span class="qn-live-dot"></span> En vivo</div>
-            <div class="qn-next-timer qn-shimmer">{{ enVivo.goles_local ?? 0 }} <span class="qn-next-vs">-</span> {{ enVivo.goles_visita ?? 0 }}</div>
+            <div class="qn-next-tag"><span class="qn-live-dot"></span> En vivo</div>
+            <div class="qn-next-timer">{{ enVivo.goles_local ?? 0 }} <span class="qn-next-vs">-</span> {{ enVivo.goles_visita ?? 0 }}</div>
             <div class="qn-next-match">
               <img v-if="enVivo.equipo_local_logo" :src="enVivo.equipo_local_logo" class="qn-next-flag" alt="" />
               {{ enVivo.equipo_local }} <span class="qn-next-vs">vs</span> {{ enVivo.equipo_visita }}
@@ -127,7 +127,7 @@
         </div>
       </q-expansion-item>
 
-      <div class="qn-champ">
+      <div v-if="campeonVisible" class="qn-champ">
         <div class="qn-champ-head">
           <q-icon name="emoji_events" size="20px" />
           <span>Tu campeón del Mundial</span>
@@ -135,7 +135,7 @@
         </div>
 
         <template v-if="!campeonCerrado">
-          <template v-if="identity">
+          <template v-if="identity && esDanielVCampeon">
             <q-select
               v-model="campeonSel"
               :options="campeonOptions"
@@ -165,7 +165,7 @@
               </template>
             </q-select>
             <div class="qn-champ-actions">
-              <q-btn unelevated no-caps rounded color="green-8" icon="save" label="Guardar campeón"
+              <q-btn unelevated no-caps rounded color="green-8" icon="save" label="Guardar campeón" class="qn-btn-cta"
                 :loading="savingCampeon" :disable="!campeonSel" @click="guardarCampeon" />
             </div>
             <div v-if="miCampeon" class="qn-champ-hint">
@@ -178,7 +178,7 @@
           <template v-else>
             <div class="qn-champ-join">
               <span>Únete para elegir a tu campeón.</span>
-              <q-btn unelevated no-caps rounded color="amber-8" icon="how_to_reg" label="Unirme" @click="showJoin = true" />
+              <q-btn unelevated no-caps rounded color="amber-8" icon="how_to_reg" label="Unirme" class="qn-btn-cta" @click="showJoin = true" />
             </div>
             <div class="qn-champ-deadline">
               <q-icon name="schedule" size="14px" /> Elige antes del {{ campeonCierraLabel }}
@@ -206,7 +206,7 @@
         </template>
       </div>
 
-      <q-tabs v-model="tab" class="qn-tabs" active-color="green-9" indicator-color="amber-8" align="justify" no-caps dense>
+      <q-tabs v-model="tab" class="qn-tabs" :style="{ top: (headerH + (stickyShow && (enVivo || proximo) ? 41 : 0)) + 'px' }" active-color="green-9" indicator-color="green-9" align="justify" no-caps dense>
         <q-tab name="partidos" icon="sports_soccer" label="Partidos" />
         <q-tab name="posiciones" icon="table_chart" label="Posiciones" />
         <q-tab v-if="hayEliminatorias" name="llaves" icon="account_tree" label="Llaves" />
@@ -215,10 +215,9 @@
 
       <q-tab-panels v-model="tab" animated class="qn-panels">
         <q-tab-panel name="partidos" class="q-pa-none">
-          <div class="qn-filtros row q-gutter-xs q-mb-md">
-            <q-chip v-for="f in filtros" :key="f.value" clickable :selected="filtro === f.value"
-              :color="filtro === f.value ? 'green-8' : 'grey-3'"
-              :text-color="filtro === f.value ? 'white' : 'grey-8'"
+          <div class="qn-filtros q-mb-md">
+            <q-chip v-for="f in filtros" :key="f.value" clickable
+              class="qn-filtro" :class="{ 'qn-filtro-on': filtro === f.value }"
               @click="filtro = f.value">{{ f.label }}</q-chip>
           </div>
 
@@ -372,9 +371,9 @@
                     <q-input v-model="form[m.id].gv" type="number" dense outlined min="0" max="30"
                       input-class="text-center text-weight-bold" class="qn-num" inputmode="numeric" />
                     <q-btn v-if="identity" unelevated no-caps rounded color="green-8" icon="save"
-                      :loading="savingId === m.id" label="Guardar" class="q-ml-sm" @click="guardar(m)" />
+                      :loading="savingId === m.id" label="Guardar" class="q-ml-sm qn-btn-cta" @click="guardar(m)" />
                     <q-btn v-else unelevated no-caps rounded color="amber-8" icon="how_to_reg"
-                      label="Unirme" class="q-ml-sm" @click="showJoin = true" />
+                      label="Unirme" class="q-ml-sm qn-btn-cta" @click="showJoin = true" />
                   </div>
                   <div v-if="esKo(m)" class="qn-pred-def">
                     <div class="qn-pred-def-q">¿Hasta dónde llega? <b class="text-amber-9">+{{ cfg.pts_ko_bonus }} si aciertas</b></div>
@@ -406,7 +405,7 @@
                         label="Falló" inputmode="numeric" class="qn-admin-pen-in" />
                     </div>
                     <q-btn no-caps unelevated rounded color="green-8" icon="save" label="Guardar penales"
-                      class="full-width q-mt-xs" :loading="penBusy === m.id" @click="setPenales(m)" />
+                      class="full-width q-mt-xs qn-btn-cta" :loading="penBusy === m.id" @click="setPenales(m)" />
                   </div>
                   <div v-if="misPron[m.id]" class="qn-mine">
                     <span>Tu pronóstico: <b>{{ misPron[m.id].goles_local }} - {{ misPron[m.id].goles_visita }}</b><span v-if="esKo(m) && misPron[m.id].def_pred" class="qn-mine-def"><q-icon name="schedule" size="12px" /> {{ defLabel(misPron[m.id].def_pred) }}</span></span>
@@ -602,7 +601,7 @@
         </q-card-section>
         <q-card-actions align="right" class="q-pa-md">
           <q-btn flat no-caps label="Cancelar" color="grey-7" v-close-popup />
-          <q-btn unelevated no-caps rounded color="green-8" label="Entrar" :loading="joinLoading" @click="join" />
+          <q-btn unelevated no-caps rounded color="green-8" label="Entrar" class="qn-btn-cta" :loading="joinLoading" @click="join" />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -621,6 +620,8 @@ const PUSH_HABILITADO = true
 
 const IDENTITY_KEY = 'quiniela_identity'
 const CELEB_KEY = 'quiniela_celebrados'
+const DANIEL_CAMPEON_NOMBRE = 'daniel v'
+const CAMPEON_CIERRA_DANIEL_V = '2026-07-01T19:00:00+00:00'
 const FIN = new Set(['FT', 'AET', 'PEN', 'WO'])
 const LIVE = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE', 'INT', 'SUSP'])
 
@@ -650,6 +651,7 @@ const TREE_ROUNDS = [
 ]
 const firstLeaf = (num) => { const ch = FEEDERS[num]; return ch ? firstLeaf(ch[0]) : num }
 const leafSeq = () => { const out = []; const rec = (n) => { const ch = FEEDERS[n]; if (!ch) { out.push(n); return } rec(ch[0]); rec(ch[1]) }; rec(104); return out }
+const normalizarNombre = (value) => String(value || '').trim().replace(/\s+/g, ' ').toLowerCase()
 
 const ERROR_MSG = {
   CREDENCIALES: 'Nombre o PIN incorrecto',
@@ -684,7 +686,7 @@ export default defineComponent({
     const route = useRoute()
     const VALID_TABS = ['partidos', 'posiciones', 'llaves', 'ranking']
     const tab = ref(VALID_TABS.includes(route.query.tab) ? route.query.tab : 'partidos')
-    const cfg = ref({ abre_horas_antes: 12, bloquea_minutos_antes: 15, pts_exacto: 3, pts_resultado: 1, pts_bonus_equipo: 1, pts_ko_exacto: 5, pts_ko_resultado: 3, pts_ko_bonus: 1, pts_campeon: 10, campeon_cierra: '2026-07-01T06:00:00+00:00' })
+    const cfg = ref({ abre_horas_antes: 12, bloquea_minutos_antes: 15, pts_exacto: 3, pts_resultado: 1, pts_bonus_equipo: 1, pts_ko_exacto: 5, pts_ko_resultado: 3, pts_ko_bonus: 1, pts_campeon: 10, campeon_cierra: CAMPEON_CIERRA_DANIEL_V })
     const partidos = ref([])
     const ranking = ref([])
     const posiciones = ref([])
@@ -763,6 +765,8 @@ export default defineComponent({
     ]
 
     const inicial = computed(() => (identity.value?.nombre || '?').trim().charAt(0).toUpperCase())
+    const esDanielVCampeon = computed(() => normalizarNombre(identity.value?.nombre) === DANIEL_CAMPEON_NOMBRE)
+    const campeonVisible = computed(() => Boolean(identity.value && esDanielVCampeon.value))
 
     const tipo = (m) => {
       const s = m.estado_corto
@@ -1098,14 +1102,14 @@ export default defineComponent({
     })
 
     const campeonCerrado = computed(() => {
-      const t = Date.parse(cfg.value.campeon_cierra)
+      const t = Date.parse(CAMPEON_CIERRA_DANIEL_V)
       return Number.isFinite(t) && now.value >= t
     })
 
     const campeonCierraLabel = computed(() => {
-      const t = Date.parse(cfg.value.campeon_cierra)
+      const t = Date.parse(CAMPEON_CIERRA_DANIEL_V)
       if (!Number.isFinite(t)) return ''
-      return new Intl.DateTimeFormat('es-CR', { day: 'numeric', month: 'long', timeZone: 'America/Costa_Rica' }).format(new Date(t - 86400000))
+      return new Intl.DateTimeFormat('es-CR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Costa_Rica' }).format(new Date(t)) + ' hora Costa Rica'
     })
 
     const filterCampeon = (val, update) => {
@@ -1119,6 +1123,7 @@ export default defineComponent({
 
     const loadMiCampeon = async () => {
       if (!identity.value) { miCampeon.value = null; campeonSel.value = null; return }
+      if (!esDanielVCampeon.value) { miCampeon.value = null; campeonSel.value = null; return }
       const { data, error } = await supabase.rpc('qn_mi_campeon', { p_nombre: identity.value.nombre, p_pin: identity.value.pin })
       if (error) return
       const row = (data || [])[0] || null
@@ -1128,6 +1133,8 @@ export default defineComponent({
 
     const guardarCampeon = async () => {
       if (!identity.value) { showJoin.value = true; return }
+      if (!esDanielVCampeon.value) { notify({ type: 'negative', message: 'Solo Daniel V puede elegir campeon', position: 'top' }); return }
+      if (campeonCerrado.value) { notify({ type: 'warning', message: 'Ya cerro la eleccion de campeon', position: 'top' }); return }
       if (!campeonSel.value) { notify({ type: 'warning', message: 'Elige un equipo', position: 'top' }); return }
       savingCampeon.value = true
       const { error } = await supabase.rpc('qn_guardar_campeon', { p_nombre: identity.value.nombre, p_pin: identity.value.pin, p_equipo: campeonSel.value })
@@ -1409,7 +1416,7 @@ export default defineComponent({
       tab, cfg, partidos, ranking, gruposPos, misPron, pubPron, form, identity, loading, filtro, filtros,
       showJoin, joinData, joinLoading, savingId, inicial,
       esAdmin, penBusy, penForm, defLabel, setGanadorKo, setPenales,
-      miCampeon, campeonSel, campeonOptions, savingCampeon, campeonCerrado, campeonCierraLabel, filterCampeon, guardarCampeon,
+      miCampeon, campeonSel, campeonOptions, savingCampeon, campeonVisible, esDanielVCampeon, campeonCerrado, campeonCierraLabel, filterCampeon, guardarCampeon,
       pushAvail, pushOn, pushBusy, pushHintDismissed, togglePush, dismissPushHint,
       tipo, hora, editable, esKo, locked, estadoTexto, lockIcon, lockTexto, grupos, esMio, abrirPron,
       enVivo, proximo, cuenta,
@@ -1426,8 +1433,20 @@ export default defineComponent({
 
 <style scoped>
 .qn-page {
-  background: #f4f7f4;
-  padding-bottom: 32px;
+  --qn-green: #1b5e20;
+  --qn-green-dark: #14532d;
+  --qn-amber: #f9a825;
+  --qn-ink: #1a1a1a;
+  --qn-muted: #6b7280;
+  --qn-bg: #f4f6f4;
+  --qn-surface: #ffffff;
+  --qn-line: #e6eae6;
+  --qn-divider: #f0f2f0;
+  --qn-r-card: 12px;
+  --qn-r-ctrl: 8px;
+  background: var(--qn-bg);
+  padding-bottom: calc(32px + env(safe-area-inset-bottom));
+  -webkit-tap-highlight-color: transparent;
 }
 
 .qn-banner {
@@ -1436,8 +1455,6 @@ export default defineComponent({
   aspect-ratio: 16 / 9;
   margin: 0 auto;
   background: #073b20;
-  -webkit-mask-image: linear-gradient(to bottom, #000 62%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 62%, transparent 100%);
 }
 
 .qn-banner-image {
@@ -1459,92 +1476,76 @@ export default defineComponent({
   max-width: calc(100% - 24px);
   padding: 7px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 213, 79, 0.62);
-  background:
-    radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.16), transparent 34%),
-    linear-gradient(135deg, rgba(7, 59, 32, 0.88), rgba(47, 125, 50, 0.76));
-  color: #fff6d7;
-  box-shadow: 0 8px 20px rgba(2, 28, 14, 0.28);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(10, 40, 22, 0.85);
+  color: #fff;
   font-size: clamp(12px, 2.5vw, 16px);
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  font-weight: 600;
   line-height: 1;
-  text-transform: uppercase;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
   white-space: nowrap;
 }
 
 .qn-banner-place .q-icon {
-  color: #ffd54f;
+  color: #fff;
   flex-shrink: 0;
 }
 
-.qn-wrap { max-width: 720px; margin: 0 auto; padding: 16px; }
+.qn-wrap { max-width: 720px; margin: -24px auto 0; padding: 0 16px 16px; position: relative; z-index: 2; }
 
 .qn-identity {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #fff;
-  border-radius: 16px;
+  background: var(--qn-surface);
+  border-radius: var(--qn-r-card);
   padding: 10px 14px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
-  margin-top: 14px;
-  position: relative;
-  z-index: 2;
-  border: 1px solid rgba(46, 125, 50, 0.12);
+  border: 1px solid var(--qn-line);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
-.qn-rules { margin-top: 12px; background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05); }
-.qn-rules-body { padding: 4px 16px 14px; font-size: 13px; color: #333; }
-.qn-rules-tag { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #1b5e20; margin: 8px 0 4px; }
+.qn-rules { margin-top: 12px; background: var(--qn-surface); border-radius: var(--qn-r-card); overflow: hidden; border: 1px solid var(--qn-line); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04); }
+.qn-rules-body { padding: 4px 16px 14px; font-size: 13px; color: var(--qn-ink); }
+.qn-rules-tag { font-size: 12px; font-weight: 600; color: var(--qn-muted); margin: 8px 0 4px; }
 .qn-rules-tag:first-child { margin-top: 0; }
-.qn-rules-note { font-size: 12px; color: #6b6b6b; padding-left: 2px; }
-.qn-rules-note-dot { flex: 0 0 18px; width: 18px; height: 18px; margin-right: 8px; border-radius: 50%; background: #f3e2b3; color: #8a6d1a; font-weight: 800; font-size: 12px; line-height: 18px; text-align: center; }
-.qn-preview-exp { border: 1px dashed #c8a14a; }
-.qn-preview { padding: 4px 12px 14px; }
-.qn-preview-h { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #1b5e20; margin: 12px 0 6px; }
+.qn-rules-note { font-size: 12px; color: var(--qn-muted); padding-left: 2px; }
+.qn-rules-note-dot { flex: 0 0 18px; width: 18px; height: 18px; margin-right: 8px; border-radius: 50%; background: #f3e2b3; color: #8a6d1a; font-weight: 700; font-size: 12px; line-height: 18px; text-align: center; }
 
 .qn-champ {
   margin-top: 12px;
-  background: #fff;
-  border-radius: 14px;
+  background: var(--qn-surface);
+  border-radius: var(--qn-r-card);
   padding: 14px 16px 16px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(249, 168, 37, 0.28);
+  border: 1px solid var(--qn-line);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 .qn-champ-head {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-weight: 800;
-  color: #14532d;
+  font-weight: 700;
+  color: var(--qn-green);
   margin-bottom: 12px;
 }
-.qn-champ-head .q-icon { color: #f9a825; }
+.qn-champ-head .q-icon { color: var(--qn-amber); }
 .qn-champ-select { margin-bottom: 10px; }
 .qn-champ-flag { width: 28px; height: 20px; object-fit: cover; border-radius: 3px; }
-.qn-champ-flag-lg { width: 46px; height: 33px; object-fit: cover; border-radius: 4px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18); }
+.qn-champ-flag-lg { width: 46px; height: 33px; object-fit: cover; border-radius: 4px; }
 .qn-champ-actions { display: flex; justify-content: flex-end; }
-.qn-champ-hint { margin-top: 8px; font-size: 13px; color: #2e7d32; display: flex; align-items: center; gap: 4px; }
-.qn-champ-deadline { margin-top: 6px; font-size: 12px; color: #777; display: flex; align-items: center; gap: 4px; }
-.qn-champ-join { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 14px; color: #444; }
+.qn-champ-hint { margin-top: 8px; font-size: 13px; color: var(--qn-green); display: flex; align-items: center; gap: 4px; }
+.qn-champ-deadline { margin-top: 6px; font-size: 12px; color: var(--qn-muted); display: flex; align-items: center; gap: 4px; }
+.qn-champ-join { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 14px; color: var(--qn-ink); }
 .qn-champ-locked { display: flex; align-items: center; gap: 12px; }
 .qn-champ-locked-info { min-width: 0; }
-.qn-champ-team { font-weight: 800; font-size: 16px; color: #14532d; }
-.qn-champ-sub { margin-top: 3px; font-size: 12px; color: #777; display: flex; align-items: center; }
+.qn-champ-team { font-weight: 700; font-size: 16px; color: var(--qn-green); }
+.qn-champ-sub { margin-top: 3px; font-size: 12px; color: var(--qn-muted); display: flex; align-items: center; }
 
 .qn-next {
   margin-top: 12px;
-  border-radius: 16px;
+  border-radius: var(--qn-r-card);
   overflow: hidden;
-  background:
-    radial-gradient(circle at 90% 10%, rgba(255, 213, 79, 0.22), transparent 45%),
-    linear-gradient(135deg, #14532d 0%, #1b5e20 60%, #0f3d18 100%);
+  background: var(--qn-green-dark);
   color: #fff;
-  box-shadow: 0 8px 22px rgba(20, 83, 45, 0.35);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 .qn-live-dot {
   width: 9px; height: 9px; border-radius: 50%;
@@ -1560,9 +1561,7 @@ export default defineComponent({
 .qn-next-body { padding: 14px 16px 16px; text-align: center; }
 .qn-next-tag {
   font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
+  font-weight: 600;
   opacity: 0.9;
   display: flex;
   align-items: center;
@@ -1570,44 +1569,24 @@ export default defineComponent({
 }
 .qn-next-timer {
   font-size: 38px;
-  font-weight: 900;
+  font-weight: 700;
   line-height: 1.1;
-  letter-spacing: 1px;
-  color: #ffd54f;
+  color: var(--qn-amber);
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
   margin: 2px 0 4px;
 }
 .qn-next-match {
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
   flex-wrap: wrap;
 }
-.qn-next-vs { color: #ffd54f; font-weight: 700; }
+.qn-next-vs { color: var(--qn-amber); font-weight: 700; }
 .qn-next-flag { width: 24px; height: 17px; object-fit: cover; border-radius: 2px; }
 .qn-next-sub { font-size: 12px; opacity: 0.85; margin-top: 3px; }
-
-.qn-shimmer {
-  background-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0) 20%,
-    rgba(255, 255, 255, 0.5) 50%,
-    rgba(255, 255, 255, 0) 80%,
-    transparent 100%
-  );
-  background-size: 300% 100%;
-  background-repeat: no-repeat;
-  animation: qn-shimmer-sweep 2s ease-in-out infinite alternate;
-}
-@keyframes qn-shimmer-sweep {
-  0% { background-position: 0% 0; }
-  100% { background-position: 100% 0; }
-}
 
 .qn-goles {
   display: flex;
@@ -1615,7 +1594,7 @@ export default defineComponent({
   gap: 10px;
   margin-top: 10px;
   padding-top: 8px;
-  border-top: 1px dashed #eee;
+  border-top: 1px solid var(--qn-divider);
 }
 .qn-goles-col { flex: 1; min-width: 0; }
 .qn-goles-right { text-align: right; }
@@ -1623,12 +1602,12 @@ export default defineComponent({
   display: flex;
   align-items: center;
   font-size: 11.5px;
-  color: #444;
+  color: var(--qn-ink);
   margin-bottom: 2px;
 }
 .qn-gol-r { justify-content: flex-end; }
 .qn-gol-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.qn-gol-min { color: #888; flex-shrink: 0; }
+.qn-gol-min { color: var(--qn-muted); flex-shrink: 0; }
 
 .qn-tarjetas {
   display: flex;
@@ -1636,7 +1615,7 @@ export default defineComponent({
   gap: 10px;
   margin-top: 6px;
   padding-top: 6px;
-  border-top: 1px dashed #f0f0f0;
+  border-top: 1px solid var(--qn-divider);
 }
 .qn-card-ic {
   display: inline-block;
@@ -1650,15 +1629,46 @@ export default defineComponent({
 .qn-card-yellow { background: #fbc02d; }
 .qn-card-red { background: #e53935; }
 
-.qn-tabs { margin-top: 14px; background: #fff; border-radius: 14px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05); }
+.qn-tabs {
+  margin-top: 14px;
+  position: sticky;
+  z-index: 5;
+  background: var(--qn-bg);
+  transition: top 0.25s ease;
+}
 .qn-panels { background: transparent; margin-top: 12px; }
 .qn-panels :deep(.q-tab-panel) { padding: 0; }
 
-.qn-filtros { flex-wrap: wrap; }
+.qn-filtros {
+  display: flex;
+  align-items: stretch;
+  background: #e9ece9;
+  border-radius: 10px;
+  padding: 3px;
+}
+.qn-filtro {
+  flex: 1;
+  margin: 0;
+  height: auto;
+  min-height: 34px;
+  padding: 0 6px;
+  border-radius: var(--qn-r-ctrl);
+  background: transparent;
+  color: var(--qn-muted);
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.qn-filtro :deep(.q-chip__content) { justify-content: center; }
+.qn-filtro.qn-filtro-on {
+  background: #fff;
+  color: var(--qn-green);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
 
 .qn-fecha {
-  font-weight: 800;
-  color: #1b5e20;
+  font-weight: 700;
+  color: var(--qn-green);
   text-transform: capitalize;
   margin: 4px 2px 10px;
   font-size: 14px;
@@ -1668,23 +1678,19 @@ export default defineComponent({
 .qn-fecha::before {
   content: "";
   width: 6px; height: 18px;
-  background: linear-gradient(180deg, #ffd54f, #f9a825);
+  background: var(--qn-amber);
   border-radius: 3px;
   margin-right: 8px;
 }
 
 .qn-card {
-  background: #fff;
-  border-radius: 18px;
+  background: var(--qn-surface);
+  border-radius: var(--qn-r-card);
   padding: 14px;
   margin-bottom: 12px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.07);
-  border: 1px solid rgba(0, 0, 0, 0.04);
-  border-left: 5px solid #bdbdbd;
+  border: 1px solid var(--qn-line);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
-.qn-card.qn-live { border-left-color: #e53935; }
-.qn-card.qn-fin { border-left-color: #1b5e20; }
-.qn-card.qn-prox { border-left-color: #1e88e5; }
 
 .qn-card-top {
   display: flex;
@@ -1692,8 +1698,8 @@ export default defineComponent({
   justify-content: space-between;
   margin-bottom: 10px;
 }
-.qn-ronda { font-size: 11px; font-weight: 700; color: #757575; text-transform: uppercase; letter-spacing: 0.4px; }
-.qn-estado { font-size: 12px; font-weight: 800; display: flex; align-items: center; padding: 3px 10px; border-radius: 999px; }
+.qn-ronda { font-size: 11px; font-weight: 700; color: var(--qn-muted); text-transform: uppercase; letter-spacing: 0.4px; }
+.qn-estado { font-size: 12px; font-weight: 700; display: flex; align-items: center; padding: 3px 10px; border-radius: 999px; }
 .qn-estado-prox { background: #e3f2fd; color: #1565c0; }
 .qn-estado-live { background: #ffebee; color: #c62828; }
 .qn-estado-fin { background: #e8f5e9; color: #1b5e20; }
@@ -1707,115 +1713,78 @@ export default defineComponent({
 .qn-team-name { font-size: 13px; font-weight: 700; margin-top: 6px; line-height: 1.2; }
 
 .qn-center { width: 24%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-top: 4px; }
-.qn-score { font-size: 26px; font-weight: 900; color: #1a1a1a; }
+.qn-score { font-size: 26px; font-weight: 700; color: var(--qn-ink); }
 .qn-dash { color: #bbb; }
-.qn-vs { font-size: 16px; font-weight: 900; color: #455a64; }
-.qn-hora { font-size: 12px; color: #757575; margin-top: 2px; font-weight: 600; }
+.qn-vs { font-size: 16px; font-weight: 700; color: #455a64; }
+.qn-hora { font-size: 12px; color: var(--qn-muted); margin-top: 2px; font-weight: 600; }
 
-.qn-pred { margin-top: 12px; border-top: 1px dashed #e0e0e0; padding-top: 10px; }
+.qn-pred { margin-top: 12px; border-top: 1px solid var(--qn-divider); padding-top: 10px; }
 .qn-pred-row { display: flex; align-items: center; justify-content: center; }
 .qn-num { width: 62px; }
-.qn-pred-x { font-size: 20px; font-weight: 900; margin: 0 8px; color: #757575; }
-.qn-pred-hint { text-align: center; font-size: 12px; color: #2e7d32; margin-top: 6px; }
+.qn-pred-x { font-size: 20px; font-weight: 700; margin: 0 8px; color: var(--qn-muted); }
+.qn-pred-hint { text-align: center; font-size: 12px; color: var(--qn-green); margin-top: 6px; }
 .qn-pred-def { margin-top: 10px; }
-.qn-pred-def-q { font-size: 12px; color: #555; text-align: center; margin-bottom: 4px; }
-.qn-def-toggle { border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; font-size: 12px; }
+.qn-pred-def-q { font-size: 12px; color: var(--qn-muted); text-align: center; margin-bottom: 4px; }
+.qn-def-toggle { border: 1px solid var(--qn-line); border-radius: var(--qn-r-ctrl); overflow: hidden; font-size: 12px; }
 .qn-mine-def { font-size: 11px; color: #b06f00; margin-left: 6px; white-space: nowrap; }
-.qn-admin-pen { margin-bottom: 10px; padding: 8px; border: 1px dashed #c8a14a; border-radius: 8px; background: #fff8e8; }
+.qn-admin-pen { margin-bottom: 10px; padding: 8px; border: 1px solid rgba(200, 161, 74, 0.45); border-radius: var(--qn-r-ctrl); background: #fff8e8; }
 .qn-admin-pen-q { font-size: 12px; color: #8a6d1a; font-weight: 600; text-align: center; margin-bottom: 6px; }
 .qn-admin-pen-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .qn-admin-pen-team { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 600; color: #5a4a14; }
 .qn-admin-pen-in { width: 78px; flex: 0 0 78px; }
-.qn-penales { text-align: center; font-size: 12.5px; color: #444; margin-top: 8px; display: flex; align-items: center; justify-content: center; }
-.qn-penales-num { margin: 0 8px; font-size: 13px; color: #333; }
+.qn-penales { text-align: center; font-size: 12.5px; color: var(--qn-ink); margin-top: 8px; display: flex; align-items: center; justify-content: center; }
+.qn-penales-num { margin: 0 8px; font-size: 13px; color: var(--qn-ink); }
 .qn-pen-dots { display: inline-flex; align-items: center; gap: 3px; }
 .qn-pen-dot { width: 9px; height: 9px; border-radius: 50%; box-sizing: border-box; flex-shrink: 0; }
-.qn-pen-ok { background: #2e7d32; }
+.qn-pen-ok { background: var(--qn-green); }
 .qn-pen-miss { background: #fff; border: 1.5px solid #c62828; }
 
-.qn-mine { font-size: 13px; color: #333; display: flex; align-items: center; justify-content: center; }
-.qn-locked { font-size: 12.5px; color: #9e9e9e; display: flex; align-items: center; justify-content: center; font-weight: 600; }
+.qn-mine { font-size: 13px; color: var(--qn-ink); display: flex; align-items: center; justify-content: center; }
+.qn-locked { font-size: 12.5px; color: var(--qn-muted); display: flex; align-items: center; justify-content: center; font-weight: 600; }
 
-.qn-pub { margin-top: 8px; background: #fafafa; border-radius: 12px; padding: 4px 10px; }
+.qn-pub { margin-top: 8px; background: var(--qn-bg); border-radius: var(--qn-r-ctrl); padding: 4px 10px; }
+.qn-btn-cta { min-height: 44px; }
 .qn-btn-pron {
-  min-height: 38px;
+  min-height: 44px;
   padding: 0 18px;
   font-weight: 700;
-  letter-spacing: 0.2px;
-  box-shadow: 0 4px 12px rgba(27, 94, 32, 0.28);
 }
 .qn-btn-pron :deep(.q-icon) { font-size: 20px; }
 .qn-pred .qn-btn-pron { margin-top: 8px; }
-.qn-pub-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 2px; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+.qn-pub-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 2px; border-bottom: 1px solid var(--qn-divider); font-size: 13px; }
 .qn-pub-row:last-child { border-bottom: none; }
 
-.qn-rank { background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06); }
-.qn-rank-row { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 14px; border-bottom: 1px solid #f2f2f2; cursor: pointer; transition: background 0.15s, box-shadow 0.15s; }
-.qn-rank-row:last-child { border-bottom: none; }
-.qn-rank-row:hover { background: rgba(46, 125, 50, 0.06); }
-.qn-rank-row.qn-me:not(.qn-rank-place-1):not(.qn-rank-place-2):not(.qn-rank-place-3) { background: linear-gradient(90deg, rgba(255, 213, 79, 0.18), transparent); }
-.qn-rank-row.qn-me { box-shadow: inset 3px 0 0 rgba(46, 125, 50, 0.75); }
-.qn-rank-row.qn-rank-place-1 { background: linear-gradient(90deg, #fff1b8 0%, #fff8df 58%, #ffffff 100%); border-bottom-color: #f1cd4f; }
-.qn-rank-row.qn-rank-place-2 { background: linear-gradient(90deg, #e9eef2 0%, #f7f9fa 58%, #ffffff 100%); border-bottom-color: #c7d0d8; }
-.qn-rank-row.qn-rank-place-3 { background: linear-gradient(90deg, #f5d2ad 0%, #fff0df 58%, #ffffff 100%); border-bottom-color: #d59a5d; }
-.qn-rank-row.qn-rank-place-1:hover { background: linear-gradient(90deg, #ffe89a 0%, #fff4ca 58%, #ffffff 100%); }
-.qn-rank-row.qn-rank-place-2:hover { background: linear-gradient(90deg, #dfe6eb 0%, #f1f5f7 58%, #ffffff 100%); }
-.qn-rank-row.qn-rank-place-3:hover { background: linear-gradient(90deg, #efc291 0%, #ffe6cb 58%, #ffffff 100%); }
-.qn-pos { width: 30px; height: 30px; border-radius: 50%; background: #eee; color: #555; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.qn-rank { background: var(--qn-surface); border-radius: var(--qn-r-card); overflow: hidden; border: 1px solid var(--qn-line); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04); }
+.qn-rank-row { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 14px; position: relative; cursor: pointer; transition: background 0.1s; }
+.qn-rank-row:not(:last-child)::after { content: ""; position: absolute; left: 60px; right: 0; bottom: 0; height: 1px; background: var(--qn-divider); }
+.qn-rank-row:active { background: rgba(0, 0, 0, 0.05); }
+.qn-rank-row.qn-me { background: rgba(27, 94, 32, 0.06); box-shadow: inset 3px 0 0 var(--qn-green); }
+.qn-pos { width: 30px; height: 30px; border-radius: 50%; background: #eee; color: var(--qn-muted); font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .qn-medal {
-  position: relative;
-  width: 44px;
-  height: 52px;
-  flex-shrink: 0;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding-top: 4px;
-  color: #fff;
-  font-size: 20px;
-  font-weight: 900;
-  line-height: 1;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
-}
-.qn-medal::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 5px;
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  z-index: 1;
-  box-shadow: inset 0 2px 5px rgba(255, 255, 255, 0.85), inset 0 -4px 7px rgba(87, 56, 0, 0.24), 0 3px 6px rgba(0, 0, 0, 0.16);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
 }
-.qn-medal::after {
-  content: "";
-  position: absolute;
-  top: 27px;
-  left: 10px;
-  width: 24px;
-  height: 24px;
-  background:
-    linear-gradient(135deg, #d7192a 0 46%, transparent 47%) left / 50% 100% no-repeat,
-    linear-gradient(225deg, #b71020 0 46%, transparent 47%) right / 50% 100% no-repeat;
-  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.15));
-}
-.qn-medal span { position: relative; z-index: 2; margin-top: 4px; }
-.qn-medal-1::before { background: radial-gradient(circle at 30% 24%, #fff7bd 0 16%, #ffd84d 38%, #f5a900 72%, #d98900 100%); border: 2px solid #ffe27a; }
-.qn-medal-2::before { background: radial-gradient(circle at 30% 24%, #ffffff 0 16%, #dfe5e8 38%, #aeb9c0 72%, #87949d 100%); border: 2px solid #eef3f6; }
-.qn-medal-3::before { background: radial-gradient(circle at 30% 24%, #ffe4ba 0 16%, #d99a5b 38%, #a96228 72%, #804014 100%); border: 2px solid #efc08b; }
+.qn-medal-1 { background: #f5b800; }
+.qn-medal-2 { background: #aeb9c0; }
+.qn-medal-3 { background: #c07a3e; }
 .qn-rank-name { flex: 1; font-weight: 700; min-width: 0; }
-.qn-yo { background: #2e7d32; color: #fff; font-size: 10px; padding: 1px 6px; border-radius: 8px; margin-left: 6px; vertical-align: middle; }
-.qn-rank-pts { font-weight: 900; font-size: 20px; color: #1b5e20; }
-.qn-rank-pts span { font-size: 11px; font-weight: 600; color: #9e9e9e; margin-left: 3px; }
-.qn-rank-place-1 .qn-rank-pts { color: #9a6700; }
-.qn-rank-place-2 .qn-rank-pts { color: #60717d; }
-.qn-rank-place-3 .qn-rank-pts { color: #8b4f1f; }
+.qn-yo { background: var(--qn-green); color: #fff; font-size: 10px; padding: 1px 6px; border-radius: 8px; margin-left: 6px; vertical-align: middle; }
+.qn-rank-pts { font-weight: 700; font-size: 20px; color: var(--qn-green); font-variant-numeric: tabular-nums; }
+.qn-rank-pts span { font-size: 11px; font-weight: 600; color: var(--qn-muted); margin-left: 3px; }
 
 .qn-grupo { margin-bottom: 18px; }
 .qn-grupo-head {
-  font-weight: 800;
-  color: #1b5e20;
+  font-weight: 700;
+  color: var(--qn-green);
   font-size: 14px;
   margin: 2px 2px 8px;
   display: flex;
@@ -1824,59 +1793,57 @@ export default defineComponent({
 .qn-grupo-head::before {
   content: "";
   width: 6px; height: 16px;
-  background: linear-gradient(180deg, #ffd54f, #f9a825);
+  background: var(--qn-amber);
   border-radius: 3px;
   margin-right: 8px;
 }
-.qn-tabla { background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06); }
+.qn-tabla { background: var(--qn-surface); border-radius: var(--qn-r-card); overflow: hidden; border: 1px solid var(--qn-line); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04); }
 .qn-tabla-row {
   display: flex;
   align-items: center;
   padding: 9px 10px;
-  border-bottom: 1px solid #f2f2f2;
+  position: relative;
   font-size: 13px;
 }
-.qn-tabla-row:last-child { border-bottom: none; }
+.qn-tabla-row:not(:last-child)::after { content: ""; position: absolute; left: 32px; right: 0; bottom: 0; height: 1px; background: var(--qn-divider); }
 .qn-tabla-head {
-  background: #1b5e20;
+  background: var(--qn-green);
   color: #fff;
   font-size: 11px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
   padding: 7px 10px;
 }
-.qn-col-pos { width: 22px; text-align: center; font-weight: 700; color: #757575; flex-shrink: 0; }
+.qn-tabla-head::after { display: none; }
+.qn-col-pos { width: 22px; text-align: center; font-weight: 700; color: var(--qn-muted); flex-shrink: 0; }
 .qn-tabla-head .qn-col-pos { color: #fff; }
 .qn-col-eq { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; font-weight: 600; }
 .qn-tabla-flag { width: 22px; height: 15px; object-fit: cover; border-radius: 2px; flex-shrink: 0; }
-.qn-col-n { width: 30px; text-align: center; flex-shrink: 0; color: #555; font-variant-numeric: tabular-nums; }
-.qn-col-pts { font-weight: 800; color: #1b5e20; width: 34px; }
+.qn-col-n { width: 30px; text-align: center; flex-shrink: 0; color: var(--qn-muted); font-variant-numeric: tabular-nums; }
+.qn-col-pts { font-weight: 700; color: var(--qn-green); width: 34px; }
 .qn-tabla-head .qn-col-n, .qn-tabla-head .qn-col-pts { color: #fff; }
-.qn-clasifica { border-left: 4px solid #2e7d32; }
-.qn-clasifica .qn-col-pos { color: #2e7d32; }
+.qn-clasifica { border-left: 4px solid var(--qn-green); }
+.qn-clasifica .qn-col-pos { color: var(--qn-green); }
 .qn-tabla-nota {
   display: flex;
   align-items: center;
   gap: 7px;
   font-size: 12px;
-  color: #757575;
+  color: var(--qn-muted);
   margin: 4px 4px 8px;
 }
-.qn-clasifica-dot { width: 10px; height: 10px; border-radius: 2px; background: #2e7d32; flex-shrink: 0; }
+.qn-clasifica-dot { width: 10px; height: 10px; border-radius: 2px; background: var(--qn-green); flex-shrink: 0; }
 .qn-rank-go { flex-shrink: 0; }
 
 .qn-push-hint {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: #fff;
-  border: 1px solid rgba(46, 125, 50, 0.2);
-  border-left: 4px solid #2e7d32;
-  border-radius: 14px;
+  background: var(--qn-surface);
+  border: 1px solid var(--qn-line);
+  border-radius: var(--qn-r-card);
   padding: 10px 12px;
   margin-top: 10px;
-  box-shadow: 0 2px 10px rgba(46, 125, 50, 0.1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 .qn-push-hint-icon { flex-shrink: 0; }
 .qn-push-hint-text { flex: 1; min-width: 0; }
@@ -1884,11 +1851,11 @@ export default defineComponent({
 .qn-hint-enter-active, .qn-hint-leave-active { transition: max-height 0.25s ease, opacity 0.25s ease; overflow: hidden; max-height: 80px; }
 .qn-hint-enter-from, .qn-hint-leave-to { max-height: 0; opacity: 0; }
 
-.qn-join { width: 360px; max-width: 92vw; border-radius: 20px; }
+.qn-join { width: 360px; max-width: 92vw; border-radius: 12px; }
 
 .qn-date-wrap { margin-bottom: 12px; }
 .qn-date-toggle { min-height: 32px; }
-.qn-date-label { font-size: 13px; font-weight: 700; color: #1b5e20; margin-left: 8px; }
+.qn-date-label { font-size: 13px; font-weight: 700; color: var(--qn-green); margin-left: 8px; }
 
 .qn-calendar-shell {
   display: flex;
@@ -1897,10 +1864,10 @@ export default defineComponent({
   overflow: hidden;
   margin-bottom: 4px;
   padding: 8px;
-  background: #fff;
-  border: 1px solid rgba(27, 94, 32, 0.1);
-  border-radius: 18px;
-  box-shadow: 0 10px 28px rgba(27, 94, 32, 0.12);
+  background: var(--qn-surface);
+  border: 1px solid var(--qn-line);
+  border-radius: var(--qn-r-card);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 .qn-calendar-picker {
   width: 100%;
@@ -1914,13 +1881,13 @@ export default defineComponent({
   gap: 8px;
   width: 100%;
   padding: 4px 4px 2px 12px;
-  border-top: 1px solid #edf2ed;
+  border-top: 1px solid var(--qn-divider);
 }
 .qn-calendar-hint {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #6b766c;
+  color: var(--qn-muted);
   font-size: 12px;
 }
 
@@ -1944,21 +1911,22 @@ export default defineComponent({
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 9px 14px;
-  background: linear-gradient(135deg, #14532d 0%, #1b5e20 65%, #0f3d18 100%);
+  padding: 9px calc(14px + env(safe-area-inset-right)) 9px calc(14px + env(safe-area-inset-left));
+  background: var(--qn-green-dark);
   color: #fff;
-  box-shadow: 0 6px 18px rgba(20, 83, 45, 0.4);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
   cursor: pointer;
   font-size: 14px;
   font-weight: 700;
 }
+.qn-sticky:active { opacity: 0.85; }
 .qn-sticky-flag { width: 22px; height: 16px; object-fit: cover; border-radius: 2px; flex-shrink: 0; }
 .qn-sticky-team { max-width: 30%; font-weight: 700; }
 .qn-sticky-team-r { text-align: right; }
-.qn-sticky-score { color: #ffd54f; font-size: 17px; font-weight: 900; font-variant-numeric: tabular-nums; flex-shrink: 0; }
-.qn-sticky-vs { color: #ffd54f; font-weight: 800; font-size: 12px; flex-shrink: 0; }
-.qn-sticky-min { margin-left: auto; font-size: 12px; font-weight: 800; color: #ffd54f; flex-shrink: 0; font-variant-numeric: tabular-nums; }
-.qn-sticky-count { margin-left: auto; font-size: 15px; font-weight: 900; color: #ffd54f; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.qn-sticky-score { color: var(--qn-amber); font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.qn-sticky-vs { color: var(--qn-amber); font-weight: 700; font-size: 12px; flex-shrink: 0; }
+.qn-sticky-min { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--qn-amber); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.qn-sticky-count { margin-left: auto; font-size: 15px; font-weight: 700; color: var(--qn-amber); font-variant-numeric: tabular-nums; flex-shrink: 0; }
 
 .qn-sticky-enter-active, .qn-sticky-leave-active { transition: transform 0.25s ease, opacity 0.25s ease; }
 .qn-sticky-enter-from, .qn-sticky-leave-to { transform: translateY(-100%); opacity: 0; }
@@ -1972,7 +1940,7 @@ export default defineComponent({
   align-items: center;
   background: #e3f2fd;
   color: #1565c0;
-  border-radius: 12px;
+  border-radius: var(--qn-r-card);
   padding: 9px 12px;
   font-size: 13px;
   font-weight: 600;
@@ -1982,7 +1950,7 @@ export default defineComponent({
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #9e9e9e;
+  color: var(--qn-muted);
   font-size: 11.5px;
   font-weight: 600;
   margin-bottom: 8px;
@@ -2012,16 +1980,17 @@ export default defineComponent({
 .qn-brk2-round:not(:last-child) { margin-right: var(--gut); }
 .qn-brk2-roundhead {
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #1b5e20;
+  color: var(--qn-green);
   text-align: center;
   padding: 6px 0;
   margin-bottom: 8px;
-  background: #fff;
+  background: var(--qn-surface);
+  border: 1px solid var(--qn-line);
   border-radius: 999px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 .qn-brk2-matches {
   flex: 0 0 auto;
@@ -2041,17 +2010,14 @@ export default defineComponent({
 }
 .qn-brk2-card {
   width: 100%;
-  background: #fff;
-  border-radius: 12px;
+  background: var(--qn-surface);
+  border-radius: var(--qn-r-card);
   padding: 7px 9px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.07);
-  border-left: 4px solid #bdbdbd;
+  border: 1px solid var(--qn-line);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
   position: relative;
   z-index: 1;
 }
-.qn-brk2-card.qn-brk-live { border-left-color: #e53935; }
-.qn-brk2-card.qn-brk-fin { border-left-color: #1b5e20; }
-.qn-brk2-card.qn-brk-prox { border-left-color: #1e88e5; }
 
 .qn-brk2-round:not(:last-child) .qn-brk2-match::after {
   content: "";
@@ -2089,26 +2055,21 @@ export default defineComponent({
   display: flex;
   align-items: center;
   font-size: 12px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  color: #8d6e00;
+  font-weight: 600;
+  color: var(--qn-muted);
   margin-bottom: 6px;
 }
-.qn-brk-3rd-card { border-left-color: #c9a227 !important; }
 .qn-brk-state {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
+  font-size: 11px;
+  font-weight: 600;
   margin-bottom: 6px;
   display: flex;
   align-items: center;
   gap: 4px;
-  color: #9e9e9e;
+  color: var(--qn-muted);
 }
 .qn-brk-state-live { color: #c62828; }
-.qn-brk-state-fin { color: #1b5e20; }
+.qn-brk-state-fin { color: var(--qn-green); }
 .qn-brk-livedot { width: 7px; height: 7px; }
 .qn-brk-team {
   display: flex;
@@ -2117,22 +2078,22 @@ export default defineComponent({
   padding: 3px 0;
   font-size: 12.5px;
   font-weight: 600;
-  color: #333;
+  color: var(--qn-ink);
 }
-.qn-brk-team + .qn-brk-team { border-top: 1px dashed #eee; }
-.qn-brk-win { font-weight: 900; color: #0d2818; }
-.qn-brk-dim { color: #9e9e9e; font-weight: 600; font-style: italic; }
+.qn-brk-team + .qn-brk-team { border-top: 1px solid var(--qn-divider); }
+.qn-brk-win { font-weight: 700; color: var(--qn-ink); }
+.qn-brk-dim { color: var(--qn-muted); font-weight: 600; font-style: italic; }
 .qn-brk-flag { width: 22px; height: 16px; object-fit: cover; border-radius: 2px; flex-shrink: 0; }
 .qn-brk-ph { width: 22px; height: 16px; border-radius: 2px; background: #ececec; flex-shrink: 0; }
 .qn-brk-name { flex: 1; min-width: 0; }
-.qn-brk-score { font-weight: 900; font-size: 14px; color: #1a1a1a; flex-shrink: 0; font-variant-numeric: tabular-nums; }
-.qn-brk-win .qn-brk-score { color: #1b5e20; }
+.qn-brk-score { font-weight: 700; font-size: 14px; color: var(--qn-ink); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.qn-brk-win .qn-brk-score { color: var(--qn-green); }
 
 @media (max-width: 599px) {
   .qn-logo { width: 40px; height: 40px; }
   .qn-team-name { font-size: 12px; }
   .qn-score { font-size: 22px; }
-  .qn-calendar-shell { padding: 4px; border-radius: 16px; }
+  .qn-calendar-shell { padding: 4px; }
   .qn-calendar-actions { padding-left: 8px; }
   .qn-hide-xs { display: none; }
   .qn-brk2 { --gut: 20px; --match-slot: 94px; }
@@ -2141,9 +2102,9 @@ export default defineComponent({
 
 @media (prefers-reduced-motion: reduce) {
   .qn-calendar-enter-active, .qn-calendar-leave-active { transition: none; }
-  .qn-shimmer { animation: none; }
   .qn-sticky-enter-active, .qn-sticky-leave-active { transition: none; }
   .qn-brk2-anim .qn-brk2-matches { transition: none; }
+  .qn-tabs { transition: none; }
 }
 </style>
 

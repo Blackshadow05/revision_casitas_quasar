@@ -587,10 +587,38 @@
             <template v-slot:prepend><q-icon name="pin" /></template>
           </q-input>
           <div class="text-caption text-grey-6">Si ya te uniste antes, usa el mismo nombre y PIN para recuperar tus pronósticos.</div>
+          <div class="text-center">
+            <q-btn flat no-caps dense color="green-8" label="Olvidé mi PIN" @click="abrirResetPin" />
+          </div>
         </q-card-section>
         <q-card-actions align="right" class="q-pa-md">
           <q-btn flat no-caps label="Cancelar" color="grey-7" v-close-popup />
           <q-btn unelevated no-caps rounded color="green-8" label="Entrar" class="qn-btn-cta" :loading="joinLoading" @click="join" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
+    <q-dialog v-model="showResetPin" position="top" no-focus no-refocus>
+      <q-card class="qn-join">
+        <q-card-section class="text-center">
+          <q-icon name="key" size="48px" color="orange-8" />
+          <div class="text-h6 text-weight-bold q-mt-sm">Cambiar PIN</div>
+          <div class="text-grey-7 text-caption">Pide al administrador un código de autorización y úsalo aquí para elegir un PIN nuevo.</div>
+        </q-card-section>
+        <q-card-section class="q-gutter-md">
+          <q-input v-model="resetData.nombre" label="Tu nombre" outlined dense maxlength="40">
+            <template v-slot:prepend><q-icon name="person" /></template>
+          </q-input>
+          <q-input v-model="resetData.token" label="Código de autorización" outlined dense>
+            <template v-slot:prepend><q-icon name="admin_panel_settings" /></template>
+          </q-input>
+          <q-input v-model="resetData.nuevoPin" label="Nuevo PIN (4 dígitos)" outlined dense type="tel" maxlength="4" @update:model-value="v => resetData.nuevoPin = String(v || '').replace(/\D/g, '').slice(0, 4)">
+            <template v-slot:prepend><q-icon name="pin" /></template>
+          </q-input>
+        </q-card-section>
+        <q-card-actions align="right" class="q-pa-md">
+          <q-btn flat no-caps label="Volver" color="grey-7" @click="cerrarResetPin" />
+          <q-btn unelevated no-caps rounded color="orange-8" label="Cambiar PIN" class="qn-btn-cta" :loading="resetLoading" @click="cambiarPin" />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -658,7 +686,9 @@ const ERROR_MSG = {
   NO_ES_KO: 'Solo aplica a partidos de eliminatoria',
   LADO_INVALIDO: 'Lado inválido',
   PENALES_EMPATE: 'En penales debe haber un ganador (anotados distintos)',
-  PENALES_INVALIDO: 'Penales inválidos'
+  PENALES_INVALIDO: 'Penales inválidos',
+  TOKEN_INCORRECTO: 'Nombre o código de autorización incorrecto',
+  TOKEN_INVALIDO: 'Escribe el código de autorización'
 }
 
 function msgFromError (e) {
@@ -691,6 +721,9 @@ export default defineComponent({
     const showJoin = ref(false)
     const joinData = reactive({ nombre: '', pin: '' })
     const joinLoading = ref(false)
+    const showResetPin = ref(false)
+    const resetData = reactive({ nombre: '', token: '', nuevoPin: '' })
+    const resetLoading = ref(false)
     const savingId = ref(null)
     const esAdmin = ref(false)
     const penBusy = ref(null)
@@ -1178,6 +1211,36 @@ export default defineComponent({
       notify({ type: 'positive', message: '¡Listo, ' + nombre + '!', position: 'top' })
     }
 
+    const abrirResetPin = () => {
+      resetData.nombre = (joinData.nombre || '').trim()
+      resetData.token = ''
+      resetData.nuevoPin = ''
+      showJoin.value = false
+      showResetPin.value = true
+    }
+
+    const cerrarResetPin = () => {
+      showResetPin.value = false
+      showJoin.value = true
+    }
+
+    const cambiarPin = async () => {
+      const nombre = (resetData.nombre || '').trim()
+      const token = (resetData.token || '').trim()
+      const nuevoPin = (resetData.nuevoPin || '').trim()
+      if (!nombre) { notify({ type: 'warning', message: 'Escribe tu nombre', position: 'top' }); return }
+      if (!token) { notify({ type: 'warning', message: 'Escribe el código de autorización', position: 'top' }); return }
+      if (!/^\d{4}$/.test(nuevoPin)) { notify({ type: 'warning', message: 'El PIN debe ser de 4 dígitos', position: 'top' }); return }
+      resetLoading.value = true
+      const { error } = await supabase.rpc('qn_cambiar_pin', { p_nombre: nombre, p_token: token, p_nuevo_pin: nuevoPin })
+      resetLoading.value = false
+      if (error) { notify({ type: 'negative', message: msgFromError(error), position: 'top' }); return }
+      notify({ type: 'positive', message: 'PIN actualizado. Entra con tu nuevo PIN.', position: 'top' })
+      joinData.nombre = nombre
+      joinData.pin = ''
+      cerrarResetPin()
+    }
+
     const salir = () => {
       identity.value = null
       localStorage.removeItem(IDENTITY_KEY)
@@ -1403,6 +1466,7 @@ export default defineComponent({
     return {
       tab, cfg, partidos, ranking, gruposPos, misPron, pubPron, form, identity, loading, filtro, filtros,
       showJoin, joinData, joinLoading, savingId, inicial,
+      showResetPin, resetData, resetLoading, abrirResetPin, cerrarResetPin, cambiarPin,
       esAdmin, penBusy, penForm, defLabel, setGanadorKo, setPenales,
       miCampeon, campeonSel, campeonOptions, savingCampeon, campeonVisible, esDanielVCampeon, campeonCerrado, campeonCierraLabel, filterCampeon, guardarCampeon,
       pushAvail, pushOn, pushBusy, pushHintDismissed, togglePush, dismissPushHint,

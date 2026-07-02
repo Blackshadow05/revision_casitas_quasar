@@ -29,7 +29,7 @@ const FIN_CODES = new Set(["FT", "AET", "PEN"]);
 const FLASH_KO_PROVIDER = "flashscore-ko";
 const FLASH_KO_LOOKAHEAD_DAYS = 7;
 const FLASH_KO_SYNC_INTERVAL_MS = 30 * 60000;
-const FLASH_KO_MATCH_TOLERANCE_MS = 8 * 3600000;
+const FLASH_KO_MATCH_TOLERANCE_MS = 90 * 60000;
 const KO_FEEDERS: Record<number, [number, number]> = {
   89: [74, 77], 90: [73, 75], 91: [76, 78], 92: [79, 80],
   93: [83, 84], 94: [81, 82], 95: [86, 88], 96: [85, 87],
@@ -480,6 +480,98 @@ async function runApiFootballBackup(supabase: any, rows: any[], nowMs: number, c
   return { enabled: true, candidates: candidates.length, due: due.length, apiCalls, updates, anyFinished: finished };
 }
 
+function footballDataKey(): string | null {
+  return Deno.env.get("FOOTBALL_DATA_KEY") ?? null;
+}
+async function fdFetch(path: string, key: string): Promise<any> {
+  const r = await fetch(`https://api.football-data.org/v4/${path}`, { headers: { "X-Auth-Token": key } });
+  if (!r.ok) throw new Error(`football-data ${path} -> ${r.status}`);
+  return await r.json();
+}
+function fdDurationToCorto(duration: string): string {
+  if (duration === "PENALTY_SHOOTOUT") return "PEN";
+  if (duration === "EXTRA_TIME") return "AET";
+  return "FT";
+}
+async function checkFootballData(supabase: any, rows: any[], nowMs: number, statusOverride: Map<number, string>, primaryFinishedIds: Set<number>): Promise<any> {
+  const key = footballDataKey();
+  if (!key) return { enabled: false };
+  if (!rows.length) return { enabled: true, checked: 0 };
+  const from = new Date(nowMs - 24 * 3600000).toISOString().slice(0, 10);
+  const to = new Date(nowMs + 24 * 3600000).toISOString().slice(0, 10);
+  let payload: any;
+  try { payload = await fdFetch(`competitions/WC/matches?dateFrom=${from}&dateTo=${to}`, key); }
+  catch (e) { return { enabled: true, error: String(e) }; }
+  const matches = Array.isArray(payload?.matches) ? payload.matches : [];
+  const byPair = new Map<string, any>();
+  for (const m of matches) {
+    const h = es(m.homeTeam?.name ?? ""), a = es(m.awayTeam?.name ?? "");
+    if (!h || !a) continue;
+    byPair.set(pairKey(h, a), m);
+  }
+  const updates: any[] = [];
+  let anyFinished = false;
+  for (const row of rows) {
+    const m = byPair.get(pairKey(row.equipo_local, row.equipo_visita));
+    if (!m) continue;
+    if (row.finalizado) continue;
+    const status = String(m.status ?? "");
+    const localIsHome = es(m.homeTeam?.name ?? "") === row.equipo_local;
+    const ft = m.score?.fullTime ?? {};
+    const gl = localIsHome ? ft.home : ft.away;
+    const gv = localIsHome ? ft.away : ft.home;
+    const rowId = Number(row.id);
+
+    if (!primaryFinishedIds.has(rowId) && status === "FINISHED") {
+      const corto = fdDurationToCorto(m.score?.duration ?? "REGULAR");
+      const patch: any = { estado_corto: corto, finalizado: true, minuto: null, minuto_label: null, updated_at: new Date(nowMs).toISOString() };
+      if (Number.isFinite(gl) && Number.isFinite(gv)) { patch.goles_local = gl; patch.goles_visita = gv; }
+      if (KO_ROUNDS.has(row.ronda)) {
+        const w = m.score?.winner;
+        let g: number | null = null;
+        if (w === "HOME_TEAM") g = localIsHome ? 1 : 2;
+        else if (w === "AWAY_TEAM") g = localIsHome ? 2 : 1;
+        if (g) patch.ganador_ko = g;
+        const pen = m.score?.penalties;
+        if (pen && Number.isFinite(pen.home) && Number.isFinite(pen.away)) {
+          patch.pen_local = localIsHome ? pen.home : pen.away;
+          patch.pen_visita = localIsHome ? pen.away : pen.home;
+        }
+      }
+      const { error } = await supabase.from("qn_partidos").update(patch).eq("id", row.id);
+      if (!error) { updates.push({ id: row.id, kind: "finish", estado: corto }); anyFinished = true; }
+      continue;
+    }
+
+    const flashCorto = statusOverride.get(rowId);
+    const effectiveCorto = flashCorto ?? row.estado_corto;
+
+    if (effectiveCorto === "NS" && ["LIVE", "IN_PLAY", "PAUSED"].includes(status)) {
+      const patch: any = { estado_corto: status === "PAUSED" ? "HT" : "LIVE", finalizado: false, updated_at: new Date(nowMs).toISOString() };
+      if (Number.isFinite(gl) && Number.isFinite(gv)) { patch.goles_local = gl; patch.goles_visita = gv; }
+      const { error } = await supabase.from("qn_partidos").update(patch).eq("id", row.id);
+      if (!error) updates.push({ id: row.id, kind: "start", estado: patch.estado_corto });
+      continue;
+    }
+
+    if (status === "PAUSED" && effectiveCorto !== "HT") {
+      const patch: any = { estado_corto: "HT", minuto: null, minuto_label: null, finalizado: false, updated_at: new Date(nowMs).toISOString() };
+      if (Number.isFinite(gl) && Number.isFinite(gv)) { patch.goles_local = gl; patch.goles_visita = gv; }
+      const { error } = await supabase.from("qn_partidos").update(patch).eq("id", row.id);
+      if (!error) updates.push({ id: row.id, kind: "halftime_in", estado: "HT" });
+      continue;
+    }
+
+    if (["LIVE", "IN_PLAY"].includes(status) && effectiveCorto === "HT") {
+      const patch: any = { estado_corto: "LIVE", finalizado: false, updated_at: new Date(nowMs).toISOString() };
+      if (Number.isFinite(gl) && Number.isFinite(gv)) { patch.goles_local = gl; patch.goles_visita = gv; }
+      const { error } = await supabase.from("qn_partidos").update(patch).eq("id", row.id);
+      if (!error) updates.push({ id: row.id, kind: "halftime_out", estado: "LIVE" });
+    }
+  }
+  return { enabled: true, checked: rows.length, matched: updates.length, updates, anyFinished };
+}
+
 async function syncFlashscoreKnockoutTeams(supabase: any, rapidKey: string, nowMs: number, cfg: any): Promise<any> {
   const last = cfg?.last_full_sync ? Date.parse(cfg.last_full_sync) : 0;
   if (last && nowMs - last < FLASH_KO_SYNC_INTERVAL_MS) {
@@ -691,18 +783,17 @@ Deno.serve(async (req: Request) => {
     const sc = fm.scores ?? {};
     let golesLocal = localIsHome ? sc.home : sc.away;
     let golesVisita = localIsHome ? sc.away : sc.home;
-    const finished = !!st.is_finished;
-    if (finished) anyFinished = true;
+    const rawFinished = !!st.is_finished;
     const koMs = Date.parse(row.kickoff);
     let minuto: number | null = null;
     let minutoLabel: string | null = null;
-    if (!finished && !interrupted) {
+    if (!rawFinished && !interrupted) {
       minuto = Number.isFinite(liveMin) && liveMin > 0 ? liveMin : Math.max(0, Math.min(Math.floor((nowMs - koMs) / 60000), 120));
       const lt = typeof st.live_time === "string" ? st.live_time : null;
       minutoLabel = lt && lt.includes("+") ? lt : null;
     }
-    const patch: any = { estado_corto: corto, estado_largo: st.stage ?? null, minuto, minuto_label: minutoLabel, finalizado: finished, updated_at: new Date().toISOString() };
-    const detailCheck = detailsDue(nowMs, row, corto, finished, golesLocal, golesVisita);
+    const patch: any = { estado_corto: corto, estado_largo: st.stage ?? null, minuto, minuto_label: minutoLabel, updated_at: new Date().toISOString() };
+    const detailCheck = detailsDue(nowMs, row, corto, rawFinished, golesLocal, golesVisita);
     if (!interrupted && detailCheck.due) {
       try {
         const sum = await rapid(`matches/match/summary?match_id=${fm.match_id}`, rapidKey); apiCalls++; summaryCalls++;
@@ -716,12 +807,17 @@ Deno.serve(async (req: Request) => {
     }
     patch.goles_local = golesLocal ?? null;
     patch.goles_visita = golesVisita ?? null;
-    if (finished && KO_ROUNDS.has(row.ronda)) {
+    let ganadorKo: number | null = null;
+    if (rawFinished && KO_ROUNDS.has(row.ronda)) {
       const ganadorApi = flashscoreWinner(st, localIsHome);
       const ganadorMarcador = corto === "PEN" ? null : scoreWinner(golesLocal, golesVisita);
-      const ganadorKo = ganadorApi ?? ganadorMarcador;
+      ganadorKo = ganadorApi ?? ganadorMarcador;
       if (ganadorKo) patch.ganador_ko = ganadorKo;
     }
+    const pendingKoWinner = rawFinished && KO_ROUNDS.has(row.ronda) && corto !== "PEN" && !ganadorKo;
+    const finished = rawFinished && !pendingKoWinner;
+    patch.finalizado = finished;
+    if (finished) anyFinished = true;
     if (finished && corto === "PEN") {
       const afKey = apiFootballKey();
       if (afKey) {
@@ -750,6 +846,12 @@ Deno.serve(async (req: Request) => {
     if (backup?.anyFinished) anyFinished = true;
   } catch (e) { backup = { enabled: true, error: String(e) }; }
 
+  let fdCheck: any = null;
+  try {
+    fdCheck = await checkFootballData(supabase, dueRows, nowMs, statusOverride, primaryFinishedIds);
+    if (fdCheck?.anyFinished) anyFinished = true;
+  } catch (e) { fdCheck = { enabled: true, error: String(e) }; }
+
   try {
     const afterLiveAdvance = await propagateKnockoutWinners(supabase, nowMs);
     if (afterLiveAdvance?.updated) koAdvance = afterLiveAdvance;
@@ -758,5 +860,5 @@ Deno.serve(async (req: Request) => {
   let scored: any = null;
   if (anyFinished) { const { data } = await supabase.rpc("qn_calcular_pendientes"); scored = data; }
   await supabase.from("qn_config").update({ last_live_sync: new Date().toISOString() }).eq("id", 1);
-  return json({ ok: true, ventana: live.length, due: dueRows.length, enBackoff, matched: updates.length, apiCalls, summaryCalls, summarySkipped, koSync, koAdvance, penResolve, backup, scored, updates });
+  return json({ ok: true, ventana: live.length, due: dueRows.length, enBackoff, matched: updates.length, apiCalls, summaryCalls, summarySkipped, koSync, koAdvance, penResolve, backup, fdCheck, scored, updates });
 });

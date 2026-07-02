@@ -985,8 +985,8 @@ export default defineComponent({
     // --- Turno classification ---
     const turnosDiurno = ["6am/2pm", "7am/3pm", "6am/5pm", "8am/5pm"];
     const turnosPartida = ["7am/4pm", "8am/7pm", "8am/4pm", "11am/7pm", "07:00/16:00"];
-    const turnosMixto = ["2pm/10pm", "3pm/10pm", "12md/10pm"];
-    const turnosNocturno = ["10pm/6am", "10pm/4am"];
+    const turnosMixto = ["2pm/10pm", "2pm/9pm", "3pm/10pm", "12md/10pm"];
+    const turnosNocturno = ["10pm/6am", "10pm/4am", "06pm/00mn", "6pm/00mn", "00mn/06am", "00mn/6am"];
 
     const normalizar = (t) => (t || "").trim();
 

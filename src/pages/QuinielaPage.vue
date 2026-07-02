@@ -621,7 +621,7 @@ const PUSH_HABILITADO = true
 const IDENTITY_KEY = 'quiniela_identity'
 const CELEB_KEY = 'quiniela_celebrados'
 const DANIEL_CAMPEON_NOMBRE = 'daniel v'
-const CAMPEON_CIERRA_DANIEL_V = '2026-07-01T19:00:00+00:00'
+const CAMPEON_CIERRA_DANIEL_V = '2026-07-02T18:00:00+00:00'
 const FIN = new Set(['FT', 'AET', 'PEN', 'WO'])
 const LIVE = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE', 'INT', 'SUSP'])
 

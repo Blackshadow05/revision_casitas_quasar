@@ -134,8 +134,7 @@
           <q-badge color="amber-8" class="q-ml-auto">+{{ cfg.pts_campeon }} pts</q-badge>
         </div>
 
-        <template v-if="!campeonCerrado">
-          <template v-if="identity && esDanielVCampeon">
+        <template v-if="!campeonCerrado && esDanielVCampeon">
             <q-select
               v-model="campeonSel"
               :options="campeonOptions"
@@ -174,16 +173,6 @@
             <div class="qn-champ-deadline">
               <q-icon name="schedule" size="14px" /> Puedes cambiarlo hasta el {{ campeonCierraLabel }}
             </div>
-          </template>
-          <template v-else>
-            <div class="qn-champ-join">
-              <span>Únete para elegir a tu campeón.</span>
-              <q-btn unelevated no-caps rounded color="amber-8" icon="how_to_reg" label="Unirme" class="qn-btn-cta" @click="showJoin = true" />
-            </div>
-            <div class="qn-champ-deadline">
-              <q-icon name="schedule" size="14px" /> Elige antes del {{ campeonCierraLabel }}
-            </div>
-          </template>
         </template>
 
         <template v-else>
@@ -766,7 +755,7 @@ export default defineComponent({
 
     const inicial = computed(() => (identity.value?.nombre || '?').trim().charAt(0).toUpperCase())
     const esDanielVCampeon = computed(() => normalizarNombre(identity.value?.nombre) === DANIEL_CAMPEON_NOMBRE)
-    const campeonVisible = computed(() => Boolean(identity.value && esDanielVCampeon.value))
+    const campeonVisible = computed(() => Boolean(identity.value))
 
     const tipo = (m) => {
       const s = m.estado_corto
@@ -1123,7 +1112,6 @@ export default defineComponent({
 
     const loadMiCampeon = async () => {
       if (!identity.value) { miCampeon.value = null; campeonSel.value = null; return }
-      if (!esDanielVCampeon.value) { miCampeon.value = null; campeonSel.value = null; return }
       const { data, error } = await supabase.rpc('qn_mi_campeon', { p_nombre: identity.value.nombre, p_pin: identity.value.pin })
       if (error) return
       const row = (data || [])[0] || null

@@ -2,7 +2,9 @@
   <q-layout view="lHh Lpr lFf">
     <q-page-container>
       <router-view v-slot="{ Component, route }">
-        <component :is="Component" :key="route.fullPath" />
+        <transition :name="pageTransition" :mode="pageTransition ? undefined : 'out-in'" @before-leave="fijarSaliente">
+          <component :is="Component" :key="route.fullPath" />
+        </transition>
       </router-view>
     </q-page-container>
 
@@ -193,6 +195,25 @@ export default defineComponent({
     const authStore = useAuthStore();
     // Puesto 01 solo visible para el usuario Esteban B
     const isEstebanB = computed(() => authStore.user?.Usuario === "Esteban B");
+    const pageTransition = ref("");
+    const esRutaQn = (p) => p.startsWith("/quiniela");
+    const profundidad = (p) => p.split("/").filter(Boolean).length;
+    const quitarAfterEach = router.afterEach((to, from) => {
+      if (!esRutaQn(to.path) && !esRutaQn(from.path)) { pageTransition.value = ""; return }
+      pageTransition.value = profundidad(to.path) >= profundidad(from.path) ? "qn-push" : "qn-pop";
+    });
+    const fijarSaliente = (el) => {
+      if (!pageTransition.value) return;
+      const cont = el.parentElement;
+      if (!cont) return;
+      const r = el.getBoundingClientRect();
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+      const cr = cont.getBoundingClientRect();
+      el.style.position = "absolute";
+      el.style.top = (r.top - cr.top) + "px";
+      el.style.left = "0";
+      el.style.width = "100%";
+    };
     let stopHomeUpdates = null;
     const footerRef = ref(null);
     let syncFooterFrame = null;
@@ -277,6 +298,7 @@ export default defineComponent({
     }, { immediate: true });
 
     onUnmounted(() => {
+      quitarAfterEach()
       detachHomeUpdates()
       if (window.visualViewport) {
         window.visualViewport.removeEventListener("resize", scheduleSyncFooter);
@@ -313,6 +335,8 @@ export default defineComponent({
     return {
       q,
       tab,
+      pageTransition,
+      fijarSaliente,
       footerRef,
       authStore,
       isEstebanB,
@@ -373,5 +397,58 @@ export default defineComponent({
 
 .menu-button {
   margin-left: 8px;
+}
+
+.q-page-container {
+  position: relative;
+}
+
+.q-page-container:has(> .qn-push-enter-active),
+.q-page-container:has(> .qn-pop-enter-active) {
+  overflow-x: hidden;
+}
+
+.qn-push-enter-active,
+.qn-pop-leave-active {
+  transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+  position: relative;
+  z-index: 2;
+  box-shadow: -12px 0 32px rgba(0, 0, 0, 0.18);
+  will-change: transform;
+}
+
+.qn-push-leave-active,
+.qn-pop-enter-active {
+  transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.32s ease;
+  position: relative;
+  z-index: 1;
+  will-change: transform;
+}
+
+.qn-push-enter-from {
+  transform: translateX(100%);
+}
+
+.qn-push-leave-to {
+  transform: translateX(-30%);
+  opacity: 0.55;
+}
+
+.qn-pop-leave-to {
+  transform: translateX(100%);
+}
+
+.qn-pop-enter-from {
+  transform: translateX(-30%);
+  opacity: 0.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qn-push-enter-active,
+  .qn-push-leave-active,
+  .qn-pop-enter-active,
+  .qn-pop-leave-active {
+    transition: none;
+  }
 }
 </style>

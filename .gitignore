@@ -12,3 +12,9 @@ yarn-error.log*
 .vscode/
 .claude/
 design-md/
+.agents/
+.playwright-mcp/
+.qwen/
+skills-lock.json
+start-dev.bat
+supabase/.temp/

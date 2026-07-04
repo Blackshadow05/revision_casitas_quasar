@@ -13,32 +13,74 @@
     <div class="qn-wrap">
       <div v-if="nombre" class="qn-det-summary">
         <div class="qn-det-stat">
-          <div class="qn-det-num">{{ resumen.puntos }}</div>
+          <div class="qn-det-num">
+            <q-skeleton v-if="loading" type="rect" width="34px" height="24px" animation="wave" class="qn-det-sk-num" />
+            <template v-else>{{ resumen.puntos }}</template>
+          </div>
           <div class="qn-det-lbl">Puntos</div>
         </div>
         <div class="qn-det-stat">
-          <div class="qn-det-num">{{ resumen.exactos }}</div>
+          <div class="qn-det-num">
+            <q-skeleton v-if="loading" type="rect" width="34px" height="24px" animation="wave" class="qn-det-sk-num" />
+            <template v-else>{{ resumen.exactos }}</template>
+          </div>
           <div class="qn-det-lbl">Exactos</div>
         </div>
         <div class="qn-det-stat">
-          <div class="qn-det-num">{{ resumen.aciertos }}</div>
+          <div class="qn-det-num">
+            <q-skeleton v-if="loading" type="rect" width="34px" height="24px" animation="wave" class="qn-det-sk-num" />
+            <template v-else>{{ resumen.aciertos }}</template>
+          </div>
           <div class="qn-det-lbl">Aciertos</div>
         </div>
         <div class="qn-det-stat">
-          <div class="qn-det-num">{{ resumen.jugados }}</div>
+          <div class="qn-det-num">
+            <q-skeleton v-if="loading" type="rect" width="34px" height="24px" animation="wave" class="qn-det-sk-num" />
+            <template v-else>{{ resumen.jugados }}</template>
+          </div>
           <div class="qn-det-lbl">Jugados</div>
         </div>
       </div>
 
-      <div v-if="nombre && campeon" class="qn-det-champ">
+      <div v-if="nombre && (campeon || loading)" class="qn-det-champ">
         <q-icon name="emoji_events" size="20px" class="qn-det-champ-trophy" />
         <span class="qn-det-champ-lbl">Campeón elegido</span>
-        <img v-if="campeon.logo" :src="campeon.logo" class="qn-det-champ-flag" alt="" />
-        <span class="qn-det-champ-team">{{ campeon.equipo }}</span>
+        <template v-if="loading && !campeon">
+          <q-skeleton type="rect" width="30px" height="21px" animation="wave" style="margin-left:auto;border-radius:3px" />
+          <q-skeleton type="rect" width="84px" height="15px" animation="wave" style="border-radius:4px" />
+        </template>
+        <template v-else>
+          <img v-if="campeon.logo" :src="campeon.logo" class="qn-det-champ-flag" alt="" />
+          <span class="qn-det-champ-team">{{ campeon.equipo }}</span>
+        </template>
       </div>
 
-      <div v-if="loading" class="flex flex-center q-my-xl">
-        <q-spinner-dots color="green-8" size="40px" />
+      <div v-if="loading">
+        <div class="qn-fecha"><q-skeleton type="rect" width="140px" height="16px" animation="wave" style="border-radius:4px" /></div>
+        <div v-for="n in 3" :key="n" class="qn-card">
+          <div class="qn-card-top">
+            <q-skeleton type="text" width="32%" animation="wave" />
+            <q-skeleton type="QChip" width="64px" height="20px" animation="wave" />
+          </div>
+          <div class="qn-match">
+            <div class="qn-team">
+              <q-skeleton type="QAvatar" size="46px" animation="wave" />
+              <q-skeleton type="text" width="70%" class="q-mt-sm" animation="wave" />
+            </div>
+            <div class="qn-center">
+              <q-skeleton type="rect" width="44px" height="26px" animation="wave" style="border-radius:6px" />
+            </div>
+            <div class="qn-team">
+              <q-skeleton type="QAvatar" size="46px" animation="wave" />
+              <q-skeleton type="text" width="70%" class="q-mt-sm" animation="wave" />
+            </div>
+          </div>
+          <div class="qn-det-pron">
+            <q-skeleton type="text" width="100%" animation="wave" />
+            <q-skeleton type="text" width="100%" animation="wave" />
+            <q-skeleton type="text" width="60%" animation="wave" />
+          </div>
+        </div>
       </div>
 
       <div v-else-if="!nombre" class="flex flex-center column q-my-xl text-grey-6">
@@ -343,6 +385,7 @@ export default defineComponent({
 }
 .qn-det-stat { flex: 1; text-align: center; }
 .qn-det-num { font-size: 22px; font-weight: 900; color: #1b5e20; line-height: 1.1; }
+.qn-det-sk-num { margin: 0 auto; border-radius: 6px; }
 .qn-det-lbl { font-size: 11px; color: #757575; text-transform: uppercase; letter-spacing: 0.4px; margin-top: 2px; }
 
 .qn-det-champ {

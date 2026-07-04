@@ -85,7 +85,15 @@
         </div>
       </transition>
 
-      <div v-if="proximo || enVivo" class="qn-next">
+      <div v-if="loading" class="qn-next">
+        <div class="qn-next-body">
+          <q-skeleton type="rect" width="140px" height="14px" animation="wave" class="qn-sk-inv" />
+          <q-skeleton type="rect" width="180px" height="42px" animation="wave" class="qn-sk-inv" style="margin-top:6px" />
+          <q-skeleton type="rect" width="210px" height="20px" animation="wave" class="qn-sk-inv" style="margin-top:7px" />
+          <q-skeleton type="rect" width="150px" height="13px" animation="wave" class="qn-sk-inv" style="margin-top:7px" />
+        </div>
+      </div>
+      <div v-else-if="proximo || enVivo" class="qn-next">
         <div class="qn-next-body">
           <template v-if="enVivo">
             <div class="qn-next-tag"><span class="qn-live-dot"></span> En vivo</div>
@@ -134,7 +142,17 @@
           <q-badge color="amber-8" class="q-ml-auto">+{{ cfg.pts_campeon }} pts</q-badge>
         </div>
 
-        <template v-if="!campeonCerrado && esDanielVCampeon">
+        <template v-if="loading && !campeonListo">
+          <div class="qn-champ-locked">
+            <q-skeleton type="rect" width="46px" height="33px" animation="wave" style="border-radius:4px" />
+            <div class="qn-champ-locked-info" style="flex:1">
+              <q-skeleton type="text" width="45%" animation="wave" />
+              <q-skeleton type="text" width="65%" animation="wave" />
+            </div>
+          </div>
+        </template>
+
+        <template v-else-if="!campeonCerrado && esDanielVCampeon">
             <q-select
               v-model="campeonSel"
               :options="campeonOptions"
@@ -414,7 +432,10 @@
                     <div v-if="pubPron[m.id].length === 0" class="text-caption text-grey-6 q-pa-sm">Nadie pronosticó este partido.</div>
                     <div v-for="(p, i) in pubPron[m.id]" :key="i" class="qn-pub-row">
                       <span class="ellipsis">{{ p.nombre }}</span>
-                      <span class="text-weight-bold">{{ p.goles_local }} - {{ p.goles_visita }}</span>
+                      <span class="qn-pub-score">
+                        <span class="text-weight-bold">{{ p.goles_local }} - {{ p.goles_visita }}</span>
+                        <span v-if="esKo(m) && p.def_pred" class="qn-pub-def">{{ defLabel(p.def_pred) }}</span>
+                      </span>
                       <q-badge v-if="p.scored" :color="p.puntos > 0 ? 'green-7' : 'grey-5'">+{{ p.puntos }}</q-badge>
                       <span v-else class="text-grey-5 text-caption">—</span>
                     </div>
@@ -637,6 +658,7 @@ const PUSH_HABILITADO = true
 
 const IDENTITY_KEY = 'quiniela_identity'
 const CELEB_KEY = 'quiniela_celebrados'
+const CAMPEON_CACHE_KEY = 'qn_campeon_cache'
 const DANIEL_CAMPEON_NOMBRE = 'daniel v'
 const CAMPEON_CIERRA_DANIEL_V = '2026-07-02T18:00:00+00:00'
 const FIN = new Set(['FT', 'AET', 'PEN', 'WO'])
@@ -729,6 +751,7 @@ export default defineComponent({
     const penBusy = ref(null)
     const miCampeon = ref(null)
     const campeonSel = ref(null)
+    const campeonListo = ref(false)
     const campeonOptions = ref([])
     const savingCampeon = ref(false)
     const pushAvail = ref(false)
@@ -1143,13 +1166,30 @@ export default defineComponent({
       })
     }
 
+    const hidratarCampeon = () => {
+      if (!identity.value) return false
+      try {
+        const c = JSON.parse(sessionStorage.getItem(CAMPEON_CACHE_KEY))
+        if (c && c.nombre === identity.value.nombre) {
+          miCampeon.value = c.row || null
+          campeonSel.value = c.row ? c.row.equipo : null
+          campeonListo.value = true
+          return true
+        }
+      } catch (e) {}
+      return false
+    }
+
     const loadMiCampeon = async () => {
       if (!identity.value) { miCampeon.value = null; campeonSel.value = null; return }
+      if (hidratarCampeon()) return
       const { data, error } = await supabase.rpc('qn_mi_campeon', { p_nombre: identity.value.nombre, p_pin: identity.value.pin })
       if (error) return
       const row = (data || [])[0] || null
       miCampeon.value = row
       campeonSel.value = row ? row.equipo : null
+      campeonListo.value = true
+      try { sessionStorage.setItem(CAMPEON_CACHE_KEY, JSON.stringify({ nombre: identity.value.nombre, row })) } catch (e) {}
     }
 
     const guardarCampeon = async () => {
@@ -1167,6 +1207,7 @@ export default defineComponent({
           : msgFromError(error)
         notify({ type: 'negative', message: msg, position: 'top' }); return
       }
+      try { sessionStorage.removeItem(CAMPEON_CACHE_KEY) } catch (e) {}
       await loadMiCampeon()
       notify({ type: 'positive', message: '¡Campeón guardado!', position: 'top' })
     }
@@ -1248,6 +1289,8 @@ export default defineComponent({
       for (const k in misPron) delete misPron[k]
       miCampeon.value = null
       campeonSel.value = null
+      campeonListo.value = false
+      try { sessionStorage.removeItem(CAMPEON_CACHE_KEY) } catch (e) {}
       primeraCargaMine = true
       seedForm()
       notify({ type: 'info', message: 'Saliste de la quiniela', position: 'top' })
@@ -1410,20 +1453,18 @@ export default defineComponent({
     onMounted(async () => {
       const saved = localStorage.getItem(IDENTITY_KEY)
       if (saved) { try { identity.value = JSON.parse(saved) } catch (e) { identity.value = null } }
-
-      await loadConfig()
-      await Promise.all([loadPartidos(), loadRanking(), loadPosiciones()])
-      await loadMine()
-      await loadMiCampeon()
-      await checkAdmin()
-      loading.value = false
-
-      if (partidos.value.some(m => tipo(m) === 'live')) filtro.value = 'live'
+      hidratarCampeon()
 
       pushAvail.value = PUSH_HABILITADO && pushSupported()
       if (pushAvail.value && identity.value) {
         try { pushOn.value = await isSubscribed() } catch (e) { pushOn.value = false }
       }
+
+      await loadConfig()
+      await Promise.all([loadPartidos(), loadRanking(), loadPosiciones(), loadMine(), loadMiCampeon(), checkAdmin()])
+      loading.value = false
+
+      if (partidos.value.some(m => tipo(m) === 'live')) filtro.value = 'live'
 
       nowTimer = setInterval(() => { now.value = Date.now() }, 30000)
       clockTimer = setInterval(() => { clock.value = Date.now() }, 1000)
@@ -1468,7 +1509,7 @@ export default defineComponent({
       showJoin, joinData, joinLoading, savingId, inicial,
       showResetPin, resetData, resetLoading, abrirResetPin, cerrarResetPin, cambiarPin,
       esAdmin, penBusy, penForm, defLabel, setGanadorKo, setPenales,
-      miCampeon, campeonSel, campeonOptions, savingCampeon, campeonVisible, esDanielVCampeon, campeonCerrado, campeonCierraLabel, filterCampeon, guardarCampeon,
+      miCampeon, campeonSel, campeonListo, campeonOptions, savingCampeon, campeonVisible, esDanielVCampeon, campeonCerrado, campeonCierraLabel, filterCampeon, guardarCampeon,
       pushAvail, pushOn, pushBusy, pushHintDismissed, togglePush, dismissPushHint,
       tipo, hora, editable, esKo, locked, estadoTexto, lockIcon, lockTexto, grupos, esMio, abrirPron,
       enVivo, proximo, cuenta,
@@ -1595,9 +1636,32 @@ export default defineComponent({
   margin-top: 12px;
   border-radius: var(--qn-r-card);
   overflow: hidden;
-  background: var(--qn-green-dark);
+  position: relative;
+  background:
+    repeating-linear-gradient(90deg,
+      rgba(255, 255, 255, 0.028) 0 44px,
+      rgba(0, 0, 0, 0.05) 44px 88px),
+    linear-gradient(165deg, #1a6332 0%, var(--qn-green-dark) 55%, #0e3d21 100%);
   color: #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+.qn-next::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 160' fill='none' stroke='%23ffffff' stroke-width='1.3'%3E%3Crect x='10' y='10' width='380' height='140' rx='2'/%3E%3Cline x1='200' y1='10' x2='200' y2='150'/%3E%3Ccircle cx='200' cy='80' r='30'/%3E%3Ccircle cx='200' cy='80' r='2.2' fill='%23ffffff' stroke='none'/%3E%3Crect x='10' y='42' width='46' height='76'/%3E%3Crect x='10' y='62' width='19' height='36'/%3E%3Cpath d='M56 64 A26 26 0 0 1 56 96'/%3E%3Crect x='344' y='42' width='46' height='76'/%3E%3Crect x='371' y='62' width='19' height='36'/%3E%3Cpath d='M344 64 A26 26 0 0 0 344 96'/%3E%3Cpath d='M10 22 A12 12 0 0 0 22 10'/%3E%3Cpath d='M378 10 A12 12 0 0 0 390 22'/%3E%3Cpath d='M22 150 A12 12 0 0 0 10 138'/%3E%3Cpath d='M390 138 A12 12 0 0 0 378 150'/%3E%3C/svg%3E");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  opacity: 0.13;
+}
+.qn-next::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 42%, rgba(0, 0, 0, 0) 45%, rgba(0, 0, 0, 0.22) 100%);
 }
 .qn-live-dot {
   width: 9px; height: 9px; border-radius: 50%;
@@ -1610,7 +1674,7 @@ export default defineComponent({
   70% { box-shadow: 0 0 0 8px rgba(255, 82, 82, 0); }
   100% { box-shadow: 0 0 0 0 rgba(255, 82, 82, 0); }
 }
-.qn-next-body { padding: 14px 16px 16px; text-align: center; }
+.qn-next-body { padding: 14px 16px 16px; text-align: center; position: relative; z-index: 1; }
 .qn-next-tag {
   font-size: 12px;
   font-weight: 600;
@@ -1639,6 +1703,7 @@ export default defineComponent({
 .qn-next-vs { color: var(--qn-amber); font-weight: 700; }
 .qn-next-flag { width: 24px; height: 17px; object-fit: cover; border-radius: 2px; }
 .qn-next-sub { font-size: 12px; opacity: 0.85; margin-top: 3px; }
+.qn-sk-inv { background: rgba(255, 255, 255, 0.16); margin-left: auto; margin-right: auto; }
 
 .qn-goles {
   display: flex;
@@ -1805,6 +1870,8 @@ export default defineComponent({
 .qn-pred .qn-btn-pron { margin-top: 8px; }
 .qn-pub-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 2px; border-bottom: 1px solid var(--qn-divider); font-size: 13px; }
 .qn-pub-row:last-child { border-bottom: none; }
+.qn-pub-score { display: flex; flex-direction: column; align-items: center; line-height: 1.15; }
+.qn-pub-def { font-size: 10.5px; color: #b06f00; font-weight: 600; white-space: nowrap; }
 
 .qn-rank { background: var(--qn-surface); border-radius: var(--qn-r-card); overflow: hidden; border: 1px solid var(--qn-line); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04); }
 .qn-rank-row { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 14px; position: relative; cursor: pointer; transition: background 0.1s; }

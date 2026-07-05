@@ -322,7 +322,7 @@
                 </div>
               </div>
 
-              <div v-if="tipo(m) !== 'prox' && m.estado_corto === 'PEN' && m.pen_local != null" class="qn-penales">
+              <div v-if="tipo(m) !== 'prox' && (m.estado_corto === 'PEN' || m.estado_corto === 'P') && m.pen_local != null" class="qn-penales">
                 <q-icon name="sports_soccer" size="13px" class="q-mr-xs" />
                 <span class="qn-pen-dots">
                   <span v-for="n in (m.pen_local_fall || 0)" :key="'plf' + n" class="qn-pen-dot qn-pen-miss"></span>

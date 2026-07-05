@@ -510,8 +510,44 @@ function espnMinute(status: any): number | null {
   const n = Number(m[1]);
   return Number.isFinite(n) && n > 0 ? n : null;
 }
-async function checkEspn(supabase: any, rows: any[], nowMs: number, statusOverride: Map<number, string>, primaryFinishedIds: Set<number>): Promise<any> {
-  if (!rows.length) return { enabled: true, checked: 0 };
+function normClock(v: unknown): string {
+  return String(v ?? "").replace(/'/g, "").trim();
+}
+function espnLabel(status: any): string | null {
+  const c = normClock(status?.displayClock);
+  return c.includes("+") ? c : null;
+}
+function jsonCount(v: unknown): number {
+  return Array.isArray(v) ? v.length : 0;
+}
+function parseEspnDetails(details: any[], homeTeamId: string, localIsHome: boolean) {
+  const golL: any[] = [], golV: any[] = [], tarL: any[] = [], tarV: any[] = [];
+  for (const dt of details ?? []) {
+    if (dt?.shootout === true) continue;
+    const teamId = String(dt?.team?.id ?? "");
+    if (!teamId || !homeTeamId) continue;
+    const homeSide = teamId === homeTeamId;
+    const isLocal = localIsHome ? homeSide : !homeSide;
+    const minute = normClock(dt.clock?.displayValue);
+    const name = String((dt.athletesInvolved ?? [])[0]?.displayName ?? "");
+    if (dt.scoringPlay === true) {
+      const g: any = { name, minute };
+      if (dt.ownGoal === true) g.owngoal = true;
+      if (dt.penaltyKick === true) g.penalty = true;
+      (isLocal ? golL : golV).push(g);
+    } else if (dt.redCard === true || dt.yellowCard === true) {
+      (isLocal ? tarL : tarV).push({ name, minute, tipo: dt.redCard === true ? "roja" : "amarilla" });
+    }
+  }
+  return { golL, golV, tarL, tarV };
+}
+async function espnPrimary(supabase: any, rows: any[], nowMs: number): Promise<{ result: any; handled: Set<number>; statusOverride: Map<number, string>; finishedIds: Set<number>; anyFinished: boolean }> {
+  const handled = new Set<number>();
+  const statusOverride = new Map<number, string>();
+  const finishedIds = new Set<number>();
+  let anyFinished = false;
+  const done = (result: any) => ({ result, handled, statusOverride, finishedIds, anyFinished });
+  if (!rows.length) return done({ enabled: true, checked: 0 });
   const from = espnDate(nowMs - 24 * 3600000);
   const to = espnDate(nowMs + 24 * 3600000);
   let payload: any;
@@ -519,7 +555,7 @@ async function checkEspn(supabase: any, rows: any[], nowMs: number, statusOverri
     const r = await fetch(`${ESPN_SCOREBOARD}?dates=${from}-${to}`);
     if (!r.ok) throw new Error(`espn scoreboard -> ${r.status}`);
     payload = await r.json();
-  } catch (e) { return { enabled: true, error: String(e) }; }
+  } catch (e) { return done({ enabled: true, error: String(e) }); }
   const events = Array.isArray(payload?.events) ? payload.events : [];
   const byPair = new Map<string, any>();
   for (const ev of events) {
@@ -534,147 +570,67 @@ async function checkEspn(supabase: any, rows: any[], nowMs: number, statusOverri
     byPair.set(pairKey(h, a), { comp, home, away, h });
   }
   const updates: any[] = [];
-  let anyFinished = false;
   for (const row of rows) {
     if (row.finalizado) continue;
+    if (INTERRUPT_CODES.has(row.estado_corto)) continue;
     const m = byPair.get(pairKey(row.equipo_local, row.equipo_visita));
     if (!m) continue;
     const rowId = Number(row.id);
     const mapped = mapEspnStatus(m.comp.status);
     if (!mapped.usable) continue;
+    const dbOrder = ESPN_ORDER[row.estado_corto] ?? 0;
+    const newOrder = ESPN_ORDER[mapped.corto] ?? 0;
+    if (!mapped.finalizado && newOrder < dbOrder) continue;
     const localIsHome = m.h === row.equipo_local;
-    const gl = scoreNum(localIsHome ? m.home?.score : m.away?.score);
-    const gv = scoreNum(localIsHome ? m.away?.score : m.home?.score);
-    const effective = statusOverride.get(rowId) ?? row.estado_corto;
-
+    const homeTeamId = String(m.home?.team?.id ?? m.home?.id ?? "");
+    let gl = scoreNum(localIsHome ? m.home?.score : m.away?.score);
+    let gv = scoreNum(localIsHome ? m.away?.score : m.home?.score);
+    if (!mapped.finalizado) {
+      const dbL = scoreNum(row.goles_local), dbV = scoreNum(row.goles_visita);
+      if (gl !== null && dbL !== null) gl = Math.max(gl, dbL);
+      if (gv !== null && dbV !== null) gv = Math.max(gv, dbV);
+    }
+    const { golL, golV, tarL, tarV } = parseEspnDetails(m.comp.details ?? [], homeTeamId, localIsHome);
+    const patch: any = {
+      estado_corto: mapped.corto,
+      estado_largo: m.comp.status?.type?.description ?? mapped.corto,
+      finalizado: false,
+      updated_at: new Date(nowMs).toISOString(),
+    };
+    if (mapped.finalizado || mapped.corto === "HT" || mapped.corto === "P") { patch.minuto = null; patch.minuto_label = null; }
+    else { patch.minuto = espnMinute(m.comp.status); patch.minuto_label = espnLabel(m.comp.status); }
+    if (gl !== null) patch.goles_local = gl;
+    if (gv !== null) patch.goles_visita = gv;
+    if (mapped.finalizado || golL.length > jsonCount(row.goleadores_local)) patch.goleadores_local = golL;
+    if (mapped.finalizado || golV.length > jsonCount(row.goleadores_visita)) patch.goleadores_visita = golV;
+    if (mapped.finalizado || tarL.length > jsonCount(row.tarjetas_local)) patch.tarjetas_local = tarL;
+    if (mapped.finalizado || tarV.length > jsonCount(row.tarjetas_visita)) patch.tarjetas_visita = tarV;
+    const ph = scoreNum(m.home?.shootoutScore);
+    const pa = scoreNum(m.away?.shootoutScore);
+    if ((mapped.corto === "P" || mapped.corto === "PEN") && ph !== null && pa !== null) {
+      patch.pen_local = localIsHome ? ph : pa;
+      patch.pen_visita = localIsHome ? pa : ph;
+    }
     if (mapped.finalizado) {
-      if (primaryFinishedIds.has(rowId)) continue;
-      const patch: any = { estado_corto: mapped.corto, estado_largo: m.comp.status?.type?.description ?? null, finalizado: true, minuto: null, minuto_label: null, updated_at: new Date(nowMs).toISOString() };
-      if (gl !== null && gv !== null) { patch.goles_local = gl; patch.goles_visita = gv; }
       if (KO_ROUNDS.has(row.ronda)) {
-        const ph = scoreNum(m.home?.shootoutScore);
-        const pa = scoreNum(m.away?.shootoutScore);
         let g: number | null = null;
         if (m.home?.winner === true) g = localIsHome ? 1 : 2;
         else if (m.away?.winner === true) g = localIsHome ? 2 : 1;
         if (!g && ph !== null && pa !== null && ph !== pa) g = ph > pa ? (localIsHome ? 1 : 2) : (localIsHome ? 2 : 1);
         if (!g && mapped.corto !== "PEN") g = scoreWinner(gl, gv);
-        if (mapped.corto === "PEN" && !g) continue;
-        if (g) patch.ganador_ko = g;
-        if (g && ph !== null && pa !== null) { patch.pen_local = localIsHome ? ph : pa; patch.pen_visita = localIsHome ? pa : ph; }
+        if (!g) continue;
+        patch.ganador_ko = g;
       }
-      const { error } = await supabase.from("qn_partidos").update(patch).eq("id", row.id);
-      if (!error) { updates.push({ id: row.id, kind: "finish", estado: mapped.corto }); anyFinished = true; }
-      continue;
+      patch.finalizado = true;
     }
-
-    if (INTERRUPT_CODES.has(effective)) continue;
-    const effOrder = ESPN_ORDER[effective] ?? 0;
-    const newOrder = ESPN_ORDER[mapped.corto] ?? 0;
-    if (newOrder <= effOrder) continue;
-    const patch: any = { estado_corto: mapped.corto, finalizado: false, updated_at: new Date(nowMs).toISOString() };
-    if (mapped.corto === "HT" || mapped.corto === "P") { patch.minuto = null; patch.minuto_label = null; }
-    else { const min = espnMinute(m.comp.status); if (min !== null) patch.minuto = min; }
-    if (gl !== null && gv !== null) { patch.goles_local = gl; patch.goles_visita = gv; }
     const { error } = await supabase.from("qn_partidos").update(patch).eq("id", row.id);
-    if (!error) { updates.push({ id: row.id, kind: "estado", de: effective, a: mapped.corto }); statusOverride.set(rowId, mapped.corto); }
+    if (error) continue;
+    handled.add(rowId);
+    statusOverride.set(rowId, mapped.corto);
+    if (patch.finalizado) { finishedIds.add(rowId); anyFinished = true; }
+    updates.push({ id: row.id, partido: `${row.equipo_local} ${patch.goles_local ?? row.goles_local ?? "-"}-${patch.goles_visita ?? row.goles_visita ?? "-"} ${row.equipo_visita}`, min: patch.minuto ?? null, label: patch.minuto_label ?? null, estado: mapped.corto, ft: patch.finalizado === true });
   }
-  return { enabled: true, checked: rows.length, matched: updates.length, updates, anyFinished };
-}
-
-function footballDataKey(): string | null {
-  return Deno.env.get("FOOTBALL_DATA_KEY") ?? null;
-}
-async function fdFetch(path: string, key: string): Promise<any> {
-  const r = await fetch(`https://api.football-data.org/v4/${path}`, { headers: { "X-Auth-Token": key } });
-  if (!r.ok) throw new Error(`football-data ${path} -> ${r.status}`);
-  return await r.json();
-}
-function fdDurationToCorto(duration: string): string {
-  if (duration === "PENALTY_SHOOTOUT") return "PEN";
-  if (duration === "EXTRA_TIME") return "AET";
-  return "FT";
-}
-async function checkFootballData(supabase: any, rows: any[], nowMs: number, statusOverride: Map<number, string>, primaryFinishedIds: Set<number>): Promise<any> {
-  const key = footballDataKey();
-  if (!key) return { enabled: false };
-  if (!rows.length) return { enabled: true, checked: 0 };
-  const from = new Date(nowMs - 24 * 3600000).toISOString().slice(0, 10);
-  const to = new Date(nowMs + 24 * 3600000).toISOString().slice(0, 10);
-  let payload: any;
-  try { payload = await fdFetch(`competitions/WC/matches?dateFrom=${from}&dateTo=${to}`, key); }
-  catch (e) { return { enabled: true, error: String(e) }; }
-  const matches = Array.isArray(payload?.matches) ? payload.matches : [];
-  const byPair = new Map<string, any>();
-  for (const m of matches) {
-    const h = es(m.homeTeam?.name ?? ""), a = es(m.awayTeam?.name ?? "");
-    if (!h || !a) continue;
-    byPair.set(pairKey(h, a), m);
-  }
-  const updates: any[] = [];
-  let anyFinished = false;
-  for (const row of rows) {
-    const m = byPair.get(pairKey(row.equipo_local, row.equipo_visita));
-    if (!m) continue;
-    if (row.finalizado) continue;
-    const status = String(m.status ?? "");
-    const localIsHome = es(m.homeTeam?.name ?? "") === row.equipo_local;
-    const ft = m.score?.fullTime ?? {};
-    const gl = localIsHome ? ft.home : ft.away;
-    const gv = localIsHome ? ft.away : ft.home;
-    const rowId = Number(row.id);
-
-    if (!primaryFinishedIds.has(rowId) && status === "FINISHED") {
-      const corto = fdDurationToCorto(m.score?.duration ?? "REGULAR");
-      const patch: any = { estado_corto: corto, finalizado: true, minuto: null, minuto_label: null, updated_at: new Date(nowMs).toISOString() };
-      if (Number.isFinite(gl) && Number.isFinite(gv)) { patch.goles_local = gl; patch.goles_visita = gv; }
-      if (KO_ROUNDS.has(row.ronda)) {
-        const w = m.score?.winner;
-        let g: number | null = null;
-        if (w === "HOME_TEAM") g = localIsHome ? 1 : 2;
-        else if (w === "AWAY_TEAM") g = localIsHome ? 2 : 1;
-        const pen = m.score?.penalties;
-        const hasPen = pen && Number.isFinite(pen.home) && Number.isFinite(pen.away);
-        if (!g && hasPen && pen.home !== pen.away) g = pen.home > pen.away ? (localIsHome ? 1 : 2) : (localIsHome ? 2 : 1);
-        if (corto === "PEN" && !g) continue;
-        if (g) patch.ganador_ko = g;
-        if (hasPen && g) {
-          patch.pen_local = localIsHome ? pen.home : pen.away;
-          patch.pen_visita = localIsHome ? pen.away : pen.home;
-        }
-      }
-      const { error } = await supabase.from("qn_partidos").update(patch).eq("id", row.id);
-      if (!error) { updates.push({ id: row.id, kind: "finish", estado: corto }); anyFinished = true; }
-      continue;
-    }
-
-    const flashCorto = statusOverride.get(rowId);
-    const effectiveCorto = flashCorto ?? row.estado_corto;
-
-    if (effectiveCorto === "NS" && ["LIVE", "IN_PLAY", "PAUSED"].includes(status)) {
-      const patch: any = { estado_corto: status === "PAUSED" ? "HT" : "LIVE", finalizado: false, updated_at: new Date(nowMs).toISOString() };
-      if (Number.isFinite(gl) && Number.isFinite(gv)) { patch.goles_local = gl; patch.goles_visita = gv; }
-      const { error } = await supabase.from("qn_partidos").update(patch).eq("id", row.id);
-      if (!error) updates.push({ id: row.id, kind: "start", estado: patch.estado_corto });
-      continue;
-    }
-
-    if (status === "PAUSED" && effectiveCorto !== "HT") {
-      const patch: any = { estado_corto: "HT", minuto: null, minuto_label: null, finalizado: false, updated_at: new Date(nowMs).toISOString() };
-      if (Number.isFinite(gl) && Number.isFinite(gv)) { patch.goles_local = gl; patch.goles_visita = gv; }
-      const { error } = await supabase.from("qn_partidos").update(patch).eq("id", row.id);
-      if (!error) updates.push({ id: row.id, kind: "halftime_in", estado: "HT" });
-      continue;
-    }
-
-    if (["LIVE", "IN_PLAY"].includes(status) && effectiveCorto === "HT") {
-      const patch: any = { estado_corto: "LIVE", finalizado: false, updated_at: new Date(nowMs).toISOString() };
-      if (Number.isFinite(gl) && Number.isFinite(gv)) { patch.goles_local = gl; patch.goles_visita = gv; }
-      const { error } = await supabase.from("qn_partidos").update(patch).eq("id", row.id);
-      if (!error) updates.push({ id: row.id, kind: "halftime_out", estado: "LIVE" });
-    }
-  }
-  return { enabled: true, checked: rows.length, matched: updates.length, updates, anyFinished };
+  return done({ enabled: true, checked: rows.length, matched: updates.length, updates });
 }
 
 async function syncFlashscoreKnockoutTeams(supabase: any, rapidKey: string, nowMs: number, cfg: any): Promise<any> {
@@ -830,7 +786,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: live, error: qerr } = await supabase
     .from("qn_partidos")
-    .select("id, kickoff, ronda, equipo_local, equipo_visita, estado_corto, updated_at, finalizado, goles_local, goles_visita")
+    .select("id, kickoff, ronda, equipo_local, equipo_visita, estado_corto, updated_at, finalizado, goles_local, goles_visita, goleadores_local, goleadores_visita, tarjetas_local, tarjetas_visita")
     .eq("finalizado", false)
     .lte("kickoff", new Date(nowMs + PRE_ROLL_MS).toISOString())
     .gte("kickoff", new Date(nowMs - WINDOW_MIN * 60000).toISOString());
@@ -849,16 +805,20 @@ Deno.serve(async (req: Request) => {
   const enBackoff = live.length - dueRows.length;
   if (dueRows.length === 0) return json({ ok: true, ventana: live.length, apiCalls: 0, summaryCalls: 0, summarySkipped: 0, enBackoff, koSync, koAdvance, penResolve, note: "todos interrumpidos/suspendidos en backoff" });
 
+  const espn = await espnPrimary(supabase, dueRows, nowMs);
+
   let apiCalls = 0;
   let summaryCalls = 0;
   let summarySkipped = 0;
+  const fsRows = dueRows.filter((m: any) => !espn.handled.has(Number(m.id)));
   const byPair = new Map<string, any>();
-  const pending = new Set(dueRows.map((m: any) => pairKey(m.equipo_local, m.equipo_visita)));
+  let listError: string | null = null;
+  const pending = new Set(fsRows.map((m: any) => pairKey(m.equipo_local, m.equipo_visita)));
   for (const day of [0, -1]) {
     if (pending.size === 0) break;
     let list: any;
     try { list = await rapid(`matches/list?sport_id=1&day=${day}`, rapidKey); apiCalls++; }
-    catch (e) { return json({ error: "list_failed", detail: String(e), apiCalls, summaryCalls, summarySkipped, penResolve }, 502); }
+    catch (e) { listError = String(e); break; }
     for (const fm of tournamentMatches(list)) {
       const h = es(fm.home_team?.name ?? ""), a = es(fm.away_team?.name ?? "");
       if (!h || !a) continue;
@@ -868,10 +828,10 @@ Deno.serve(async (req: Request) => {
   }
 
   const updates: any[] = [];
-  let anyFinished = penResolveScored;
-  const statusOverride = new Map<number, string>();
-  const primaryFinishedIds = new Set<number>();
-  for (const row of dueRows) {
+  let anyFinished = penResolveScored || espn.anyFinished;
+  const statusOverride = new Map<number, string>(espn.statusOverride);
+  const primaryFinishedIds = new Set<number>(espn.finishedIds);
+  for (const row of fsRows) {
     const fm = byPair.get(pairKey(row.equipo_local, row.equipo_visita));
     if (!fm) {
       if (INTERRUPT_CODES.has(row.estado_corto)) await supabase.from("qn_partidos").update({ updated_at: new Date().toISOString() }).eq("id", row.id);
@@ -889,6 +849,7 @@ Deno.serve(async (req: Request) => {
     let golesLocal = localIsHome ? sc.home : sc.away;
     let golesVisita = localIsHome ? sc.away : sc.home;
     const rawFinished = !!st.is_finished;
+    if (!interrupted && !rawFinished && (ESPN_ORDER[corto] ?? 99) < (ESPN_ORDER[row.estado_corto] ?? 0)) continue;
     const koMs = Date.parse(row.kickoff);
     let minuto: number | null = null;
     let minutoLabel: string | null = null;
@@ -903,15 +864,23 @@ Deno.serve(async (req: Request) => {
       try {
         const sum = await rapid(`matches/match/summary?match_id=${fm.match_id}`, rapidKey); apiCalls++; summaryCalls++;
         const { golL, golV, tarL, tarV } = parseSummary(sum, localIsHome);
-        patch.goleadores_local = golL; patch.goleadores_visita = golV; patch.tarjetas_local = tarL; patch.tarjetas_visita = tarV;
+        if (rawFinished || golL.length > jsonCount(row.goleadores_local)) patch.goleadores_local = golL;
+        if (rawFinished || golV.length > jsonCount(row.goleadores_visita)) patch.goleadores_visita = golV;
+        if (rawFinished || tarL.length > jsonCount(row.tarjetas_local)) patch.tarjetas_local = tarL;
+        if (rawFinished || tarV.length > jsonCount(row.tarjetas_visita)) patch.tarjetas_visita = tarV;
         golesLocal = Math.max(Number(golesLocal) || 0, golL.length);
         golesVisita = Math.max(Number(golesVisita) || 0, golV.length);
       } catch (_e) { /* keep score from list; leave detail untouched */ }
     } else if (!interrupted) {
       summarySkipped++;
     }
-    patch.goles_local = golesLocal ?? null;
-    patch.goles_visita = golesVisita ?? null;
+    if (!rawFinished) {
+      const dbL = scoreNum(row.goles_local), dbV = scoreNum(row.goles_visita);
+      if (dbL !== null) golesLocal = Math.max(Number(golesLocal) || 0, dbL);
+      if (dbV !== null) golesVisita = Math.max(Number(golesVisita) || 0, dbV);
+    }
+    patch.goles_local = golesLocal ?? row.goles_local ?? null;
+    patch.goles_visita = golesVisita ?? row.goles_visita ?? null;
     let ganadorKo: number | null = null;
     if (rawFinished && KO_ROUNDS.has(row.ronda)) {
       const ganadorApi = flashscoreWinner(st, localIsHome);
@@ -951,12 +920,6 @@ Deno.serve(async (req: Request) => {
     if (backup?.anyFinished) anyFinished = true;
   } catch (e) { backup = { enabled: true, error: String(e) }; }
 
-  let espnCheck: any = null;
-  try {
-    espnCheck = await checkEspn(supabase, dueRows, nowMs, statusOverride, primaryFinishedIds);
-    if (espnCheck?.anyFinished) anyFinished = true;
-  } catch (e) { espnCheck = { enabled: true, error: String(e) }; }
-
   try {
     const afterLiveAdvance = await propagateKnockoutWinners(supabase, nowMs);
     if (afterLiveAdvance?.updated) koAdvance = afterLiveAdvance;
@@ -965,5 +928,5 @@ Deno.serve(async (req: Request) => {
   let scored: any = null;
   if (anyFinished) { const { data } = await supabase.rpc("qn_calcular_pendientes"); scored = data; }
   await supabase.from("qn_config").update({ last_live_sync: new Date().toISOString() }).eq("id", 1);
-  return json({ ok: true, ventana: live.length, due: dueRows.length, enBackoff, matched: updates.length, apiCalls, summaryCalls, summarySkipped, koSync, koAdvance, penResolve, backup, espnCheck, scored, updates });
+  return json({ ok: true, ventana: live.length, due: dueRows.length, enBackoff, espn: espn.result, fsMatched: updates.length, listError, apiCalls, summaryCalls, summarySkipped, koSync, koAdvance, penResolve, backup, scored, fsUpdates: updates });
 });

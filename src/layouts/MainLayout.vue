@@ -218,12 +218,18 @@ export default defineComponent({
     const footerRef = ref(null);
     let syncFooterFrame = null;
 
+    const tecladoAbierto = () => {
+      const ae = document.activeElement;
+      if (!ae) return false;
+      return ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.isContentEditable;
+    };
+
     const syncFooter = () => {
       const el = footerRef.value?.$el;
       const vv = window.visualViewport;
       if (!el || !vv) return;
       const offset = window.innerHeight - vv.height - vv.offsetTop;
-      el.style.transform = offset > 1 ? `translateY(-${offset}px)` : "";
+      el.style.transform = tecladoAbierto() && offset > 1 ? `translateY(-${offset}px)` : "";
     };
 
     const scheduleSyncFooter = () => {
@@ -235,6 +241,7 @@ export default defineComponent({
       if (window.visualViewport) {
         window.visualViewport.addEventListener("resize", scheduleSyncFooter);
         window.visualViewport.addEventListener("scroll", scheduleSyncFooter);
+        window.addEventListener("focusin", scheduleSyncFooter);
         window.addEventListener("focusout", scheduleSyncFooter);
       }
     });
@@ -303,6 +310,7 @@ export default defineComponent({
       if (window.visualViewport) {
         window.visualViewport.removeEventListener("resize", scheduleSyncFooter);
         window.visualViewport.removeEventListener("scroll", scheduleSyncFooter);
+        window.removeEventListener("focusin", scheduleSyncFooter);
         window.removeEventListener("focusout", scheduleSyncFooter);
       }
       if (syncFooterFrame) cancelAnimationFrame(syncFooterFrame);

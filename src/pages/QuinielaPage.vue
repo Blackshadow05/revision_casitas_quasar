@@ -538,7 +538,7 @@
             <div class="qn-brk-scrollhint">
               <q-icon name="swipe" size="15px" class="q-mr-xs" />Desliza para ver todo el cuadro
             </div>
-            <div ref="brkScroll" class="qn-brk-scroll" @scroll="onBrkScroll">
+            <div ref="brkScroll" class="qn-brk-scroll">
               <div class="qn-brk2" :class="{ 'qn-brk2-anim': brkReady }" :style="brkH ? { '--brk-h': brkH + 'px' } : null">
                 <div v-for="col in brkTree" :key="col.key" class="qn-brk2-round">
                   <div class="qn-brk2-roundhead">{{ col.label }}</div>
@@ -766,10 +766,6 @@ export default defineComponent({
     const brkScroll = ref(null)
     const brkH = ref(null)
     const brkReady = ref(false)
-    const brkLastIdx = ref(0)
-    let brkRaf = 0
-    let brkSettleTimer = 0
-    let brkSnapping = false
     const celebrados = new Set((() => { try { return JSON.parse(localStorage.getItem(CELEB_KEY) || '[]') } catch (e) { return [] } })())
     let primeraCargaMine = true
     const fechaCalendario = ref('2026-01-01')
@@ -970,67 +966,9 @@ export default defineComponent({
       if (!sc) return
       const inner = sc.querySelector('.qn-brk2')
       if (!inner) return
-      const rounds = inner.querySelectorAll('.qn-brk2-round')
-      if (!rounds.length) return
       const slot = parseFloat(getComputedStyle(inner).getPropertyValue('--match-slot')) || 96
-      const sl = sc.scrollLeft
-      let lead = 0
-      for (let i = 0; i < rounds.length; i++) {
-        if (rounds[i].offsetLeft <= sl + 48) lead = i
-      }
-      const count = (brkTree.value[lead] && brkTree.value[lead].items.length) || 1
+      const count = Math.max(1, ...brkTree.value.map(c => c.items.length))
       brkH.value = Math.round(count * slot)
-    }
-
-    const onBrkScroll = () => {
-      if (!brkRaf) brkRaf = requestAnimationFrame(() => { brkRaf = 0; calcBrkHeight() })
-      if (brkSnapping) return
-      if (brkSettleTimer) clearTimeout(brkSettleTimer)
-      brkSettleTimer = setTimeout(brkSettle, 140)
-    }
-
-    const brkRoundEls = () => {
-      const sc = brkScroll.value
-      return sc ? Array.from(sc.querySelectorAll('.qn-brk2-round')) : []
-    }
-    const brkNearestIdx = (left) => {
-      const els = brkRoundEls()
-      let best = 0
-      let bd = Infinity
-      els.forEach((e, i) => { const d = Math.abs(e.offsetLeft - left); if (d < bd) { bd = d; best = i } })
-      return best
-    }
-    const brkSnapTo = (left) => {
-      const sc = brkScroll.value
-      if (!sc) return
-      brkSnapping = true
-      sc.scrollTo({ left, behavior: 'smooth' })
-      setTimeout(() => { brkSnapping = false; calcBrkHeight() }, 420)
-    }
-    const brkSettle = () => {
-      if (brkSnapping) return
-      const sc = brkScroll.value
-      const els = brkRoundEls()
-      if (!sc || !els.length) return
-      const maxScroll = sc.scrollWidth - sc.clientWidth
-      let lastFlush = 0
-      els.forEach((e, i) => { if (e.offsetLeft <= maxScroll + 4) lastFlush = i })
-      const cur = brkNearestIdx(sc.scrollLeft)
-
-      if (cur >= lastFlush && brkLastIdx.value >= lastFlush) {
-        const minLeft = els[lastFlush].offsetLeft
-        if (sc.scrollLeft < minLeft - 4) brkSnapTo(minLeft)
-        brkLastIdx.value = Math.max(lastFlush, cur)
-        return
-      }
-
-      let target = cur
-      if (cur - brkLastIdx.value > 1) target = brkLastIdx.value + 1
-      else if (cur - brkLastIdx.value < -1) target = brkLastIdx.value - 1
-      target = Math.max(0, Math.min(target, els.length - 1))
-      brkLastIdx.value = target
-      const dest = els[target].offsetLeft
-      if (Math.abs(dest - sc.scrollLeft) > 1) brkSnapTo(dest)
     }
 
     const scrollTop = () => {
@@ -1440,7 +1378,6 @@ export default defineComponent({
 
     watch(tab, (t) => {
       if (t === 'llaves') {
-        brkLastIdx.value = 0
         nextTick(() => {
           calcBrkHeight()
           requestAnimationFrame(() => { brkReady.value = true })
@@ -1498,8 +1435,6 @@ export default defineComponent({
       if (clockTimer) clearInterval(clockTimer)
       if (pollTimer) clearInterval(pollTimer)
       if (channel) supabase.removeChannel(channel)
-      if (brkRaf) cancelAnimationFrame(brkRaf)
-      if (brkSettleTimer) clearTimeout(brkSettleTimer)
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onResize)
     })
@@ -1514,7 +1449,7 @@ export default defineComponent({
       tipo, hora, editable, esKo, locked, estadoTexto, lockIcon, lockTexto, grupos, esMio, abrirPron,
       enVivo, proximo, cuenta,
       stickyShow, headerH, sentinel, scrollTop, onRefresh,
-      brkScroll, brkH, brkReady, onBrkScroll,
+      brkScroll, brkH, brkReady,
       brkTree, tercerLugar, hayEliminatorias, eliminatoriasVacias, ganador, brkEstado,
       fechaActiva, calAbierto, fechaCalendario, calendarLocale, fechaLabel,
       toggleFecha, limpiarFecha, alElegirFecha,

@@ -800,7 +800,6 @@ export default defineComponent({
 
     const filtros = [
       { label: 'Todos', value: 'todos' },
-      { label: 'En vivo', value: 'live' },
       { label: 'Próximos', value: 'prox' },
       { label: 'Finalizados', value: 'fin' }
     ]
@@ -862,8 +861,10 @@ export default defineComponent({
 
     const lista = computed(() => {
       let arr = partidos.value
-      if (filtro.value === 'live') arr = arr.filter(m => tipo(m) === 'live')
-      else if (filtro.value === 'prox') arr = arr.filter(m => tipo(m) === 'prox')
+      if (filtro.value === 'prox') arr = arr.filter(m => {
+        const estado = tipo(m)
+        return estado === 'prox' || estado === 'live'
+      })
       else if (filtro.value === 'fin') {
         arr = arr
           .filter(m => tipo(m) === 'fin')
@@ -1400,8 +1401,6 @@ export default defineComponent({
       await loadConfig()
       await Promise.all([loadPartidos(), loadRanking(), loadPosiciones(), loadMine(), loadMiCampeon(), checkAdmin()])
       loading.value = false
-
-      if (partidos.value.some(m => tipo(m) === 'live')) filtro.value = 'live'
 
       nowTimer = setInterval(() => { now.value = Date.now() }, 30000)
       clockTimer = setInterval(() => { clock.value = Date.now() }, 1000)

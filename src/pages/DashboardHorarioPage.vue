@@ -18,7 +18,7 @@
 
     <!-- ==================== TAB HORARIOS ==================== -->
     <div v-show="activeTab === 'horarios'">
-      <!-- Date picker and 7 days selector -->
+      <!-- Date picker and 9 days selector -->
       <div v-if="!$q.screen.gt.md" class="column q-mb-md q-gutter-y-sm">
         <div class="row items-center q-gutter-sm">
           <q-icon name="event" size="sm" color="primary" />
@@ -32,9 +32,9 @@
           />
         </div>
 
-        <div class="row q-gutter-xs no-wrap scroll q-pb-xs">
+        <div class="row q-gutter-xs no-wrap q-pb-xs date-selector-scroll">
           <q-btn
-            v-for="day in next7Days"
+            v-for="day in next9Days"
             :key="day.fecha"
             padding="xs sm"
             :color="selectedDate === day.fecha ? 'primary' : 'grey-2'"
@@ -586,87 +586,114 @@
     </div>
 
     <!-- ==================== TAB VACACIONES ==================== -->
-    <div v-show="activeTab === 'vacaciones'">
-      <div class="row q-gutter-sm q-mb-md">
+    <div v-show="activeTab === 'vacaciones'" class="vacaciones-ios">
+      <header class="vacaciones-hero">
+        <div class="vacaciones-hero__copy">
+          <div class="vacaciones-hero__eyebrow">
+            <q-icon name="calendar_month" size="16px" />
+            <span>Tiempo libre</span>
+          </div>
+          <h2 class="vacaciones-hero__title">Vacaciones</h2>
+          <p class="vacaciones-hero__subtitle">Consulta los descansos programados del equipo.</p>
+        </div>
+
         <q-select
           v-model="vacacionesAnio"
           :options="vacacionesAnioOptions"
-          label="Año"
+          aria-label="Año de vacaciones"
+          borderless
           dense
-          outlined
+          options-dense
           emit-value
           map-options
-          style="min-width: 120px"
-        />
-      </div>
+          behavior="menu"
+          hide-bottom-space
+          class="vacaciones-year"
+        >
+          <template #prepend>
+            <q-icon name="event" size="18px" />
+          </template>
+        </q-select>
+      </header>
 
-      <q-inner-loading :showing="loadingVacaciones">
-        <q-spinner-gears size="50px" color="primary" />
-      </q-inner-loading>
+      <div class="vacaciones-content">
+        <q-inner-loading :showing="loadingVacaciones" class="vacaciones-loading">
+          <q-spinner-ios size="42px" color="primary" />
+        </q-inner-loading>
 
-      <q-banner v-if="errorVacaciones" class="bg-negative text-white q-mb-md" rounded>
-        <template #avatar><q-icon name="error" /></template>
-        {{ errorVacaciones }}
-      </q-banner>
+        <q-banner v-if="errorVacaciones" class="vacaciones-error q-mb-md" rounded>
+          <template #avatar><q-icon name="error" /></template>
+          {{ errorVacaciones }}
+        </q-banner>
 
-      <template v-if="!loadingVacaciones && vacacionesResumen.length > 0">
-        <q-card class="q-mb-md" v-for="vac in vacacionesResumen" :key="vac.empleado">
-          <q-card-section class="bg-cyan-7 text-white">
-            <div class="row items-center">
-              <q-avatar color="cyan-2" text-color="cyan-9" class="q-mr-sm" size="36px">
+        <div v-if="!loadingVacaciones && vacacionesResumen.length > 0" class="vacaciones-personas">
+          <section v-for="vac in vacacionesResumen" :key="vac.empleado" class="vacaciones-persona">
+            <header class="vacaciones-persona__header">
+              <q-avatar class="vacaciones-persona__avatar" size="48px">
                 {{ vac.empleado.charAt(0).toUpperCase() }}
               </q-avatar>
-              <div>
-                <div class="text-subtitle1 text-weight-bold">{{ vac.empleado }}</div>
-                <div class="text-caption">{{ vac.periodos.length }} periodo(s) en {{ vacacionesAnio }}</div>
-              </div>
-              <q-space />
-              <q-badge color="white" text-color="cyan-9" :label="vac.totalDiasVacaciones + ' día(s)'" />
-            </div>
-          </q-card-section>
-          <q-card-section class="q-pa-none">
-            <div v-for="(periodo, idx) in vac.periodos" :key="periodo.desde + periodo.hasta">
-              <div class="q-pa-md">
-                <div class="row items-center q-mb-sm">
-                  <div class="text-subtitle2 text-weight-bold">Periodo {{ idx + 1 }}</div>
-                  <q-space />
-                  <q-badge color="cyan-7" text-color="white" :label="periodo.diasVacaciones + ' día(s)'" />
-                </div>
-                <div class="text-caption text-grey-7 q-mb-sm">
-                  {{ periodo.desde }} → {{ periodo.hasta }}
-                </div>
-                <q-list separator dense>
-                  <q-item v-for="d in periodo.detalle" :key="d.fecha">
-                    <q-item-section avatar>
-                      <q-icon
-                        :name="d.esVacacion ? 'beach_access' : 'event_busy'"
-                        :color="d.esVacacion ? 'cyan-7' : 'grey-5'"
-                        size="xs"
-                      />
-                    </q-item-section>
-                    <q-item-section>
-                      <q-item-label :class="d.esVacacion ? '' : 'text-grey'">
-                        {{ formatFechaDisplay(d.fecha) }}
-                      </q-item-label>
-                    </q-item-section>
-                    <q-item-section side>
-                      <q-badge
-                        :color="d.esVacacion ? 'cyan-7' : 'grey-5'"
-                        text-color="white"
-                        :label="d.esVacacion ? 'Vacaciones' : d.esFeriadoDia ? 'Feriado' : 'Libre'"
-                      />
-                    </q-item-section>
-                  </q-item>
-                </q-list>
-              </div>
-              <q-separator v-if="idx < vac.periodos.length - 1" />
-            </div>
-          </q-card-section>
-        </q-card>
-      </template>
 
-      <div v-if="!loadingVacaciones && vacacionesResumen.length === 0 && !errorVacaciones" class="text-grey text-center q-pa-lg">
-        No se encontraron registros de vacaciones
+              <div class="vacaciones-persona__identity">
+                <div class="vacaciones-persona__name">{{ vac.empleado }}</div>
+                <div class="vacaciones-persona__meta">
+                  {{ vac.periodos.length }} período{{ vac.periodos.length === 1 ? '' : 's' }} · {{ vacacionesAnio }}
+                </div>
+              </div>
+
+              <div class="vacaciones-persona__total" :aria-label="vac.totalDiasVacaciones + ' días de vacaciones'">
+                <strong>{{ vac.totalDiasVacaciones }}</strong>
+                <span>días</span>
+              </div>
+            </header>
+
+            <div class="vacaciones-periodos">
+              <article
+                v-for="(periodo, idx) in vac.periodos"
+                :key="periodo.desde + periodo.hasta"
+                class="vacaciones-periodo"
+                :aria-label="'Período ' + (idx + 1) + ', ' + periodo.diasVacaciones + ' días de vacaciones'"
+              >
+                <div class="vacaciones-periodo__header">
+                  <div class="vacaciones-periodo__icon">
+                    <q-icon name="flight_takeoff" size="21px" />
+                  </div>
+                  <div class="vacaciones-periodo__heading">
+                    <div class="vacaciones-periodo__name">Período {{ idx + 1 }}</div>
+                    <div class="vacaciones-periodo__range">
+                      {{ formatFechaDisplay(periodo.desde) }} – {{ formatFechaDisplay(periodo.hasta) }}
+                    </div>
+                  </div>
+                  <div class="vacaciones-periodo__count">{{ periodo.diasVacaciones }} d</div>
+                </div>
+
+                <div class="vacaciones-dias">
+                  <div
+                    v-for="d in periodo.detalle"
+                    :key="d.fecha"
+                    class="vacaciones-dia"
+                    :class="{
+                      'vacaciones-dia--vacacion': d.esVacacion,
+                      'vacaciones-dia--feriado': d.esFeriadoDia,
+                      'vacaciones-dia--libre': !d.esVacacion && !d.esFeriadoDia,
+                    }"
+                  >
+                    <div class="vacaciones-dia__icon">
+                      <q-icon :name="d.esVacacion ? 'beach_access' : d.esFeriadoDia ? 'celebration' : 'weekend'" size="17px" />
+                    </div>
+                    <span class="vacaciones-dia__fecha">{{ formatFechaDisplay(d.fecha) }}</span>
+                    <span class="vacaciones-dia__tipo">{{ d.esVacacion ? 'Vacaciones' : d.esFeriadoDia ? 'Feriado' : 'Libre' }}</span>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </section>
+        </div>
+
+        <div v-if="!loadingVacaciones && vacacionesResumen.length === 0 && !errorVacaciones" class="vacaciones-vacio">
+          <div class="vacaciones-vacio__icon"><q-icon name="beach_access" size="32px" /></div>
+          <div class="vacaciones-vacio__title">Sin vacaciones programadas</div>
+          <div class="vacaciones-vacio__text">No hay períodos registrados para {{ vacacionesAnio }}.</div>
+        </div>
       </div>
     </div>
 
@@ -930,10 +957,10 @@ export default defineComponent({
 
     const selectedDate = ref(getLocalDateString());
 
-    const next7Days = computed(() => {
+    const next9Days = computed(() => {
       const days = [];
       const base = new Date();
-      for (let i = 0; i < 7; i++) {
+      for (let i = 0; i < 9; i++) {
         const d = new Date(base);
         d.setDate(base.getDate() + i);
         const fecha = formatDate(d);
@@ -1487,7 +1514,7 @@ export default defineComponent({
       guardarPeriodo,
       loading,
       selectedDate,
-      next7Days,
+      next9Days,
       selectQuickDate,
       errorMsg,
       turnoDiurno,
@@ -1554,6 +1581,411 @@ export default defineComponent({
   margin: 0 auto;
 }
 
+.date-selector-scroll {
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  -webkit-overflow-scrolling: touch;
+}
+
+.date-selector-scroll > .q-btn {
+  flex: 0 0 auto;
+}
+
+.vacaciones-ios {
+  --ios-accent: #007aff;
+  --ios-bg: #f2f2f7;
+  --ios-label: #1c1c1e;
+  --ios-secondary: #6e6e73;
+  --ios-separator: rgb(60 60 67 / 14%);
+  --ios-surface: #fff;
+  overflow: hidden;
+  border: 1px solid rgb(60 60 67 / 8%);
+  border-radius: 24px;
+  background: var(--ios-bg);
+  color: var(--ios-label);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  box-shadow: 0 12px 34px rgb(0 0 0 / 7%);
+}
+
+.vacaciones-hero {
+  position: relative;
+  display: flex;
+  min-height: 156px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  overflow: hidden;
+  padding: 26px 28px 24px;
+  color: #fff;
+  background: linear-gradient(145deg, #0a84ff 0%, #0874db 58%, #0058b8 100%);
+}
+
+.vacaciones-hero::after {
+  position: absolute;
+  top: -92px;
+  right: -58px;
+  width: 230px;
+  height: 230px;
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 50%;
+  background: rgb(255 255 255 / 8%);
+  content: "";
+}
+
+.vacaciones-hero__copy,
+.vacaciones-year {
+  position: relative;
+  z-index: 1;
+}
+
+.vacaciones-hero__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  color: rgb(255 255 255 / 78%);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vacaciones-hero__title {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 2.55rem);
+  font-weight: 750;
+  letter-spacing: -0.035em;
+  line-height: 1.06;
+}
+
+.vacaciones-hero__subtitle {
+  margin: 8px 0 0;
+  color: rgb(255 255 255 / 82%);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.vacaciones-year {
+  width: 124px;
+  min-height: 44px;
+  flex: 0 0 auto;
+  padding: 0 10px;
+  border: 1px solid rgb(255 255 255 / 28%);
+  border-radius: 13px;
+  color: #fff;
+  background: rgb(255 255 255 / 18%);
+  backdrop-filter: blur(16px) saturate(140%);
+}
+
+.vacaciones-year :deep(.q-field__native),
+.vacaciones-year :deep(.q-field__prepend),
+.vacaciones-year :deep(.q-field__append) {
+  color: #fff;
+  font-weight: 650;
+}
+
+.vacaciones-content {
+  position: relative;
+  min-height: 150px;
+  padding: 22px;
+}
+
+.vacaciones-loading {
+  border-radius: 0 0 24px 24px;
+  background: rgb(242 242 247 / 86%);
+  backdrop-filter: blur(10px);
+}
+
+.vacaciones-error {
+  color: #b42318;
+  background: #ffebe9;
+}
+
+.vacaciones-personas {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
+.vacaciones-persona {
+  overflow: hidden;
+  border: 1px solid rgb(60 60 67 / 8%);
+  border-radius: 20px;
+  background: var(--ios-surface);
+  box-shadow: 0 3px 14px rgb(0 0 0 / 4%);
+}
+
+.vacaciones-persona__header {
+  display: flex;
+  min-height: 84px;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--ios-separator);
+}
+
+.vacaciones-persona__avatar {
+  flex: 0 0 auto;
+  color: #fff;
+  background: linear-gradient(145deg, #5ac8fa, var(--ios-accent));
+  font-size: 1.18rem;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 24%);
+}
+
+.vacaciones-persona__identity {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.vacaciones-persona__name {
+  overflow: hidden;
+  font-size: 1rem;
+  font-weight: 680;
+  letter-spacing: -0.015em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vacaciones-persona__meta {
+  margin-top: 3px;
+  color: var(--ios-secondary);
+  font-size: 0.78rem;
+}
+
+.vacaciones-persona__total {
+  display: flex;
+  min-width: 58px;
+  min-height: 52px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  border-radius: 14px;
+  color: var(--ios-accent);
+  background: #eaf4ff;
+  line-height: 1;
+}
+
+.vacaciones-persona__total strong {
+  font-size: 1.35rem;
+  font-weight: 750;
+}
+
+.vacaciones-persona__total span {
+  margin-top: 4px;
+  color: #3977b4;
+  font-size: 0.67rem;
+  font-weight: 600;
+}
+
+.vacaciones-periodos {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.vacaciones-periodo {
+  overflow: hidden;
+  border: 1px solid var(--ios-separator);
+  border-radius: 16px;
+  background: #fafafa;
+}
+
+.vacaciones-periodo__header {
+  display: flex;
+  min-height: 64px;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  background: var(--ios-surface);
+}
+
+.vacaciones-periodo__icon {
+  display: flex;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: #fff;
+  background: var(--ios-accent);
+}
+
+.vacaciones-periodo__heading {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.vacaciones-periodo__name {
+  font-size: 0.9rem;
+  font-weight: 680;
+}
+
+.vacaciones-periodo__range {
+  overflow: hidden;
+  margin-top: 2px;
+  color: var(--ios-secondary);
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vacaciones-periodo__count {
+  flex: 0 0 auto;
+  padding: 6px 9px;
+  border-radius: 999px;
+  color: #0064cc;
+  background: #eaf4ff;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.vacaciones-dias {
+  border-top: 1px solid var(--ios-separator);
+  background: var(--ios-surface);
+}
+
+.vacaciones-dia {
+  position: relative;
+  display: flex;
+  min-height: 46px;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+}
+
+.vacaciones-dia:not(:last-child)::after {
+  position: absolute;
+  right: 12px;
+  bottom: 0;
+  left: 50px;
+  height: 1px;
+  background: var(--ios-separator);
+  content: "";
+}
+
+.vacaciones-dia__icon {
+  display: flex;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+
+.vacaciones-dia__fecha {
+  min-width: 0;
+  flex: 1 1 auto;
+  font-size: 0.82rem;
+  font-weight: 550;
+}
+
+.vacaciones-dia__tipo {
+  flex: 0 0 auto;
+  color: var(--ios-secondary);
+  font-size: 0.74rem;
+  font-weight: 550;
+}
+
+.vacaciones-dia--vacacion .vacaciones-dia__icon {
+  color: #0070e8;
+  background: #e7f3ff;
+}
+
+.vacaciones-dia--feriado,
+.vacaciones-dia--libre {
+  background: #fffbea;
+}
+
+.vacaciones-dia--feriado .vacaciones-dia__icon,
+.vacaciones-dia--libre .vacaciones-dia__icon {
+  color: #624800;
+  background: #ffd60a;
+}
+
+.vacaciones-dia--feriado .vacaciones-dia__tipo,
+.vacaciones-dia--libre .vacaciones-dia__tipo {
+  color: #765900;
+  font-weight: 650;
+}
+
+.vacaciones-vacio {
+  display: flex;
+  min-height: 250px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  padding: 32px;
+  text-align: center;
+}
+
+.vacaciones-vacio__icon {
+  display: flex;
+  width: 72px;
+  height: 72px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  border-radius: 22px;
+  color: var(--ios-accent);
+  background: #e5f2ff;
+}
+
+.vacaciones-vacio__title {
+  font-size: 1.05rem;
+  font-weight: 680;
+}
+
+.vacaciones-vacio__text {
+  max-width: 270px;
+  margin-top: 5px;
+  color: var(--ios-secondary);
+  font-size: 0.84rem;
+}
+
+:global(.body--dark) .vacaciones-ios {
+  --ios-bg: #000;
+  --ios-label: #f5f5f7;
+  --ios-secondary: #98989d;
+  --ios-separator: rgb(84 84 88 / 58%);
+  --ios-surface: #1c1c1e;
+  border-color: #2c2c2e;
+}
+
+:global(.body--dark) .vacaciones-persona,
+:global(.body--dark) .vacaciones-periodo {
+  border-color: #38383a;
+  background: #1c1c1e;
+}
+
+:global(.body--dark) .vacaciones-persona__total,
+:global(.body--dark) .vacaciones-periodo__count {
+  color: #64aefb;
+  background: #102a43;
+}
+
+:global(.body--dark) .vacaciones-persona__total span {
+  color: #8bc1fa;
+}
+
+:global(.body--dark) .vacaciones-loading {
+  background: rgb(0 0 0 / 84%);
+}
+
+:global(.body--dark) .vacaciones-dia--feriado,
+:global(.body--dark) .vacaciones-dia--libre {
+  background: rgb(255 214 10 / 10%);
+}
+
+:global(.body--dark) .vacaciones-dia--feriado .vacaciones-dia__tipo,
+:global(.body--dark) .vacaciones-dia--libre .vacaciones-dia__tipo {
+  color: #ffd60a;
+}
+
 @media (min-width: 1024px) {
   .dashboard-horario {
     max-width: 1200px;
@@ -1568,6 +2000,38 @@ export default defineComponent({
   /* Asegurar que las tarjetas tengan un ancho mínimo para que el contenido no quede apretado */
   .container-pc-horarios q-card {
     min-width: 260px;
+  }
+}
+
+@media (max-width: 599px) {
+  .vacaciones-ios {
+    margin: 0 -8px;
+    border-radius: 22px;
+  }
+
+  .vacaciones-hero {
+    min-height: 176px;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 18px;
+    padding: 23px 20px 20px;
+  }
+
+  .vacaciones-hero__subtitle {
+    max-width: 235px;
+  }
+
+  .vacaciones-year {
+    width: 118px;
+  }
+
+  .vacaciones-content {
+    padding: 14px;
+  }
+
+  .vacaciones-personas {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
   }
 }
 </style>

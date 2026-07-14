@@ -243,6 +243,24 @@ export default defineComponent({
       })
     }
 
+    const getScanErrorMessage = (error) => {
+      const message = String(error?.message || '').toLowerCase()
+      const isNetworkError = !navigator.onLine || [
+        'failed to fetch',
+        'networkerror',
+        'network error',
+        'network request failed',
+        'load failed',
+        'err_internet_disconnected',
+        'err_network_changed',
+        'timeout'
+      ].some(term => message.includes(term))
+
+      return isNetworkError
+        ? 'Error de red. Intenta conectarte a otra red e inténtalo de nuevo.'
+        : 'Error al escanear la imagen. Inténtalo de nuevo.'
+    }
+
     // 1. ESCANEO DE IMAGEN
     const scanWithAI = async () => {
       if (!selectedImage.value) return
@@ -291,7 +309,7 @@ export default defineComponent({
         }
       } catch (error) {
         console.error('Scan Error:', error)
-        notify({ type: 'negative', message: 'Error: ' + error.message })
+        notify({ type: 'negative', message: getScanErrorMessage(error) })
       } finally {
         loading.value = false
       }

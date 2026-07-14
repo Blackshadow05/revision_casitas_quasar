@@ -593,8 +593,6 @@
         </div>
       </div>
     </q-form>
-  </q-page>
-
   <!-- Bottom Sheet for Photo Selection -->
   <q-dialog v-model="photoSheetOpen" position="bottom">
     <q-card class="photo-bottom-sheet">
@@ -676,6 +674,7 @@
       </q-card-actions>
     </q-card>
   </q-dialog>
+  </q-page>
 </template>
 
 <script>
@@ -1256,8 +1255,11 @@ export default defineComponent({
       }
     }
 
+    // Esta pantalla siempre se abre desde Inicio. Usar el historial del
+    // navegador aquí puede intentar restaurar una entrada ya descartada por
+    // el WebView/PWA y dejar el router sin una vista activa.
     const goBack = () => {
-      router.back()
+      router.replace('/')
     }
 
     const openPhotoSheet = (field) => {
@@ -1429,7 +1431,7 @@ export default defineComponent({
       }
       
       formSubmitted.value = false
-      router.back()
+      router.replace('/')
     }
 
     const onSubmit = async () => {

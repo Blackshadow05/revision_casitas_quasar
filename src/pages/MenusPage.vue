@@ -1,102 +1,142 @@
 <template>
   <q-page class="menus-page">
-    <div class="menus-topbar">
-      <div>
-        <div class="menus-eyebrow">Comedor</div>
-        <h1 class="menus-title">Menús</h1>
-      </div>
-      <q-btn
-        v-if="isLoggedIn"
-        unelevated
-        no-caps
-        icon="document_scanner"
-        label="Escanear"
-        to="/menus/scan"
-        class="menus-scan-btn"
-      />
-    </div>
-
     <div class="menus-shell">
-      <div v-if="loading && menus.length === 0" class="menus-loading">
-        <q-spinner-dots color="dark" size="40px" />
-        <div>Cargando menús</div>
+      <header class="menus-header">
+        <div class="menus-header__copy">
+          <div class="menus-eyebrow">Comedor</div>
+          <h1 class="menus-title">Menús</h1>
+          <p class="menus-subtitle">Lo que se sirve hoy y los próximos días.</p>
+        </div>
+
+        <div class="menus-header__actions">
+          <q-btn
+            round
+            flat
+            dense
+            icon="refresh"
+            class="menus-icon-btn"
+            :loading="loading && menus.length > 0"
+            @click="fetchMenus"
+          >
+            <q-tooltip>Actualizar</q-tooltip>
+          </q-btn>
+          <q-btn
+            v-if="isLoggedIn"
+            unelevated
+            no-caps
+            icon="document_scanner"
+            label="Escanear"
+            to="/menus/scan"
+            class="menus-scan-btn"
+          />
+        </div>
+      </header>
+
+      <div v-if="loading && menus.length === 0" class="menus-skeleton">
+        <q-skeleton class="menus-skeleton__hero" />
+        <div class="menus-grid">
+          <q-skeleton v-for="n in 3" :key="n" class="menus-skeleton__card" />
+        </div>
       </div>
 
-      <div v-else class="content-wrapper">
-        <section v-if="todayMenu" class="today-menu-section">
-          <div class="section-heading">
-            <div>
-              <div class="menus-eyebrow">Servicio actual</div>
-              <h2>Menú del día</h2>
-            </div>
-            <div class="today-date-pill">
-              <q-icon name="today" size="18px" />
-              <span>{{ getRelativeLabel(todayMenu.fecha_menu) }}</span>
-            </div>
-          </div>
-
-          <article class="today-menu-card">
-            <div class="today-menu-card__date">
-              <div class="today-menu-card__day">{{ formatDayName(todayMenu.fecha_menu) }}</div>
-              <div class="today-menu-card__full-date">{{ formatLongDate(todayMenu.fecha_menu) }}</div>
-            </div>
-
-            <div class="today-menu-card__content">
-              <div class="menu-items-label">Platillos</div>
-              <div class="today-menu-items">
-                <div
-                  v-for="(item, idx) in parseMenuItems(todayMenu.contenido_menu)"
-                  :key="idx"
-                  class="today-menu-item"
-                >
-                  <q-icon name="restaurant_menu" size="18px" />
-                  <span>{{ item }}</span>
-                </div>
+      <template v-else-if="menus.length > 0">
+        <section v-if="featuredMenu" class="featured-section">
+          <article class="today-card">
+            <div class="today-card__aside">
+              <div class="today-card__badge">
+                <q-icon name="restaurant" size="15px" />
+                <span>{{ isTodayFeatured ? 'Hoy' : 'Próximo servicio' }}</span>
               </div>
+
+              <div class="today-card__day">{{ formatDayName(featuredMenu.fecha_menu) }}</div>
+              <div class="today-card__date">{{ formatLongDate(featuredMenu.fecha_menu) }}</div>
+
+              <div class="today-card__meta">
+                <q-icon name="lunch_dining" size="14px" />
+                <span>{{ featuredItems.length }} {{ featuredItems.length === 1 ? 'platillo' : 'platillos' }}</span>
+              </div>
+            </div>
+
+            <div class="today-card__main">
+              <div class="today-card__label">Platillos</div>
+
+              <ul v-if="featuredItems.length > 0" class="today-card__list">
+                <li
+                  v-for="(item, idx) in featuredItems"
+                  :key="idx"
+                  class="today-item"
+                  :style="{ animationDelay: `${idx * 45}ms` }"
+                >
+                  <span class="today-item__index">{{ idx + 1 }}</span>
+                  <span class="today-item__text">{{ item }}</span>
+                </li>
+              </ul>
+
+              <div v-else class="today-card__empty">Sin platillos registrados para este día.</div>
             </div>
           </article>
         </section>
 
-        <section v-if="upcomingMenus.length > 0" class="other-menus-section">
+        <section v-if="upcomingMenus.length > 0" class="upcoming-section">
           <div class="section-heading">
             <div>
               <div class="menus-eyebrow">Programación</div>
-              <h2>Otros días</h2>
+              <h2 class="section-title">Próximos días</h2>
             </div>
-            <div class="menus-count">{{ upcomingMenus.length }}</div>
+            <div class="section-count">{{ upcomingMenus.length }}</div>
           </div>
 
           <div class="menus-grid">
-            <article v-for="menu in upcomingMenus" :key="menu.id" class="menu-card">
-              <div class="menu-card__date">
-                <div class="menu-card__number">{{ formatDayNumber(menu.fecha_menu) }}</div>
-                <div>
-                  <div class="menu-card__day">{{ formatDayName(menu.fecha_menu) }}</div>
-                  <div class="menu-card__relative">{{ getRelativeLabel(menu.fecha_menu) }}</div>
+            <article
+              v-for="(menu, idx) in upcomingMenus"
+              :key="menu.id"
+              class="menu-card"
+              :style="{ animationDelay: `${Math.min(idx, 8) * 50}ms` }"
+            >
+              <header class="menu-card__head">
+                <div class="menu-card__date">
+                  <span class="menu-card__day-number">{{ formatDayNumber(menu.fecha_menu) }}</span>
+                  <span class="menu-card__month">{{ formatMonthShort(menu.fecha_menu) }}</span>
                 </div>
-              </div>
 
-              <div class="menu-card__items">
-                <div
-                  v-for="(item, idx) in parseMenuItems(menu.contenido_menu)"
-                  :key="idx"
+                <div class="menu-card__labels">
+                  <div class="menu-card__day-name">{{ formatDayName(menu.fecha_menu) }}</div>
+                  <div class="menu-card__relative">{{ getCountdownLabel(menu.fecha_menu) }}</div>
+                </div>
+              </header>
+
+              <ul v-if="parseMenuItems(menu.contenido_menu).length > 0" class="menu-card__list">
+                <li
+                  v-for="(item, i) in parseMenuItems(menu.contenido_menu)"
+                  :key="i"
                   class="menu-card__item"
                 >
-                  <q-icon name="fiber_manual_record" size="8px" />
+                  <span class="menu-card__bullet"></span>
                   <span>{{ item }}</span>
-                </div>
-              </div>
+                </li>
+              </ul>
+
+              <div v-else class="menu-card__empty">Sin platillos registrados.</div>
             </article>
           </div>
         </section>
+      </template>
 
-        <div v-if="menus.length === 0 && !loading" class="empty-state">
-          <q-icon name="restaurant" size="56px" color="grey-5" />
-          <div>
-            <div class="empty-state__title">No hay menús disponibles</div>
-            <div class="empty-state__caption">Cuando se carguen desde escaneo aparecerán aquí.</div>
-          </div>
+      <div v-else class="empty-state">
+        <div class="empty-state__icon">
+          <q-icon name="restaurant" size="30px" />
         </div>
+        <div class="empty-state__title">No hay menús disponibles</div>
+        <div class="empty-state__caption">Cuando se carguen desde escaneo aparecerán aquí.</div>
+        <q-btn
+          v-if="isLoggedIn"
+          unelevated
+          no-caps
+          icon="document_scanner"
+          label="Escanear menú"
+          to="/menus/scan"
+          class="menus-scan-btn q-mt-md"
+        />
       </div>
     </div>
   </q-page>
@@ -106,17 +146,18 @@
 import { computed, defineComponent, onMounted, ref } from 'vue'
 import { notify } from '../utils/notify'
 import { supabase } from '../supabase'
-import { date, useQuasar } from 'quasar'
+import { date } from 'quasar'
 import { useAuthStore } from '../stores/auth'
 
 export default defineComponent({
   name: 'MenusPage',
   setup() {
-    const $q = useQuasar()
     const loading = ref(false)
     const menus = ref([])
     const authStore = useAuthStore()
     const isLoggedIn = computed(() => authStore.isLoggedIn)
+
+    const monthsShort = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 
     const getLocalDateString = (dateValue) => {
       const year = dateValue.getFullYear()
@@ -153,14 +194,19 @@ export default defineComponent({
       }
     }
 
-    const todayMenu = computed(() => {
+    const featuredMenu = computed(() => {
       const todayStr = getLocalDateString(new Date())
       return menus.value.find(m => m.fecha_menu === todayStr) || (menus.value.length > 0 ? menus.value[0] : null)
     })
 
+    const isTodayFeatured = computed(() => {
+      if (!featuredMenu.value) return false
+      return featuredMenu.value.fecha_menu === getLocalDateString(new Date())
+    })
+
     const upcomingMenus = computed(() => {
-      if (!todayMenu.value) return []
-      return menus.value.filter(m => m.id !== todayMenu.value.id)
+      if (!featuredMenu.value) return []
+      return menus.value.filter(m => m.id !== featuredMenu.value.id)
     })
 
     const formatDayName = (val) => {
@@ -177,6 +223,12 @@ export default defineComponent({
       return val.split('-')[2]
     }
 
+    const formatMonthShort = (val) => {
+      const d = parseDateOnly(val)
+      if (!d) return ''
+      return monthsShort[d.getMonth()]
+    }
+
     const formatLongDate = (val) => {
       const d = parseDateOnly(val)
       if (!d) return ''
@@ -185,16 +237,21 @@ export default defineComponent({
       })
     }
 
-    const getRelativeLabel = (val) => {
+    const getDayDiff = (val) => {
       const targetDate = parseDateOnly(val)
-      if (!targetDate) return ''
+      if (!targetDate) return null
       const now = new Date()
       now.setHours(0, 0, 0, 0)
       targetDate.setHours(0, 0, 0, 0)
+      return date.getDateDiff(targetDate, now, 'days')
+    }
 
-      const diff = date.getDateDiff(targetDate, now, 'days')
+    const getCountdownLabel = (val) => {
+      const diff = getDayDiff(val)
+      if (diff === null) return ''
       if (diff === 0) return 'Hoy'
       if (diff === 1) return 'Mañana'
+      if (diff > 1) return `En ${diff} días`
       return formatLongDate(val)
     }
 
@@ -224,6 +281,11 @@ export default defineComponent({
         .map(item => item.replace(/^[•\-\*]\s*/, ''))
     }
 
+    const featuredItems = computed(() => {
+      if (!featuredMenu.value) return []
+      return parseMenuItems(featuredMenu.value.contenido_menu)
+    })
+
     onMounted(() => {
       fetchMenus()
     })
@@ -231,12 +293,16 @@ export default defineComponent({
     return {
       loading,
       menus,
-      todayMenu,
+      fetchMenus,
+      featuredMenu,
+      featuredItems,
+      isTodayFeatured,
       upcomingMenus,
       formatDayName,
       formatDayNumber,
+      formatMonthShort,
       formatLongDate,
-      getRelativeLabel,
+      getCountdownLabel,
       parseMenuItems,
       isLoggedIn
     }
@@ -246,287 +312,447 @@ export default defineComponent({
 
 <style scoped>
 .menus-page {
-  min-height: 100vh;
   background:
-    linear-gradient(180deg, #f4f4f2 0%, #ffffff 34%, #f7f7f5 100%);
+    radial-gradient(900px 420px at 100% -8%, rgba(0, 0, 0, 0.07), transparent 62%),
+    linear-gradient(180deg, #f2f1ee 0%, #ffffff 26%, #f6f5f2 100%);
   color: var(--uber-black);
   font-family: var(--uber-font-body);
-}
-
-.menus-topbar {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px clamp(16px, 4vw, 44px);
-  background: rgba(255, 255, 255, 0.92);
-  border-bottom: 1px solid var(--uber-border);
-  backdrop-filter: blur(16px);
-}
-
-.menus-eyebrow {
-  color: #6b6b6b;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.menus-title {
-  margin: 2px 0 0;
-  font-family: var(--uber-font-display);
-  font-size: clamp(1.45rem, 3vw, 2.1rem);
-  line-height: 1;
-  font-weight: 800;
-}
-
-.menus-scan-btn {
-  min-height: 42px;
-  border-radius: 999px;
-  background: var(--uber-black) !important;
-  color: var(--uber-white) !important;
-  font-weight: 800;
-  padding: 0 18px;
 }
 
 .menus-shell {
   width: min(1180px, 100%);
   margin: 0 auto;
-  padding: 22px clamp(14px, 3vw, 28px) 96px;
-}
-
-.menus-loading,
-.empty-state {
-  min-height: 52vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  color: #6b6b6b;
-  text-align: center;
-}
-
-.content-wrapper {
+  padding: clamp(18px, 3vw, 30px) clamp(14px, 3vw, 28px) calc(96px + env(safe-area-inset-bottom));
   display: grid;
-  gap: 28px;
+  gap: clamp(22px, 3vw, 34px);
+  align-content: start;
+}
+
+.menus-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.menus-eyebrow {
+  color: #8a8a86;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.menus-title {
+  margin: 4px 0 0;
+  font-family: var(--uber-font-display);
+  font-size: clamp(1.9rem, 4.4vw, 2.9rem);
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.menus-subtitle {
+  margin: 8px 0 0;
+  max-width: 42ch;
+  color: #6f6f6b;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.menus-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.menus-icon-btn {
+  width: 44px;
+  height: 44px;
+  background: var(--uber-white);
+  color: #111111;
+  border: 1px solid var(--uber-border);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+}
+
+.menus-scan-btn {
+  min-height: 44px;
+  border-radius: var(--uber-radius-pill);
+  background: var(--uber-black) !important;
+  color: var(--uber-white) !important;
+  font-weight: 700;
+  padding: 0 20px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+}
+
+.menus-skeleton {
+  display: grid;
+  gap: clamp(22px, 3vw, 34px);
+}
+
+.menus-skeleton__hero {
+  height: clamp(260px, 34vw, 300px);
+  border-radius: 28px;
+}
+
+.menus-skeleton__card {
+  height: 190px;
+  border-radius: 24px;
+}
+
+.today-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+  gap: clamp(18px, 2.6vw, 32px);
+  padding: clamp(22px, 3.2vw, 36px);
+  border-radius: 28px;
+  background:
+    radial-gradient(130% 150% at 0% 0%, rgba(255, 255, 255, 0.12), transparent 58%),
+    linear-gradient(158deg, #171717 0%, #090909 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 26px 60px rgba(0, 0, 0, 0.26);
+  color: var(--uber-white);
+  overflow: hidden;
+  animation: menu-rise 0.4s ease both;
+}
+
+.today-card__aside {
+  align-self: center;
+}
+
+.today-card__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 0 14px;
+  border-radius: var(--uber-radius-pill);
+  background: var(--uber-white);
+  color: #0b0b0b;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.today-card__day {
+  margin-top: 18px;
+  font-family: var(--uber-font-display);
+  font-size: clamp(2rem, 5.2vw, 3.1rem);
+  font-weight: 800;
+  line-height: 0.98;
+  letter-spacing: -0.03em;
+}
+
+.today-card__date {
+  margin-top: 10px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.today-card__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 18px;
+  padding: 7px 12px;
+  border-radius: var(--uber-radius-pill);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.today-card__main {
+  padding-left: clamp(18px, 2.6vw, 32px);
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.today-card__label {
+  color: rgba(255, 255, 255, 0.46);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.today-card__list {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.today-item {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 13px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  animation: menu-rise 0.36s ease both;
+}
+
+.today-item:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.today-item__index {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.today-item__text {
+  font-size: clamp(1rem, 1.7vw, 1.14rem);
+  font-weight: 700;
+  line-height: 1.38;
+}
+
+.today-card__empty {
+  margin-top: 14px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.9rem;
 }
 
 .section-heading {
   display: flex;
-  align-items: end;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
-.section-heading h2 {
-  margin: 3px 0 0;
+.section-title {
+  margin: 4px 0 0;
   font-family: var(--uber-font-display);
-  font-size: clamp(1.3rem, 2.4vw, 1.8rem);
+  font-size: clamp(1.25rem, 2.4vw, 1.65rem);
+  font-weight: 800;
   line-height: 1.05;
+  letter-spacing: -0.02em;
 }
 
-.today-date-pill,
-.menus-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 36px;
-  padding: 0 13px;
-  border-radius: 999px;
-  background: var(--uber-chip-gray);
-  color: var(--uber-black);
+.section-count {
+  display: grid;
+  place-items: center;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: var(--uber-radius-pill);
+  background: var(--uber-white);
+  border: 1px solid var(--uber-border);
+  color: #111111;
   font-size: 13px;
   font-weight: 800;
 }
 
-.today-menu-card {
-  display: grid;
-  grid-template-columns: minmax(210px, 0.72fr) minmax(0, 1.28fr);
-  gap: 1px;
-  overflow: hidden;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: var(--uber-shadow-medium);
-}
-
-.today-menu-card__date {
-  padding: clamp(22px, 4vw, 34px);
-  background: #000000;
-  color: #ffffff;
-}
-
-.today-menu-card__day {
-  font-family: var(--uber-font-display);
-  font-size: clamp(2.2rem, 6vw, 4.4rem);
-  font-weight: 900;
-  line-height: 0.94;
-}
-
-.today-menu-card__full-date {
-  margin-top: 16px;
-  color: rgba(255, 255, 255, 0.66);
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.today-menu-card__content {
-  padding: clamp(22px, 4vw, 34px);
-  background: #171717;
-  color: #ffffff;
-}
-
-.menu-items-label {
-  color: rgba(255, 255, 255, 0.52);
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.today-menu-items {
-  display: grid;
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.today-menu-item {
-  display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
-  gap: 10px;
-  align-items: start;
-  padding: 12px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-  font-size: clamp(1.02rem, 2vw, 1.22rem);
-  font-weight: 800;
-  line-height: 1.35;
-}
-
-.today-menu-item:last-child {
-  border-bottom: 0;
-}
-
-.today-menu-item .q-icon {
-  margin-top: 2px;
-  color: rgba(255, 255, 255, 0.72);
-}
-
 .menus-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(272px, 1fr));
   gap: 14px;
 }
 
 .menu-card {
   display: grid;
-  gap: 18px;
+  gap: 16px;
   align-content: start;
-  min-height: 100%;
   padding: 18px;
-  border-radius: 8px;
+  border-radius: 24px;
   background: var(--uber-white);
   border: 1px solid var(--uber-border);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  animation: menu-rise 0.4s ease both;
 }
 
-.menu-card__date {
+.menu-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.09);
+}
+
+.menu-card__head {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.menu-card__number {
+.menu-card__date {
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
-  flex: 0 0 48px;
-  border-radius: 8px;
-  background: #f0f0ed;
-  color: #111111;
-  font-family: var(--uber-font-display);
-  font-size: 1.28rem;
-  font-weight: 900;
+  flex: 0 0 52px;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: #101010;
+  color: var(--uber-white);
+  line-height: 1;
 }
 
-.menu-card__day {
-  font-size: 1.05rem;
-  font-weight: 900;
+.menu-card__day-number {
+  font-family: var(--uber-font-display);
+  font-size: 1.32rem;
+  font-weight: 800;
+}
+
+.menu-card__month {
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.menu-card__day-name {
+  font-size: 1.02rem;
+  font-weight: 800;
   color: #111111;
+  letter-spacing: -0.01em;
 }
 
 .menu-card__relative {
-  margin-top: 2px;
-  color: #717171;
+  margin-top: 3px;
+  color: #7d7d78;
   font-size: 12px;
   font-weight: 700;
 }
 
-.menu-card__items {
+.menu-card__list {
+  margin: 0;
+  padding: 14px 0 0;
+  list-style: none;
+  border-top: 1px solid rgba(0, 0, 0, 0.07);
   display: grid;
-  gap: 9px;
+  gap: 10px;
 }
 
 .menu-card__item {
   display: grid;
-  grid-template-columns: 12px minmax(0, 1fr);
-  gap: 8px;
+  grid-template-columns: 6px minmax(0, 1fr);
+  gap: 10px;
   align-items: start;
-  color: #333333;
+  color: #3a3a38;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.45;
 }
 
-.menu-card__item .q-icon {
+.menu-card__bullet {
+  width: 6px;
+  height: 6px;
   margin-top: 7px;
-  color: #111111;
+  border-radius: 50%;
+  background: #111111;
+  opacity: 0.32;
+}
+
+.menu-card__empty {
+  padding-top: 14px;
+  border-top: 1px solid rgba(0, 0, 0, 0.07);
+  color: #9a9a95;
+  font-size: 13px;
 }
 
 .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 46vh;
+  padding: 40px 20px;
+  border-radius: 28px;
   background: var(--uber-white);
   border: 1px solid var(--uber-border);
-  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.05);
+}
+
+.empty-state__icon {
+  display: grid;
+  place-items: center;
+  width: 68px;
+  height: 68px;
+  margin-bottom: 18px;
+  border-radius: 50%;
+  background: #f2f2ef;
+  color: #9a9a95;
 }
 
 .empty-state__title {
   color: #111111;
-  font-size: 1.05rem;
-  font-weight: 900;
+  font-family: var(--uber-font-display);
+  font-size: 1.15rem;
+  font-weight: 800;
 }
 
 .empty-state__caption {
-  margin-top: 4px;
-  color: #777777;
+  margin-top: 6px;
+  max-width: 34ch;
+  color: #85857f;
   font-size: 13px;
+  line-height: 1.5;
+}
+
+@keyframes menu-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 @media (max-width: 720px) {
-  .menus-topbar {
-    padding: 14px 16px;
+  .menus-header {
+    align-items: flex-start;
+  }
+
+  .menus-header__actions {
+    width: 100%;
   }
 
   .menus-scan-btn {
-    padding: 0 12px;
+    flex: 1;
   }
 
-  .section-heading {
-    align-items: start;
-    flex-direction: column;
-  }
-
-  .today-menu-card {
+  .today-card {
     grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .today-card__main {
+    padding-left: 0;
+    padding-top: 20px;
+    border-left: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
   }
 
   .menus-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .today-card,
+  .today-item,
+  .menu-card {
+    animation: none;
+  }
+
+  .menu-card:hover {
+    transform: none;
   }
 }
 </style>

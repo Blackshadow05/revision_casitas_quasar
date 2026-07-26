@@ -14,8 +14,11 @@ import {
 
 const PAGE_SIZE = 100
 const SEARCH_BATCH_SIZE = 1000
+const SEARCH_DEBOUNCE_MS = 350
 const REMOTE_SEARCH_CACHE_KEY = 'remoteSearchResults'
 const homeRealtimeListeners = new Set()
+
+let remoteSearchDebounceTimer = null
 
 const getLocalDeviceDateTime = () => {
   const now = new Date()
@@ -64,6 +67,17 @@ const compareByMostRecentDesc = (left, right) => {
 }
 
 const normalizeComparableValue = (value) => String(value || '').trim().replace(/^0+/, '') || '0'
+
+const buildCasitaVariants = (value) => {
+  const raw = String(value || '').trim()
+  const bare = normalizeComparableValue(raw)
+  const variants = new Set([raw, bare])
+
+  if (bare.length < 2) variants.add(bare.padStart(2, '0'))
+  if (bare.length < 3) variants.add(bare.padStart(3, '0'))
+
+  return Array.from(variants).filter(Boolean)
+}
 
 const mergeUniqueRowsById = (...rowSets) => {
   const uniqueRows = new Map()
@@ -135,6 +149,7 @@ export const useCasasStore = defineStore('casas', {
     casas: [],
     matchedCasas: [],
     loading: false,
+    searchLoading: false,
     localReady: false,
     quickLoadReady: false,
     notificationsReady: false,
@@ -166,7 +181,7 @@ export const useCasasStore = defineStore('casas', {
 
       return records.filter((record) => {
         if (/^\d+$/.test(searchTerm)) {
-          return String(record.casita || '') === searchTerm
+          return normalizeComparableValue(record.casita) === normalizeComparableValue(searchTerm)
         }
 
         return [record.quien_revisa, record.notas, record.nota_extra]
@@ -437,7 +452,7 @@ export const useCasasStore = defineStore('casas', {
 
       const searches = /^\d+$/.test(trimmedSearch)
         ? [
-            () => supabase.from('revisiones_casitas').select('*').eq('casita', trimmedSearch)
+            () => supabase.from('revisiones_casitas').select('*').in('casita', buildCasitaVariants(trimmedSearch))
           ]
         : [
             () => supabase.from('revisiones_casitas').select('*').ilike('quien_revisa', `%${trimmedSearch}%`),
@@ -560,6 +575,11 @@ export const useCasasStore = defineStore('casas', {
       }
     },
     async clearHomeSessionState() {
+      if (remoteSearchDebounceTimer) {
+        clearTimeout(remoteSearchDebounceTimer)
+        remoteSearchDebounceTimer = null
+      }
+
       if (this.homeQuerySubscription) {
         this.homeQuerySubscription.unsubscribe()
         this.homeQuerySubscription = null
@@ -585,6 +605,8 @@ export const useCasasStore = defineStore('casas', {
       this.localReady = false
       this.quickLoadReady = false
       this.notificationsReady = false
+      this.searchLoading = false
+      this.searchRequestId += 1
       this.page = 0
       this.hasMore = true
       this.allLoaded = false
@@ -615,30 +637,45 @@ export const useCasasStore = defineStore('casas', {
       const searchTerm = String(value || '').trim()
       const requestId = ++this.searchRequestId
 
+      if (remoteSearchDebounceTimer) {
+        clearTimeout(remoteSearchDebounceTimer)
+        remoteSearchDebounceTimer = null
+      }
+
       if (!searchTerm || this.activeFilter) {
+        this.searchLoading = false
         return
       }
 
-      this.loading = true
-      this.fetchRemoteSearchResults(searchTerm)
-        .then((remoteRows) => {
-          if (requestId !== this.searchRequestId || this.search.trim() !== searchTerm || !remoteRows) {
-            return
-          }
+      this.searchLoading = true
 
-          this.remoteSearchTerm = searchTerm
-          this.remoteSearchRows = remoteRows
-          saveRemoteSearchCache(searchTerm, remoteRows)
-          this.recomputeVisibleCasas(true)
-        })
-        .catch((error) => {
-          console.error('[CasasStore] Error en busqueda remota:', error.message)
-        })
-        .finally(() => {
-          if (requestId === this.searchRequestId) {
-            this.loading = false
-          }
-        })
+      remoteSearchDebounceTimer = setTimeout(() => {
+        remoteSearchDebounceTimer = null
+
+        if (requestId !== this.searchRequestId) {
+          return
+        }
+
+        this.fetchRemoteSearchResults(searchTerm)
+          .then((remoteRows) => {
+            if (requestId !== this.searchRequestId || String(this.search || '').trim() !== searchTerm || !remoteRows) {
+              return
+            }
+
+            this.remoteSearchTerm = searchTerm
+            this.remoteSearchRows = remoteRows
+            saveRemoteSearchCache(searchTerm, remoteRows)
+            this.recomputeVisibleCasas(true)
+          })
+          .catch((error) => {
+            console.error('[CasasStore] Error en busqueda remota:', error.message)
+          })
+          .finally(() => {
+            if (requestId === this.searchRequestId) {
+              this.searchLoading = false
+            }
+          })
+      }, SEARCH_DEBOUNCE_MS)
     },
     async loadSavedSearch() {
       const savedSearch = localStorage.getItem('searchQuery')

@@ -64,17 +64,6 @@
       </q-card>
     </q-dialog>
 
-    <!-- Acceso Quiniela Mundialista (visible siempre, sin login) -->
-    <div class="quiniela-banner" @click="goToQuiniela">
-      <div class="quiniela-banner-glow"></div>
-      <q-icon name="emoji_events" class="quiniela-banner-trophy" />
-      <div class="quiniela-banner-text">
-        <div class="quiniela-banner-title">Quiniela Mundial 2026</div>
-        <div class="quiniela-banner-sub">Pronostica los partidos y compite. ¡No necesitas cuenta!</div>
-      </div>
-      <q-icon name="chevron_right" size="26px" class="quiniela-banner-arrow" />
-    </div>
-
     <!-- Login Button (Only visible if not logged in) -->
     <div v-if="!isLoggedIn" class="flex flex-center q-pa-xl column">
       <q-icon name="lock_person" size="100px" color="grey-5" class="q-mb-md" />
@@ -100,7 +89,7 @@
         <!-- Fila principal con usuario y botón logout -->
         <div class="row items-center justify-between">
           <div class="row items-center">
-            <q-btn flat round icon="person" color="dark" class="bg-grey-2 q-mr-sm" />
+            <q-avatar size="40px" color="grey-2" text-color="dark" icon="person" class="q-mr-sm" />
             <div>
               <div class="text-weight-bold text-orange-9" style="font-size: 14px;">Bienvenido, {{ currentUser?.Usuario || 'Usuario' }}</div>
               <div class="text-weight-bold text-orange-9" style="font-size: 14px; line-height: 1;">{{ currentUser?.Rol || '' }}</div>
@@ -124,7 +113,7 @@
       </div>
 
       <!-- ==================== AVISOS DE OPERACIÓN ==================== -->
-      <div v-if="avisos.length && !$q.screen.gt.md" class="avisos-wrapper q-mb-md">
+      <div v-if="avisos.length" class="avisos-wrapper q-mb-md">
         <div class="avisos-header row items-center justify-between no-wrap q-mb-xs">
           <div class="row items-center no-wrap">
             <q-icon name="notifications_active" size="20px" color="orange-9" class="q-mr-xs" />
@@ -161,7 +150,7 @@
 
       <div class="text-h5 text-weight-bold q-mb-lg" style="color: #4CAF50;">Revisiones de Casitas</div>
 
-      <div v-if="!$q.screen.gt.md" class="row q-col-gutter-sm q-mb-lg">
+      <div class="row q-col-gutter-sm q-mb-lg">
         <div class="col-6">
           <q-btn
             color="orange-8"
@@ -264,21 +253,28 @@
 
       <!-- Mostrando registros badge -->
       <div v-if="visibleRecordsCount > 0" class="flex justify-center q-mb-md">
-        <div class="records-badge">Mostrando {{ visibleRecordsCount }} registros</div>
+        <div class="records-badge">{{ recordsBadgeText }}</div>
       </div>
 
       <div class="full-width">
         <!-- Initial Loading State -->
-        <div v-if="firstSyncPending || (loading && casas.length === 0)" class="flex flex-center q-my-xl">
+        <div v-if="showListSpinner" class="flex flex-center q-my-xl">
           <q-spinner-dots color="primary" size="40px" />
         </div>
 
         <!-- Empty State if no results -->
-        <div v-if="!firstSyncPending && !loading && casas.length === 0" class="flex flex-center q-mt-xl text-center">
+        <div v-if="showEmptyState" class="flex flex-center q-mt-xl text-center">
           <div>
             <q-icon name="search_off" size="64px" color="grey-4" />
-            <div class="text-h6 text-grey-5 q-mt-md">No encontramos nada</div>
-            <q-btn flat color="primary" label="Intentar de nuevo" @click="loadData" class="q-mt-sm" />
+            <div class="text-h6 text-grey-5 q-mt-md">{{ emptyStateTitle }}</div>
+            <div v-if="hasActiveQuery" class="text-body2 text-grey-6 q-mt-xs">Prueba con otro término o quita el filtro</div>
+            <q-btn
+              flat
+              color="primary"
+              :label="hasActiveQuery ? 'Limpiar búsqueda y filtros' : 'Intentar de nuevo'"
+              class="q-mt-sm"
+              @click="hasActiveQuery ? resetQuery() : loadData()"
+            />
           </div>
         </div>
 
@@ -333,7 +329,7 @@
 
         <!-- Table View - DESKTOP ONLY -->
         <div v-if="isLoggedIn && $q.screen.gt.md && !firstSyncPending">
-          <div class="table-container">
+          <div ref="tableContainer" class="table-container">
             <q-table
               :rows="desktopCasas"
               :columns="tableColumns"
@@ -341,13 +337,11 @@
               flat
               dense
               bordered
-              :pagination="{ rowsPerPage: 0 }"
-              virtual-scroll
-              :virtual-scroll-item-size="48"
-              :virtual-scroll-sticky-size-start="48"
-              style="height: calc(100vh - 200px)"
+              v-model:pagination="tablePagination"
+              :rows-per-page-options="[50, 100, 200]"
+              rows-per-page-label="Filas por página"
+              :style="{ height: tableHeight }"
               class="modern-table"
-              @row-click="(evt, row) => goToDetails(row)"
             >
               <!-- Custom header for theme-based coloring -->
               <template v-slot:header="props">
@@ -505,7 +499,7 @@
         </q-card-section>
 
         <q-card-actions align="right" class="q-px-md q-pb-md">
-          <q-btn flat label="Limpiar" color="grey-7" @click="clearFilters" :disable="!selectedFilter && !filterDate" />
+          <q-btn flat label="Limpiar" color="grey-7" @click="clearFilters" :disable="!selectedFilter && !filterDate && !store.activeFilter" />
           <q-btn flat label="Cancelar" color="grey-7" v-close-popup @click="showFilterModal = false" />
           <q-btn unelevated label="Aplicar" color="primary" @click="applyFilters" :disable="!selectedFilter && !filterDate" />
         </q-card-actions>
@@ -543,15 +537,19 @@
       </transition>
     </q-page-sticky>
 
-    <!-- Floating Action Button (visible sólo en pantallas < md) -->
+    <!-- Floating Action Button -->
     <q-page-sticky position="bottom-right" :offset="[18, 18]">
-      <q-fab
-        v-if="$q.screen.lt.md && canAdd"
+      <q-btn
+        v-if="isLoggedIn && canAdd"
+        fab
         icon="add"
         color="primary"
         class="fab-btn"
+        aria-label="Nueva revisión"
         @click="addNew"
-      />
+      >
+        <q-tooltip>Nueva revisión</q-tooltip>
+      </q-btn>
     </q-page-sticky>
 
     <!-- Scroll to top button (visible en todas las pantallas cuando hay scroll) -->
@@ -803,10 +801,10 @@ export default defineComponent({
 
     // Desktop table columns
     const tableColumns = [
-      { name: 'casita', label: 'Casita', field: 'casita', align: 'left', sortable: true, style: 'font-weight: bold; width: 80px', sticky: true },
-      { name: 'caja_fuerte', label: 'Caja Fuerte', field: 'caja_fuerte', align: 'left', sortable: true, style: 'font-weight: 600', sticky: true },
-      { name: 'quien_revisa', label: 'Revisado por', field: 'quien_revisa', align: 'left', sortable: true, sticky: true },
-      { name: 'created_at', label: 'Fecha', field: 'created_at', align: 'left', sortable: true, format: val => formatFullDate(val), sticky: true },
+      { name: 'casita', label: 'Casita', field: 'casita', align: 'left', sortable: true, style: 'font-weight: bold; width: 80px' },
+      { name: 'caja_fuerte', label: 'Caja Fuerte', field: 'caja_fuerte', align: 'left', sortable: true, style: 'font-weight: 600' },
+      { name: 'quien_revisa', label: 'Revisado por', field: 'quien_revisa', align: 'left', sortable: true },
+      { name: 'created_at', label: 'Fecha', field: 'created_at', align: 'left', sortable: true, format: val => formatFullDate(val) },
       { name: 'chromecast', label: 'Chromecast', field: 'chromecast', align: 'center', sortable: true },
       { name: 'speaker', label: 'Speaker', field: 'speaker', align: 'center', sortable: true },
       { name: 'usb_speaker', label: 'USB Spk', field: 'usb_speaker', align: 'center', sortable: true },
@@ -827,12 +825,22 @@ export default defineComponent({
       { name: 'nota_extra', label: 'Nota Extra', field: 'nota_extra', align: 'center', sortable: false }
     ]
 
+    const tablePagination = ref({ rowsPerPage: 100, page: 1 })
+    const tableContainer = ref(null)
+    const tableHeight = ref('60vh')
+
+    const updateTableHeight = () => {
+      const el = tableContainer.value
+      if (!el) return
+      const available = window.innerHeight - el.getBoundingClientRect().top - 24
+      tableHeight.value = `${Math.max(320, Math.round(available))}px`
+    }
+
     const showFilterModal = ref(false)
     const showLoginModal = ref(false)
 
     // Opciones de filtro
     const filterOptions = [
-      { label: 'Por fecha', value: JSON.stringify({ isDate: true, label: 'Por fecha' }) },
       { label: 'Sin trapo binocular', value: JSON.stringify({ field: 'trapo_binoculares', value: 'No', label: 'Sin trapo binocular' }) },
       { label: 'Con trapo binocular', value: JSON.stringify({ field: 'trapo_binoculares', value: 'Si', label: 'Con trapo binocular' }) },
       { label: 'Sin sombrero', value: JSON.stringify({ field: 'sombrero', value: 'No', label: 'Sin sombrero' }) },
@@ -894,6 +902,7 @@ export default defineComponent({
       selectedFilter.value = null
       filterDate.value = null
       await store.clearAdvancedFilter()
+      showFilterModal.value = false
       window.scrollTo({ top: 0 })
       notify({
         type: 'info',
@@ -904,6 +913,7 @@ export default defineComponent({
 
     const clearFiltersFromBadge = async () => {
       selectedFilter.value = null
+      filterDate.value = null
       await store.clearAdvancedFilter()
       window.scrollTo({ top: 0 })
       notify({
@@ -911,6 +921,14 @@ export default defineComponent({
         message: 'Filtro limpiado',
         position: 'top'
       })
+    }
+
+    const resetQuery = async () => {
+      selectedFilter.value = null
+      filterDate.value = null
+      store.setSearch('')
+      await store.clearAdvancedFilter()
+      window.scrollTo({ top: 0 })
     }
     const loginLoading = computed(() => authStore.loading)
     const loginError = computed(() => authStore.error)
@@ -928,19 +946,18 @@ export default defineComponent({
       const result = await authStore.login(loginData.username, loginData.password)
       if (result.success) {
         showLoginModal.value = false
+        loginData.username = ''
+        loginData.password = ''
         await loadData()
         await cargarMemos()
-      } else {
-        notify({
-          type: 'negative',
-          message: result.message || 'Error al iniciar sesión',
-          position: 'top'
-        })
       }
     }
 
     const handleLogout = async () => {
       await authStore.logout()
+      loginData.username = ''
+      loginData.password = ''
+      memoRows.value = []
       showLoginModal.value = true
     }
     
@@ -952,42 +969,56 @@ export default defineComponent({
     const casas = computed(() => store.filteredCasas)
     const desktopCasas = computed(() => store.matchedCasas)
     const loading = computed(() => store.loading)
+    const searchLoading = computed(() => store.searchLoading)
     const syncState = computed(() => store.homeSyncState)
     // firstSyncPending blocks the UI only when we have no quick-loaded data yet.
     // Once quickLoadReady=true the user can see the most-recent records immediately
     // while the full RxDB sync continues in background.
     const firstSyncPending = computed(() => syncState.value.firstSyncPending && !store.quickLoadReady)
-    const isSyncing = computed(() => syncState.value.syncing)
     const syncError = computed(() => syncState.value.error)
-    const lastSyncAt = computed(() => syncState.value.lastSyncAt)
-    const syncTitle = computed(() => {
-      if (firstSyncPending.value) {
-        return 'Sincronizando'
-      }
-
-      return ''
-    })
+    const syncTitle = 'Sincronizando'
 
     const syncStatusText = computed(() => {
-      if (firstSyncPending.value) {
-        if (syncState.value.initialSyncPulled > 0) {
-          return `${syncState.value.initialSyncPulled} registros descargados para uso offline`
-        }
-
-        return 'Preparando el cache local del inicio...'
+      if (syncState.value.initialSyncPulled > 0) {
+        return `${syncState.value.initialSyncPulled} registros descargados para uso offline`
       }
 
-      if (lastSyncAt.value) {
-        return `Última sincronización: ${formatFullDate(lastSyncAt.value)}`
-      }
-
-      return ''
+      return 'Preparando el cache local del inicio...'
     })
 
+    const isDesktopView = computed(() => isLoggedIn.value && $q.screen.gt.md)
+
     const visibleRecordsCount = computed(() => {
-      return isLoggedIn.value && $q.screen.gt.md
+      return isDesktopView.value
         ? desktopCasas.value.length
         : casas.value.length
+    })
+
+    const recordsBadgeText = computed(() => {
+      const total = desktopCasas.value.length
+      const shown = visibleRecordsCount.value
+
+      if (!isDesktopView.value && total > shown) {
+        return `Mostrando ${shown} de ${total} registros`
+      }
+
+      return `Mostrando ${shown} registros`
+    })
+
+    const hasActiveQuery = computed(() => {
+      return Boolean(String(store.search || '').trim() || store.activeFilter)
+    })
+
+    const showListSpinner = computed(() => {
+      return firstSyncPending.value || ((loading.value || searchLoading.value) && casas.value.length === 0)
+    })
+
+    const showEmptyState = computed(() => {
+      return !showListSpinner.value && casas.value.length === 0
+    })
+
+    const emptyStateTitle = computed(() => {
+      return hasActiveQuery.value ? 'Sin resultados' : 'No encontramos nada'
     })
 
     const initData = async () => {
@@ -1032,6 +1063,7 @@ export default defineComponent({
       clearInterval(checkSessionInterval)
       if (avisoNowTimer) clearInterval(avisoNowTimer)
       if (avisoMemoTimer) clearInterval(avisoMemoTimer)
+      window.removeEventListener('resize', updateTableHeight)
     })
 
     onMounted(async () => {
@@ -1047,6 +1079,14 @@ export default defineComponent({
       avisoMemoTimer = setInterval(() => {
         if (isLoggedIn.value) cargarMemos()
       }, 5 * 60 * 1000)
+
+      await nextTick()
+      updateTableHeight()
+      window.addEventListener('resize', updateTableHeight)
+    })
+
+    watch([avisos, visibleRecordsCount, isLoggedIn], () => {
+      nextTick(updateTableHeight)
     })
 
     const formatFullDate = (val) => {
@@ -1073,10 +1113,6 @@ export default defineComponent({
 
     const goToOperacionDiaria = () => {
       router.push('/operacion-diaria')
-    }
-
-    const goToQuiniela = () => {
-      router.push('/quiniela')
     }
 
     const goToDetails = (casa) => {
@@ -1115,6 +1151,8 @@ export default defineComponent({
       if (s.includes('guardar upsell')) return 'file_download'
       if (s.includes('upsell')) return 'file_download'
       if (s.includes('move')) return 'sync_alt'
+      if (s === 'si' || s === 'no') return 'lock'
+      if (s === 'back to back' || s === 'backtoback') return 'repeat'
       return 'login'
     }
 
@@ -1166,7 +1204,6 @@ export default defineComponent({
       getCardNoteText,
       goToDashboardHorario,
       goToOperacionDiaria,
-      goToQuiniela,
       goToDetails,
       showFilterModal,
       applyFilters,
@@ -1185,14 +1222,21 @@ export default defineComponent({
       handleLogin,
       handleLogout,
       firstSyncPending,
-      isSyncing,
       syncError,
-      lastSyncAt,
       syncTitle,
       syncStatusText,
       visibleRecordsCount,
+      recordsBadgeText,
+      hasActiveQuery,
+      showListSpinner,
+      showEmptyState,
+      emptyStateTitle,
+      resetQuery,
       // Table
       tableColumns,
+      tablePagination,
+      tableContainer,
+      tableHeight,
       getStatusColor
     }
   }
@@ -1200,62 +1244,7 @@ export default defineComponent({
 </script>
 
 <style scoped>
-.gradient-text {
-  color: #2e7d32; /* Match the image header color */
-}
-
-.quiniela-banner {
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
-  margin-bottom: 16px;
-  border-radius: 18px;
-  cursor: pointer;
-  color: #fff;
-  background:
-    radial-gradient(circle at 12% 30%, rgba(255, 213, 79, 0.28), transparent 45%),
-    linear-gradient(135deg, #1b5e20 0%, #2e7d32 50%, #1b5e20 100%);
-  box-shadow: 0 10px 24px rgba(27, 94, 32, 0.32);
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
-}
-
-.quiniela-banner:active {
-  transform: scale(0.985);
-  box-shadow: 0 6px 16px rgba(27, 94, 32, 0.28);
-}
-
-.quiniela-banner-glow {
-  position: absolute;
-  top: -40%;
-  right: -10%;
-  width: 160px;
-  height: 160px;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.18), transparent 70%);
-  pointer-events: none;
-}
-
-.quiniela-banner-trophy {
-  font-size: 40px;
-  color: #ffd54f;
-  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.3));
-  flex-shrink: 0;
-}
-
-.quiniela-banner-text { flex: 1; min-width: 0; position: relative; z-index: 1; }
-.quiniela-banner-title { font-size: 17px; font-weight: 900; letter-spacing: 0.3px; }
-.quiniela-banner-sub { font-size: 12px; opacity: 0.92; }
-.quiniela-banner-arrow { color: rgba(255, 255, 255, 0.85); flex-shrink: 0; }
-
 /* ===== Avisos de operación ===== */
-.avisos-wrapper {
-  position: sticky;
-  top: 8px;
-  z-index: 200;
-}
-
 .avisos-header {
   background: #fff8e1;
   border-radius: 10px;
@@ -1312,19 +1301,6 @@ export default defineComponent({
   box-shadow: 0 8px 18px rgba(25, 118, 210, 0.08);
 }
 
-.rotate-sync {
-  animation: spin-sync 1.2s linear infinite;
-}
-
-@keyframes spin-sync {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 .modern-card {
   position: relative;
   overflow: hidden;
@@ -1374,10 +1350,6 @@ export default defineComponent({
 .theme-orange {
   background: linear-gradient(145deg, #ffd39a 0%, #fff3e1 58%, #ffffff 100%);
   box-shadow: 0 12px 20px rgba(255, 152, 0, 0.2);
-}
-.theme-yellow {
-  background: linear-gradient(145deg, #fffad2 0%, #fffdf0 58%, #ffffff 100%);
-  box-shadow: 0 12px 20px rgba(250, 204, 21, 0.2);
 }
 .theme-gold {
   background: linear-gradient(145deg, #ffe7a3 0%, #fff8df 58%, #ffffff 100%);
@@ -1451,7 +1423,6 @@ export default defineComponent({
 .bg-red-action { background-color: #FF4D4D; }
 .bg-purple-action { background-color: #9333EA; }
 .bg-orange-action { background-color: #FF9800; }
-.bg-yellow-action { background-color: #FACC15; }
 .bg-gold-action { background-color: #FFD700; }
 .bg-blue-action { background-color: #2196F3; }
 .bg-brown-action { background-color: #3e2723; }
@@ -1467,27 +1438,6 @@ export default defineComponent({
 .info-row {
   margin-bottom: 4px;
 }
-
-.circle-badge {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: 700;
-  font-size: 14px;
-}
-
-.theme-green .circle-badge { background-color: #00D26A; box-shadow: 0 4px 10px rgba(0, 210, 106, 0.4); }
-.theme-red .circle-badge { background-color: #FF4D4D; box-shadow: 0 4px 10px rgba(255, 77, 77, 0.4); }
-.theme-purple .circle-badge { background-color: #9333EA; box-shadow: 0 4px 10px rgba(147, 51, 234, 0.4); }
-.theme-orange .circle-badge { background-color: #FF9800; box-shadow: 0 4px 10px rgba(255, 152, 0, 0.4); }
-.theme-yellow .circle-badge { background-color: #FACC15; box-shadow: 0 4px 10px rgba(250, 204, 21, 0.4); }
-.theme-gold .circle-badge { background-color: #FFD700; box-shadow: 0 4px 10px rgba(255, 215, 0, 0.4); }
-.theme-blue .circle-badge { background-color: #2196F3; box-shadow: 0 4px 10px rgba(33, 150, 243, 0.4); }
-.theme-brown .circle-badge { background-color: #795548; box-shadow: 0 4px 10px rgba(121, 85, 72, 0.4); }
 
 .note-text {
   font-size: 11px;
@@ -1762,10 +1712,5 @@ export default defineComponent({
   .modern-table {
     min-width: 1200px;
   }
-}
-
-.load-more-btn {
-  border-radius: 20px;
-  padding: 8px 24px;
 }
 </style>

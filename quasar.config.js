@@ -117,9 +117,6 @@ export default configure((ctx) => {
             }
           }
         ]
-      },
-      extendGenerateSWOptions (cfg) {
-        cfg.importScripts = ['push-sw.js']
       }
     },
     ssr: {

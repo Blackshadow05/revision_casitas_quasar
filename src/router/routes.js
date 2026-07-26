@@ -4,8 +4,6 @@ const routes = [
     component: () => import('layouts/MainLayout.vue'),
     children: [
       { path: '', component: () => import('pages/IndexPage.vue') },
-      { path: 'quiniela', component: () => import('pages/QuinielaPage.vue') },
-      { path: 'quiniela/pronostico', component: () => import('pages/QuinielaPronosticoPage.vue') },
       { path: 'details', component: () => import('pages/DetailsPage.vue') },
       {
         path: 'new-revision',

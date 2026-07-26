@@ -578,14 +578,16 @@
             </div>
 
             <!-- Doors Row -->
-            <div class="row items-center justify-between q-py-sm border-bottom-light">
-              <div class="row items-center">
+            <div class="row items-center justify-between q-py-sm border-bottom-light no-wrap">
+              <div class="row items-center no-wrap q-mr-md">
                 <div class="mini-icon-box bg-green-1 q-mr-sm">
                   <q-icon name="door_front" color="green" />
                 </div>
                 <div class="text-weight-medium text-grey-8">Puertas y Ventanas</div>
               </div>
-              <q-btn outline color="green" label="Ok" rounded dense class="q-px-lg text-weight-bold" no-caps />
+              <div class="pv-status" :class="puertasVentanasOk ? 'pv-status--ok' : 'pv-status--alert'">
+                {{ casa.puertas_ventanas || '--' }}
+              </div>
             </div>
           </div>
         </div>
@@ -682,9 +684,12 @@
             </div>
           </div>
           <div v-if="nota.imagen" class="q-mt-md">
-            <img 
-              :src="getImageUrl(nota.imagen)" 
+            <img
+              :src="getThumbUrl(nota.imagen)"
               class="nota-extra-image"
+              loading="lazy"
+              decoding="async"
+              alt="Imagen de la nota extra"
               @click="openNoteImage(nota.imagen)"
             />
           </div>
@@ -856,6 +861,14 @@
 
 
 
+    <!-- Loading -->
+    <div v-else-if="bootstrapping" class="flex flex-center full-height q-pa-xl">
+      <div class="text-center">
+        <q-spinner-dots size="48px" color="primary" />
+        <div class="text-subtitle2 text-grey-6 q-mt-md">Cargando revisión...</div>
+      </div>
+    </div>
+
     <!-- Error/Not Found -->
     <div v-else class="flex flex-center full-height q-pa-xl">
       <div class="text-center">
@@ -925,21 +938,55 @@ export default defineComponent({
     // ─── PhotoSwipe lightbox (pinch-to-zoom, swipe, doble-tap) ───
     let lightbox = null
 
-    // PhotoSwipe necesita el tamaño real de cada imagen; lo precargamos.
-    const loadImageSize = (src) => new Promise((resolve) => {
-      const img = new Image()
-      img.onload = () => resolve({
-        src,
-        width: img.naturalWidth || 1600,
-        height: img.naturalHeight || 1200
+    const CLOUDINARY_BASE = 'https://res.cloudinary.com/dhd61lan4/image/upload'
+    const CAROUSEL_TRANSFORM = 'f_auto,q_auto,w_900'
+    const THUMB_TRANSFORM = 'f_auto,q_auto,w_600'
+    const FULL_TRANSFORM = 'f_auto,q_auto,w_1600'
+    const PROBE_TRANSFORM = 'f_auto,q_auto,w_64'
+    const FULL_WIDTH = 1600
+
+    const buildCloudinaryUrl = (path, transform) => {
+      if (!path) return ''
+      if (path.startsWith('http')) return path
+      let cleanPath = path.split(' ').join('%20')
+      if (!/\.(jpg|jpeg|png|webp)$/i.test(cleanPath)) {
+        cleanPath += '.jpg'
+      }
+      return transform
+        ? `${CLOUDINARY_BASE}/${transform}/${cleanPath}`
+        : `${CLOUDINARY_BASE}/${cleanPath}`
+    }
+
+    const aspectCache = new Map()
+
+    const loadImageSize = (path) => {
+      if (aspectCache.has(path)) {
+        return Promise.resolve(aspectCache.get(path))
+      }
+
+      return new Promise((resolve) => {
+        const probe = new Image()
+        const finish = (naturalWidth, naturalHeight) => {
+          const width = naturalWidth || 4
+          const height = naturalHeight || 3
+          const scale = FULL_WIDTH / width
+          const item = {
+            src: buildCloudinaryUrl(path, FULL_TRANSFORM),
+            width: FULL_WIDTH,
+            height: Math.round(height * scale)
+          }
+          aspectCache.set(path, item)
+          resolve(item)
+        }
+        probe.onload = () => finish(probe.naturalWidth, probe.naturalHeight)
+        probe.onerror = () => finish(0, 0)
+        probe.src = buildCloudinaryUrl(path, PROBE_TRANSFORM)
       })
-      img.onerror = () => resolve({ src, width: 1600, height: 1200 })
-      img.src = src
-    })
+    }
 
     const getCurrentImageUrl = () => {
       if (lightbox && lightbox.pswp) {
-        return images.value[lightbox.pswp.currIndex]
+        return buildCloudinaryUrl(imagePaths.value[lightbox.pswp.currIndex], FULL_TRANSFORM)
       }
       return null
     }
@@ -986,7 +1033,15 @@ export default defineComponent({
     const authStore = useAuthStore()
     const canAdd = computed(() => authStore.canAdd)
     const canEdit = computed(() => authStore.canEdit)
-    
+    const bootstrapping = ref(true)
+
+    const PUERTAS_VENTANAS_OK = ['ok', 'okay', 'si', 'sí', 'bien', 'todo bien', 'correcto', 'cerradas']
+
+    const puertasVentanasOk = computed(() => {
+      const value = String(casa.value?.puertas_ventanas || '').trim().toLowerCase()
+      return !value || PUERTAS_VENTANAS_OK.includes(value)
+    })
+
     // Nota extra fields
     const showNotaExtra = ref(false)
     const notasExtra = ref([])
@@ -1051,15 +1106,16 @@ export default defineComponent({
       return evidenceFields.filter(field => !casa.value[field.key])
     })
 
-    const fetchLogs = async () => {
-      if (!casa.value || !casa.value.id) return
+    const fetchLogs = async (revisionId = casa.value?.id) => {
+      if (!revisionId) return
       try {
         const { data, error } = await supabase
           .from('Registro_ediciones')
           .select('*')
-          .ilike('Dato_anterior', `%[${casa.value.id}]%`)
+          .like('Dato_anterior', `[${revisionId}]%`)
           .order('created_at', { ascending: false })
-        
+          .limit(50)
+
         if (error) {
           console.error('Error fetching logs:', error)
           return
@@ -1088,29 +1144,8 @@ export default defineComponent({
       'Si', 'No', 'Check in', 'Check out', 'Upsell', 'Guardar Upsell',
       'Back to Back', 'Show Room', 'Room Move'
     ]
-    const users = ref([])
-
-    // Load users from Supabase
-    const loadUsers = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('Usuarios')
-          .select('Usuario')
-          .order('Usuario')
-        
-        if (error) {
-          console.error('Error loading users:', error)
-          return
-        }
-        
-        users.value = data.map(user => user.Usuario) || []
-      } catch (error) {
-        console.error('Error loading users:', error)
-      }
-    }
-
-    const fetchNotasExtra = async () => {
-      if (!casa.value?.id) {
+    const fetchNotasExtra = async (revisionId = casa.value?.id) => {
+      if (!revisionId) {
         notasExtra.value = []
         return
       }
@@ -1119,7 +1154,7 @@ export default defineComponent({
         const { data, error } = await supabase
           .from('notas_revisiones_casitas')
           .select('*')
-          .eq('revision_id', casa.value.id)
+          .eq('revision_id', revisionId)
           .order('hora', { ascending: false })
 
         if (error) {
@@ -1137,7 +1172,8 @@ export default defineComponent({
     const fileNotaExtra = ref(null)
     const imageModalOpen = ref(false)
     const modalImageUrl = ref('')
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 
     // Check if Web Share API is available
     const canShare = computed(() => {
@@ -1264,152 +1300,153 @@ export default defineComponent({
       }
     }
 
+    const toBlobAsync = (canvas, mime, quality) => new Promise((resolve) => {
+      canvas.toBlob(resolve, mime, quality)
+    })
+
+    const releaseCanvas = (canvas) => {
+      if (!canvas) return
+      canvas.width = 0
+      canvas.height = 0
+    }
+
     const compressImage = async (file, field = null) => {
       const config = getCompressionConfig()
       const originalSize = file.size
-      
-      return new Promise(async (resolve, reject) => {
-        try {
-          const img = new Image()
-          const url = URL.createObjectURL(file)
-          await new Promise((res, rej) => {
-            img.onload = res
-            img.onerror = rej
-            img.src = url
-          })
+      let objectUrl = null
+      let source = null
 
-          if ('decode' in img) await img.decode()
-
-          const decodeSafely = async (file, img) => {
-            if ('createImageBitmap' in window) {
-              try {
-                const tempUrl = URL.createObjectURL(file)
-                const tempBlob = await fetch(tempUrl).then(r => r.blob())
-                URL.revokeObjectURL(tempUrl)
-                return await createImageBitmap(tempBlob)
-              } catch (e) {
-                console.warn('[Compression] createImageBitmap failed, fallback to img', e)
-              }
-            }
-            return img
+      const loadSource = async () => {
+        if ('createImageBitmap' in window) {
+          try {
+            return await createImageBitmap(file, { imageOrientation: 'from-image' })
+          } catch (e) {
+            console.warn('[Compression] createImageBitmap no disponible, se usa <img>', e)
           }
-
-          const normalizeCanvas = document.createElement('canvas')
-          normalizeCanvas.width = img.width
-          normalizeCanvas.height = img.height
-          
-          const nCtx = normalizeCanvas.getContext('2d', { 
-            willReadFrequently: true,
-            alpha: false 
-          })
-          
-          if (!nCtx) throw new Error('Could not get normalization context')
-
-          nCtx.fillStyle = '#FFFFFF'
-          nCtx.fillRect(0, 0, normalizeCanvas.width, normalizeCanvas.height)
-          
-          const source = await decodeSafely(file, img)
-          nCtx.drawImage(source, 0, 0)
-          
-          if (source instanceof ImageBitmap) {
-            source.close()
-          }
-
-          let width = img.width
-          let height = img.height
-          let currentCanvas = normalizeCanvas
-
-          while (width > config.maxResolution * 1.5) {
-            const nextWidth = Math.floor(width / 2)
-            const nextHeight = Math.floor(height / 2)
-            
-            const nextCanvas = document.createElement('canvas')
-            const nextCtx = nextCanvas.getContext('2d', { alpha: false, style: 'image-rendering: crisp-edges;' })
-            nextCanvas.width = nextWidth
-            nextCanvas.height = nextHeight
-            
-            nextCtx.fillStyle = '#FFFFFF'
-            nextCtx.fillRect(0, 0, nextWidth, nextHeight)
-            nextCtx.drawImage(currentCanvas, 0, 0, width, height, 0, 0, nextWidth, nextHeight)
-            
-            if (currentCanvas !== normalizeCanvas) {
-              currentCanvas.width = 0
-              currentCanvas.height = 0
-            }
-            
-            currentCanvas = nextCanvas
-            width = nextWidth
-            height = nextHeight
-          }
-
-          const ratio = Math.min(config.maxResolution / width, config.maxResolution / height)
-          const targetW = Math.round(width * ratio)
-          const targetH = Math.round(height * ratio)
-
-          const finalCanvas = document.createElement('canvas')
-          const finalCtx = finalCanvas.getContext('2d', { alpha: false })
-          finalCanvas.width = targetW
-          finalCanvas.height = targetH
-
-          finalCtx.fillStyle = '#FFFFFF'
-          finalCtx.fillRect(0, 0, targetW, targetH)
-          finalCtx.drawImage(currentCanvas, 0, 0, width, height, 0, 0, targetW, targetH)
-
-          URL.revokeObjectURL(url)
-          if (currentCanvas !== normalizeCanvas) {
-            currentCanvas.width = 0
-            currentCanvas.height = 0
-          }
-          normalizeCanvas.width = 0
-          normalizeCanvas.height = 0
-
-          let quality = config.maxQuality
-          let attempts = 0
-          const finalMime = field ? `image/${config.format}` : 'image/jpeg'
-          const finalFormat = field ? config.format.toUpperCase() : 'JPEG'
-
-          const generateBlob = () => {
-            finalCanvas.toBlob((blob) => {
-              if (!blob) {
-                reject(new Error('Failed to generate final blob'))
-                return
-              }
-
-              const sizeKB = blob.size / 1024
-              if (sizeKB <= config.targetSizeKB || attempts >= config.maxAttempts || quality <= config.minQuality) {
-                const finalFile = new File([blob], `${field || 'nota'}_${Date.now()}.${field ? config.format : 'jpg'}`, { type: finalMime })
-                
-                const info = {
-                  originalSize: formatBytes(originalSize),
-                  compressedSize: formatBytes(finalFile.size),
-                  reduction: Math.round(((originalSize - finalFile.size) / originalSize) * 100),
-                  format: finalFormat,
-                  originalDimensions: `${img.width}x${img.height}`,
-                  compressedDimensions: `${targetW}x${targetH}`
-                }
-                if (field && compressionInfoEdit.value[field] !== undefined) {
-                  compressionInfoEdit.value[field] = info
-                } else {
-                  compressionInfoNota.value = info
-                }
-                
-                finalCanvas.width = 0
-                finalCanvas.height = 0
-                resolve(finalFile)
-              } else {
-                quality -= 0.05
-                attempts++
-                generateBlob()
-              }
-            }, finalMime, quality)
-          }
-
-          generateBlob()
-        } catch (error) {
-          console.error(`[Compression] Failed:`, error)
-          reject(error)
         }
-      })
+
+        const img = new Image()
+        objectUrl = URL.createObjectURL(file)
+        await new Promise((resolve, reject) => {
+          img.onload = resolve
+          img.onerror = () => reject(new Error('No se pudo leer la imagen'))
+          img.src = objectUrl
+        })
+        if ('decode' in img) {
+          try {
+            await img.decode()
+          } catch (e) {
+            console.warn('[Compression] decode() falló, se continúa igual', e)
+          }
+        }
+        return img
+      }
+
+      try {
+        source = await loadSource()
+
+        const sourceWidth = source.width
+        const sourceHeight = source.height
+        if (!sourceWidth || !sourceHeight) {
+          throw new Error('Dimensiones de imagen inválidas')
+        }
+
+        let width = sourceWidth
+        let height = sourceHeight
+        let currentCanvas = null
+
+        while (width > config.maxResolution * 1.5) {
+          const nextWidth = Math.floor(width / 2)
+          const nextHeight = Math.floor(height / 2)
+
+          const nextCanvas = document.createElement('canvas')
+          nextCanvas.width = nextWidth
+          nextCanvas.height = nextHeight
+
+          const nextCtx = nextCanvas.getContext('2d', { alpha: false })
+          if (!nextCtx) throw new Error('No se pudo crear el contexto 2d')
+
+          nextCtx.fillStyle = '#FFFFFF'
+          nextCtx.fillRect(0, 0, nextWidth, nextHeight)
+          nextCtx.drawImage(currentCanvas || source, 0, 0, width, height, 0, 0, nextWidth, nextHeight)
+
+          releaseCanvas(currentCanvas)
+          currentCanvas = nextCanvas
+          width = nextWidth
+          height = nextHeight
+        }
+
+        const ratio = Math.min(config.maxResolution / width, config.maxResolution / height, 1)
+        const targetW = Math.max(1, Math.round(width * ratio))
+        const targetH = Math.max(1, Math.round(height * ratio))
+
+        const finalCanvas = document.createElement('canvas')
+        finalCanvas.width = targetW
+        finalCanvas.height = targetH
+
+        const finalCtx = finalCanvas.getContext('2d', { alpha: false })
+        if (!finalCtx) throw new Error('No se pudo crear el contexto 2d')
+
+        finalCtx.fillStyle = '#FFFFFF'
+        finalCtx.fillRect(0, 0, targetW, targetH)
+        finalCtx.drawImage(currentCanvas || source, 0, 0, width, height, 0, 0, targetW, targetH)
+
+        releaseCanvas(currentCanvas)
+        if (source instanceof ImageBitmap) source.close()
+        source = null
+        if (objectUrl) {
+          URL.revokeObjectURL(objectUrl)
+          objectUrl = null
+        }
+
+        const finalMime = field ? `image/${config.format}` : 'image/jpeg'
+        const finalFormat = field ? config.format.toUpperCase() : 'JPEG'
+        let quality = config.maxQuality
+        let attempts = 0
+        let blob = null
+
+        while (true) {
+          blob = await toBlobAsync(finalCanvas, finalMime, quality)
+          if (!blob) throw new Error('No se pudo generar el blob final')
+
+          const sizeKB = blob.size / 1024
+          if (sizeKB <= config.targetSizeKB || attempts >= config.maxAttempts || quality <= config.minQuality) {
+            break
+          }
+
+          quality -= 0.05
+          attempts++
+        }
+
+        const finalFile = new File(
+          [blob],
+          `${field || 'nota'}_${Date.now()}.${field ? config.format : 'jpg'}`,
+          { type: finalMime }
+        )
+
+        const info = {
+          originalSize: formatBytes(originalSize),
+          compressedSize: formatBytes(finalFile.size),
+          reduction: Math.round(((originalSize - finalFile.size) / originalSize) * 100),
+          format: finalFormat,
+          originalDimensions: `${sourceWidth}x${sourceHeight}`,
+          compressedDimensions: `${targetW}x${targetH}`
+        }
+        if (field && compressionInfoEdit.value[field] !== undefined) {
+          compressionInfoEdit.value[field] = info
+        } else {
+          compressionInfoNota.value = info
+        }
+
+        releaseCanvas(finalCanvas)
+        return finalFile
+      } catch (error) {
+        console.error('[Compression] Failed:', error)
+        throw error
+      } finally {
+        if (source instanceof ImageBitmap) source.close()
+        if (objectUrl) URL.revokeObjectURL(objectUrl)
+      }
     }
 
     const getMonthFolder = () => {
@@ -1459,7 +1496,11 @@ export default defineComponent({
     }
 
     const setEvidenceFileRef = (field, el) => {
-      if (el) evidenceFileRefs.value[field] = el
+      if (el) {
+        evidenceFileRefs.value[field] = el
+      } else {
+        delete evidenceFileRefs.value[field]
+      }
     }
 
     const openPhotoSheet = (field = 'imagen_nota') => {
@@ -1468,31 +1509,54 @@ export default defineComponent({
     }
 
     const selectPhotoSource = (source) => {
-      photoSheetOpen.value = false
-      setTimeout(() => {
-        const field = currentPhotoField.value
-        const fileInputRef = field === 'imagen_nota'
-          ? fileNotaExtra.value
-          : evidenceFileRefs.value[field]
+      const field = currentPhotoField.value
+      const fileInputRef = field === 'imagen_nota'
+        ? fileNotaExtra.value
+        : evidenceFileRefs.value[field]
 
-        if (fileInputRef && fileInputRef.$el) {
-          const fileInput = fileInputRef.$el.querySelector('input[type="file"]')
-          if (fileInput) {
-            if (source === 'camera') {
-              fileInput.setAttribute('capture', 'environment')
-            } else {
-              fileInput.removeAttribute('capture')
-            }
-            fileInput.click()
-          }
+      const fileInput = fileInputRef?.$el?.querySelector('input[type="file"]')
+      if (fileInput) {
+        if (source === 'camera') {
+          fileInput.setAttribute('capture', 'environment')
+        } else {
+          fileInput.removeAttribute('capture')
         }
-      }, 300)
+        fileInput.click()
+      }
+
+      photoSheetOpen.value = false
     }
+
+    const previewUrlCache = new WeakMap()
+    const activePreviewUrls = new Set()
 
     const getPreviewUrl = (file) => {
       if (!file) return ''
       if (typeof file === 'string') return file
-      return URL.createObjectURL(file)
+
+      let url = previewUrlCache.get(file)
+      if (!url) {
+        url = URL.createObjectURL(file)
+        previewUrlCache.set(file, url)
+        activePreviewUrls.add(url)
+      }
+      return url
+    }
+
+    const releasePreviewUrl = (file) => {
+      if (!file || typeof file === 'string') return
+
+      const url = previewUrlCache.get(file)
+      if (url) {
+        URL.revokeObjectURL(url)
+        previewUrlCache.delete(file)
+        activePreviewUrls.delete(url)
+      }
+    }
+
+    const releaseAllPreviewUrls = () => {
+      activePreviewUrls.forEach(url => URL.revokeObjectURL(url))
+      activePreviewUrls.clear()
     }
 
     const openImageModal = (url) => {
@@ -1502,10 +1566,12 @@ export default defineComponent({
 
     const removePhoto = (field = 'imagen_nota') => {
       if (field && evidenceLabelMap[field] && !casa.value?.[field]) {
+        releasePreviewUrl(editForm.value[field])
         editForm.value[field] = null
         compressionInfoEdit.value[field] = null
         return
       }
+      releasePreviewUrl(notaExtraForm.value.imagen_nota)
       notaExtraForm.value.imagen_nota = null
       compressionInfoNota.value = null
     }
@@ -1555,7 +1621,7 @@ export default defineComponent({
         }
 
         notasExtra.value = data ? [data, ...notasExtra.value] : [{ ...nuevaNota, id: `local-${Date.now()}`, created_at: localTime }, ...notasExtra.value]
-        casa.value.update_at = localTime
+        store.setSelectedCasa({ ...casa.value, update_at: localTime })
 
         $q.dialog({
           title: 'Éxito',
@@ -1584,7 +1650,9 @@ export default defineComponent({
     }
 
     // Watch for image compression
-    watch(() => notaExtraForm.value.imagen_nota, async (newFile) => {
+    watch(() => notaExtraForm.value.imagen_nota, async (newFile, oldFile) => {
+      releasePreviewUrl(oldFile)
+
       if (newFile && typeof newFile !== 'string' && !newFile._isCompressed) {
         try {
           const compressed = await compressImage(newFile)
@@ -1599,7 +1667,9 @@ export default defineComponent({
     })
 
     evidenceFields.forEach(({ key }) => {
-      watch(() => editForm.value[key], async (newFile) => {
+      watch(() => editForm.value[key], async (newFile, oldFile) => {
+        releasePreviewUrl(oldFile)
+
         if (newFile && typeof newFile !== 'string' && !newFile._isCompressed) {
           try {
             const compressed = await compressImage(newFile, key)
@@ -1615,32 +1685,32 @@ export default defineComponent({
     })
 
     onMounted(async () => {
-      const stored = localStorage.getItem('selectedCasa')
+      try {
+        const stored = localStorage.getItem('selectedCasa')
 
-      if (!store.selectedCasa && stored) {
-        try {
-          store.selectedCasa = JSON.parse(stored)
-        } catch (error) {
-          console.error('[DetailsPage] No se pudo leer selectedCasa guardada:', error)
+        if (!store.selectedCasa && stored) {
+          try {
+            store.selectedCasa = JSON.parse(stored)
+          } catch (error) {
+            console.error('[DetailsPage] No se pudo leer selectedCasa guardada:', error)
+          }
         }
+
+        const revisionId = store.selectedCasa?.id
+
+        if (!revisionId) {
+          console.warn('[DetailsPage] No hay casa en el store ni en localStorage.')
+          return
+        }
+
+        await Promise.all([
+          store.fetchCasaById(revisionId),
+          fetchLogs(revisionId),
+          fetchNotasExtra(revisionId)
+        ])
+      } finally {
+        bootstrapping.value = false
       }
-
-      if (store.selectedCasa?.id) {
-        await store.fetchCasaById(store.selectedCasa.id)
-      }
-
-      if (!store.selectedCasa) {
-        console.warn('[DetailsPage] No hay casa en el store ni en localStorage.')
-      }
-
-      // Load users for edit form
-      loadUsers()
-
-      // Load edition history
-      fetchLogs()
-
-      // Load multiple extra notes
-      fetchNotasExtra()
     })
 
     onUnmounted(() => {
@@ -1648,6 +1718,7 @@ export default defineComponent({
         lightbox.destroy()
         lightbox = null
       }
+      releaseAllPreviewUrls()
     })
 
     const formatDate = (val) => {
@@ -1670,28 +1741,18 @@ export default defineComponent({
       return `${Number(day)} De ${months[Number(month) - 1] || month} ${year} ${hour}:${minute}`
     }
 
-    const getImageUrl = (path) => {
-      if (!path) return ''
-      if (path.startsWith('http')) return path
-      const cloudinaryBase = 'https://res.cloudinary.com/dhd61lan4/image/upload'
-      let cleanPath = path.split(' ').join('%20')
-      if (!cleanPath.toLowerCase().endsWith('.jpg') && !cleanPath.toLowerCase().endsWith('.png')) {
-        cleanPath += '.jpg'
-      }
-      return `${cloudinaryBase}/${cleanPath}`
-    }
+    const getThumbUrl = (path) => buildCloudinaryUrl(path, THUMB_TRANSFORM)
 
     const onOpenImage = async (index) => {
-      if (!images.value.length) return
-      const dataSource = await Promise.all(images.value.map(loadImageSize))
+      if (!imagePaths.value.length) return
+      const dataSource = await Promise.all(imagePaths.value.map(loadImageSize))
       if (!lightbox) initLightbox()
       lightbox.loadAndOpen(index, dataSource)
     }
 
     const openNoteImage = (imagePath) => {
       if (!imagePath) return
-      const noteImageUrl = getImageUrl(imagePath)
-      const index = images.value.indexOf(noteImageUrl)
+      const index = imagePaths.value.indexOf(imagePath)
       if (index >= 0) {
         onOpenImage(index)
       }
@@ -1757,16 +1818,22 @@ export default defineComponent({
         const localTime = getLocalTime()
         const uploadedEvidence = {}
 
-        for (const { key } of evidenceFields) {
+        const pendingUploads = evidenceFields.filter(({ key }) => {
           const selectedFile = editForm.value[key]
-          if (!casa.value[key] && selectedFile && typeof selectedFile !== 'string') {
-            const uploadedUrl = await uploadImageToCloudinary(selectedFile, key)
-            if (!uploadedUrl) {
-              throw new Error(`No se pudo subir ${evidenceLabelMap[key]}`)
-            }
-            uploadedEvidence[key] = uploadedUrl
+          return !casa.value[key] && selectedFile && typeof selectedFile !== 'string'
+        })
+
+        const uploadResults = await Promise.all(
+          pendingUploads.map(({ key }) => uploadImageToCloudinary(editForm.value[key], key))
+        )
+
+        pendingUploads.forEach(({ key }, index) => {
+          const uploadedUrl = uploadResults[index]
+          if (!uploadedUrl) {
+            throw new Error(`No se pudo subir ${evidenceLabelMap[key]}`)
           }
-        }
+          uploadedEvidence[key] = uploadedUrl
+        })
 
         const updateData = {
           casita: editForm.value.casita,
@@ -1813,17 +1880,6 @@ export default defineComponent({
           }
         }
 
-        // Si hay cambios, guardarlos en Registro_ediciones
-        if (changes.length > 0) {
-          const { error: logError } = await supabase
-            .from('Registro_ediciones')
-            .insert(changes)
-          
-          if (logError) {
-            console.error('Error al registrar ediciones:', logError)
-          }
-        }
-
         updateData.update_at = localTime
 
         const { error } = await supabase
@@ -1833,8 +1889,19 @@ export default defineComponent({
 
         if (error) throw error
 
+        // Si hay cambios, guardarlos en Registro_ediciones
+        if (changes.length > 0) {
+          const { error: logError } = await supabase
+            .from('Registro_ediciones')
+            .insert(changes)
+
+          if (logError) {
+            console.error('Error al registrar ediciones:', logError)
+          }
+        }
+
         // Update local state
-        Object.assign(casa.value, updateData)
+        store.setSelectedCasa({ ...casa.value, ...updateData })
 
         $q.dialog({
           title: 'Éxito',
@@ -1857,23 +1924,25 @@ export default defineComponent({
       }
     }
 
-    const images = computed(() => {
+    const imagePaths = computed(() => {
       if (!casa.value) return []
       const found = []
       const imageFields = ['evidencia_01', 'evidencia_02', 'evidencia_03', 'foto_minibar', 'foto_amenidad']
       imageFields.forEach(field => {
         const val = casa.value[field]
         if (val && typeof val === 'string' && val.length > 5) {
-          found.push(getImageUrl(val))
+          found.push(val)
         }
       })
       notasExtra.value.forEach(nota => {
         if (nota.imagen && typeof nota.imagen === 'string' && nota.imagen.length > 5) {
-          found.push(getImageUrl(nota.imagen))
+          found.push(nota.imagen)
         }
       })
       return found
     })
+
+    const images = computed(() => imagePaths.value.map(path => buildCloudinaryUrl(path, CAROUSEL_TRANSFORM)))
 
     const electronicItems = computed(() => {
       if (!casa.value) return []
@@ -1939,6 +2008,8 @@ export default defineComponent({
       casa,
       images,
       slide,
+      bootstrapping,
+      puertasVentanasOk,
       formatDate,
       formatNotaDate,
       electronicItems,
@@ -1956,7 +2027,6 @@ export default defineComponent({
       notaExtraForm,
       savingNota,
       photoSheetOpen,
-      currentPhotoField,
       compressionInfoNota,
       compressionInfoEdit,
       fileNotaExtra,
@@ -1971,20 +2041,17 @@ export default defineComponent({
       openImageModal,
       removePhoto,
       saveNotaExtra,
-      formatBytes,
-      getImageUrl,
+      getThumbUrl,
       // Edit mode
       isEditing,
       editForm,
       savingEdit,
       casitaOptions,
       cajaFuerteOptions,
-      users,
       startEditing,
       cancelEditing,
       saveEditing,
       logs,
-      fetchLogs,
       formatLogData,
       canAdd,
       canEdit
@@ -1997,6 +2064,7 @@ export default defineComponent({
 .content-container {
   background-color: #f5f5f7;
   min-height: 100vh;
+  min-height: 100dvh;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
 }
 
@@ -2017,11 +2085,6 @@ export default defineComponent({
   background-color: transparent;
   z-index: 2;
   margin: 16px 16px 0 16px;
-}
-
-.zoomable-image {
-  backface-visibility: hidden;
-  will-change: transform;
 }
 
 @media (min-width: 768px) {
@@ -2148,48 +2211,24 @@ export default defineComponent({
   border-radius: 12px;
 }
 
-.action-btn {
-  background: #0071e3 !important;
-  color: white;
+.pv-status {
+  padding: 4px 14px;
   border-radius: 980px;
-  font-weight: 600;
-  text-transform: none;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: right;
+  word-break: break-word;
 }
 
-/* ===== OVERLAY CAROUSEL STYLES ===== */
-
-.image-carousel .q-carousel__control {
-  position: absolute;
-  z-index: 2;
+.pv-status--ok {
+  background-color: rgba(52, 199, 89, 0.1);
+  color: #248a3d;
 }
 
-.image-carousel .q-carousel__arrow {
-  background: rgba(0, 0, 0, 0.3) !important;
-  backdrop-filter: blur(4px);
-  border-radius: 50%;
-  margin: 0 16px;
-}
-
-.image-carousel .q-carousel__arrow .q-icon {
-  color: white;
-  font-size: 24px;
-}
-
-.image-carousel .q-carousel__navigation {
-  bottom: 20px;
-  background: rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(4px);
-  border-radius: 20px;
-  padding: 8px 16px;
-}
-
-.image-carousel .q-carousel__navigation-icon {
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 12px;
-}
-
-.image-carousel .q-carousel__navigation-icon--active {
-  color: white;
+.pv-status--alert {
+  background-color: rgba(255, 149, 0, 0.12);
+  color: #b25000;
 }
 
 /* ===== THEME COLORS ===== */
@@ -2282,10 +2321,6 @@ export default defineComponent({
 }
 .theme-brown .theme-status-chip {
   background-color: #6e4e37;
-}
-
-.z-max {
-  z-index: 1000;
 }
 
 /* ─── Nota Extra ─── */
@@ -2387,6 +2422,7 @@ export default defineComponent({
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;
 }
 
 .image-modal-close {
@@ -2434,6 +2470,7 @@ export default defineComponent({
 .edit-form-container {
   background: #f5f5f7;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .edit-form-container .section-label {

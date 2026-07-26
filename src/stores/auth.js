@@ -2,9 +2,29 @@ import { defineStore } from 'pinia'
 import { supabase } from '../supabase'
 import { useCasasStore } from './casas'
 
+const loadStoredUser = () => {
+  try {
+    const stored = JSON.parse(localStorage.getItem('user'))
+
+    if (!stored || typeof stored !== 'object') {
+      return null
+    }
+
+    if ('password_hash' in stored) {
+      delete stored.password_hash
+      localStorage.setItem('user', JSON.stringify(stored))
+    }
+
+    return stored
+  } catch (_error) {
+    localStorage.removeItem('user')
+    return null
+  }
+}
+
 export const useAuthStore = defineStore('auth', {
   state: () => ({
-    user: JSON.parse(localStorage.getItem('user')) || null,
+    user: loadStoredUser(),
     sessionExpiry: localStorage.getItem('sessionExpiry') ? new Date(localStorage.getItem('sessionExpiry')) : null,
     loading: false,
     error: null
@@ -64,30 +84,29 @@ export const useAuthStore = defineStore('auth', {
       try {
         const { data, error } = await supabase
           .from('Usuarios')
-          .select('id, Usuario, Rol, password_hash')
+          .select('id, Usuario, Rol')
           .eq('Usuario', username)
           .eq('password_hash', password)
           .single()
 
-        if (error) {
+        if (error || !data) {
           this.error = 'Usuario o contraseña incorrectos'
           return { success: false, message: this.error }
         }
 
-        if (data) {
-          // Check if user is inactive
-          if (data.Rol === 'inactivo') {
-            this.error = 'Usuario inactivo. Contacte al administrador.'
-            return { success: false, message: this.error }
-          }
-          this.user = data
-          const expiryDate = new Date()
-          expiryDate.setDate(expiryDate.getDate() + 6)
-          this.sessionExpiry = expiryDate
-          localStorage.setItem('user', JSON.stringify(data))
-          localStorage.setItem('sessionExpiry', expiryDate.toISOString())
-          return { success: true, userId: data.id }
+        // Check if user is inactive
+        if (data.Rol === 'inactivo') {
+          this.error = 'Usuario inactivo. Contacte al administrador.'
+          return { success: false, message: this.error }
         }
+
+        this.user = data
+        const expiryDate = new Date()
+        expiryDate.setDate(expiryDate.getDate() + 6)
+        this.sessionExpiry = expiryDate
+        localStorage.setItem('user', JSON.stringify(data))
+        localStorage.setItem('sessionExpiry', expiryDate.toISOString())
+        return { success: true, userId: data.id }
       } catch (err) {
         this.error = 'Ocurrió un error inesperado'
         console.error('Login error:', err)

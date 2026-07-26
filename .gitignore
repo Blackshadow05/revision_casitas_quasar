@@ -18,3 +18,10 @@ design-md/
 skills-lock.json
 start-dev.bat
 supabase/.temp/
+
+backups/
+apps_script.txt
+log.txt
+*.tmp
+d0.json
+sum.json

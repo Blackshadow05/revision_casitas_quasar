@@ -297,6 +297,18 @@
   <!-- Bottom Sheet for Photo Selection -->
   <q-dialog v-model="photoSheetOpen" position="bottom">
     <q-card class="photo-bottom-sheet">
+      <div class="photo-sheet-header">
+        <div class="photo-sheet-title">Agregar foto</div>
+        <q-btn
+          icon="close"
+          flat
+          round
+          dense
+          class="photo-sheet-close"
+          aria-label="Cerrar"
+          @click="photoSheetOpen = false"
+        />
+      </div>
       <q-card-section class="photo-options-container">
         <div class="photo-option" @click="selectPhotoSource('camera')">
           <q-icon name="photo_camera" size="28px" color="primary" />
@@ -1120,8 +1132,6 @@ export default defineComponent({
     }
 
     const promptNextPhoto = (justCompletedField) => {
-      if (lastCaptureSource.value !== 'camera') return
-
       const slots = evidenciaSlots.value
       const index = slots.findIndex((slot) => slot.field === justCompletedField)
       if (index === -1) return
@@ -1129,10 +1139,12 @@ export default defineComponent({
       const next = slots.slice(index + 1).find((slot) => slot.visible && !form.value[slot.field])
       if (!next) return
 
+      const desdeCamara = lastCaptureSource.value === 'camera'
+
       notify({
         type: 'success',
         message: `${slots[index].label} guardada`,
-        caption: `Puedes tomar ${next.label} o cerrar para terminar`,
+        caption: `Puedes ${desdeCamara ? 'tomar' : 'agregar'} ${next.label} o cerrar para terminar`,
         timeout: 2500,
         position: 'top'
       })
@@ -1631,10 +1643,37 @@ export default defineComponent({
   transform: scale(0.95);
 }
 
-.photo-options-container {
-  padding: 16px;
+.photo-bottom-sheet {
+  width: 100%;
   background: white;
   border-radius: 16px 16px 0 0;
+  overflow: hidden;
+}
+
+.photo-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 2px;
+  background: white;
+}
+
+.photo-sheet-title {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #1f2937;
+  letter-spacing: -0.01em;
+}
+
+.photo-sheet-close {
+  color: #6b7280;
+  min-width: 42px;
+  min-height: 42px;
+}
+
+.photo-options-container {
+  padding: 12px 16px 16px;
+  background: white;
 }
 
 .photo-option {

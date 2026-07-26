@@ -881,6 +881,18 @@
     <!-- Photo Selection Dialog -->
     <q-dialog v-model="photoSheetOpen" position="bottom">
       <q-card class="photo-bottom-sheet">
+        <div class="photo-sheet-header">
+          <div class="photo-sheet-title">Agregar foto</div>
+          <q-btn
+            icon="close"
+            flat
+            round
+            dense
+            class="photo-sheet-close"
+            aria-label="Cerrar"
+            @click="photoSheetOpen = false"
+          />
+        </div>
         <q-card-section class="photo-options-container">
           <div class="photo-option" @click="selectPhotoSource('camera')">
             <q-icon name="photo_camera" size="28px" color="primary" />
@@ -2378,12 +2390,34 @@ export default defineComponent({
 
 /* ─── Photo Bottom Sheet ─── */
 .photo-bottom-sheet {
+  width: 100%;
   border-radius: 20px 20px 0 0;
+  overflow: hidden;
+}
+
+.photo-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 0;
+}
+
+.photo-sheet-title {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #1d1d1f;
+  letter-spacing: -0.01em;
+}
+
+.photo-sheet-close {
+  color: rgba(0, 0, 0, 0.48);
+  min-width: 42px;
+  min-height: 42px;
 }
 
 .photo-options-container {
   display: flex;
-  padding: 20px;
+  padding: 12px 20px 20px;
   gap: 20px;
 }
 

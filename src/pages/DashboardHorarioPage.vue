@@ -376,17 +376,32 @@
               :key="dia.fecha"
               class="col-12 col-sm-6 col-lg-4"
             >
-              <q-card flat bordered class="schedule-day-card full-height" :class="{ 'schedule-day-card--today': dia.esHoy }">
+              <q-card
+                flat
+                bordered
+                class="schedule-day-card full-height"
+                :class="[
+                  { 'schedule-day-card--today': dia.esHoy },
+                  dia.estado ? 'schedule-day-card--filtered' : '',
+                  dia.estado ? `schedule-day-card--status-${dia.estado.key}` : ''
+                ]"
+              >
                 <q-card-section class="schedule-day-card__header q-py-sm">
                   <div class="row items-center no-wrap">
                     <div class="schedule-day-card__date">
                       <div class="text-subtitle1 text-weight-bold text-capitalize">{{ formatFechaLarga(dia.fecha) }}</div>
-                      <div v-if="dia.esHoy" class="text-caption text-primary text-weight-bold">Hoy</div>
-                      <div v-else-if="dia.esManana" class="text-caption text-grey-7 text-weight-medium">Mañana</div>
+                      <div class="row items-center q-gutter-xs q-mt-xs">
+                        <span v-if="dia.esHoy" class="text-caption text-primary text-weight-bold">Hoy</span>
+                        <span v-else-if="dia.esManana" class="text-caption text-grey-7 text-weight-medium">Mañana</span>
+                        <q-badge v-if="dia.estado" :color="dia.estado.color" rounded class="schedule-status-badge">
+                          <q-icon :name="dia.estado.icon" size="13px" class="q-mr-xs" />
+                          {{ dia.estado.label }}
+                        </q-badge>
+                      </div>
                     </div>
                     <q-space />
                     <q-badge
-                      :color="dia.total ? 'primary' : 'grey-4'"
+                      :color="dia.estado ? dia.estado.color : (dia.total ? 'primary' : 'grey-4')"
                       :text-color="dia.total ? 'white' : 'grey-8'"
                       rounded
                       :label="scheduleUserFilter
@@ -408,8 +423,13 @@
                 <q-list v-else separator class="schedule-day-card__list">
                   <template v-for="grupo in dia.grupos" :key="grupo.key">
                     <q-item-label v-if="grupo.personas.length" header class="schedule-shift-header">
-                      <q-icon :name="grupo.icon" :color="grupo.color" size="16px" class="q-mr-xs" />
-                      {{ grupo.label }}
+                      <q-icon
+                        :name="dia.estado?.icon || grupo.icon"
+                        :color="dia.estado?.color || grupo.color"
+                        size="16px"
+                        class="q-mr-xs"
+                      />
+                      {{ dia.estado?.label || grupo.label }}
                       <span class="text-grey-6">· {{ grupo.personas.length }}</span>
                     </q-item-label>
                     <q-item v-for="emp in grupo.personas" :key="emp.id" dense class="q-px-md">
@@ -417,7 +437,7 @@
                         <q-item-label class="text-weight-medium">{{ emp.empleado }}</q-item-label>
                       </q-item-section>
                       <q-item-section side>
-                        <q-badge outline :color="grupo.color" :label="emp.turno" />
+                        <q-badge outline :color="dia.estado?.color || grupo.color" :label="emp.turno" />
                       </q-item-section>
                     </q-item>
                   </template>
@@ -1593,6 +1613,42 @@ export default defineComponent({
       return gruposTurno.find((grupo) => grupo.turnos.includes(turnoNormalizado)) || gruposTurno[4];
     }
 
+    const estadosEspeciales = {
+      libre: { key: "libre", label: "Libre", icon: "weekend", color: "amber-9" },
+      feriado: { key: "feriado", label: "Feriado", icon: "celebration", color: "purple-7" },
+      vacaciones: { key: "vacaciones", label: "Vacaciones", icon: "beach_access", color: "teal-7" },
+      ausencia: { key: "ausencia", label: "Ausencia", icon: "event_busy", color: "pink-7" },
+      varios: { key: "varios", label: "Varios turnos", icon: "layers", color: "deep-purple-6" },
+    };
+
+    function estadoVisualDeTurno(turno) {
+      const turnoNormalizado = normalizar(turno);
+      const turnoBusqueda = turnoNormalizado.toLocaleLowerCase("es");
+
+      if (turnoBusqueda.includes("feriado")) return estadosEspeciales.feriado;
+      if (turnoBusqueda.includes("vacacion")) return estadosEspeciales.vacaciones;
+      if (turnoBusqueda.includes("incap") || turnoBusqueda.includes("permiso")) return estadosEspeciales.ausencia;
+      if (
+        turnoBusqueda === "l" ||
+        turnoBusqueda === "off" ||
+        turnoBusqueda.includes("libre") ||
+        turnoBusqueda.includes("descanso") ||
+        turnoBusqueda.includes("winter break")
+      ) {
+        return estadosEspeciales.libre;
+      }
+
+      const grupo = grupoDeTurno(turnoNormalizado);
+      return { key: grupo.key, label: grupo.label, icon: grupo.icon, color: grupo.color };
+    }
+
+    function estadoVisualDelDia(registros) {
+      if (!scheduleUserFilter.value || registros.length === 0) return null;
+      const estados = registros.map((registro) => estadoVisualDeTurno(registro.turno));
+      const estadosUnicos = [...new Set(estados.map((estado) => estado.key))];
+      return estadosUnicos.length === 1 ? estados[0] : estadosEspeciales.varios;
+    }
+
     const scheduleUserOptions = computed(() =>
       [...new Set(horarios.value.map((horario) => horario.empleado).filter(Boolean))]
         .sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }))
@@ -1619,6 +1675,7 @@ export default defineComponent({
           esHoy: fechaFormateada === fechaHoy,
           esManana: fechaFormateada === fechaManana,
           total: registros.length,
+          estado: estadoVisualDelDia(registros),
           grupos: gruposTurno.map((grupo) => ({
             ...grupo,
             personas: registros.filter((horario) => grupoDeTurno(horario.turno).key === grupo.key),
@@ -1873,6 +1930,95 @@ export default defineComponent({
   background: rgb(25 118 210 / 7%);
 }
 
+.schedule-day-card--filtered {
+  border: 2px solid var(--schedule-status-accent);
+  background: var(--schedule-status-surface);
+  box-shadow: 0 5px 16px var(--schedule-status-shadow);
+}
+
+.schedule-day-card--filtered .schedule-day-card__header {
+  background: var(--schedule-status-header);
+}
+
+.schedule-day-card--filtered .schedule-day-card__list {
+  background: transparent;
+}
+
+.schedule-day-card--status-diurno {
+  --schedule-status-accent: #d32f2f;
+  --schedule-status-header: #ffebee;
+  --schedule-status-surface: #fff8f8;
+  --schedule-status-shadow: rgb(211 47 47 / 12%);
+}
+
+.schedule-day-card--status-partida {
+  --schedule-status-accent: #ef6c00;
+  --schedule-status-header: #fff3e0;
+  --schedule-status-surface: #fffbf5;
+  --schedule-status-shadow: rgb(239 108 0 / 12%);
+}
+
+.schedule-day-card--status-mixto {
+  --schedule-status-accent: #2e7d32;
+  --schedule-status-header: #e8f5e9;
+  --schedule-status-surface: #f7fcf7;
+  --schedule-status-shadow: rgb(46 125 50 / 12%);
+}
+
+.schedule-day-card--status-nocturno {
+  --schedule-status-accent: #1565c0;
+  --schedule-status-header: #e3f2fd;
+  --schedule-status-surface: #f6faff;
+  --schedule-status-shadow: rgb(21 101 192 / 13%);
+}
+
+.schedule-day-card--status-libre {
+  --schedule-status-accent: #f9a825;
+  --schedule-status-header: #fff8e1;
+  --schedule-status-surface: #fffdf5;
+  --schedule-status-shadow: rgb(249 168 37 / 14%);
+}
+
+.schedule-day-card--status-feriado {
+  --schedule-status-accent: #7b1fa2;
+  --schedule-status-header: #f3e5f5;
+  --schedule-status-surface: #fcf8fd;
+  --schedule-status-shadow: rgb(123 31 162 / 13%);
+}
+
+.schedule-day-card--status-vacaciones {
+  --schedule-status-accent: #00897b;
+  --schedule-status-header: #e0f2f1;
+  --schedule-status-surface: #f5fcfb;
+  --schedule-status-shadow: rgb(0 137 123 / 13%);
+}
+
+.schedule-day-card--status-ausencia {
+  --schedule-status-accent: #c2185b;
+  --schedule-status-header: #fce4ec;
+  --schedule-status-surface: #fff7fa;
+  --schedule-status-shadow: rgb(194 24 91 / 13%);
+}
+
+.schedule-day-card--status-varios {
+  --schedule-status-accent: #5e35b1;
+  --schedule-status-header: #ede7f6;
+  --schedule-status-surface: #faf8fd;
+  --schedule-status-shadow: rgb(94 53 177 / 13%);
+}
+
+.schedule-day-card--status-otros {
+  --schedule-status-accent: #757575;
+  --schedule-status-header: #eeeeee;
+  --schedule-status-surface: #fafafa;
+  --schedule-status-shadow: rgb(97 97 97 / 11%);
+}
+
+.schedule-status-badge {
+  min-height: 20px;
+  padding: 3px 7px;
+}
+
 .schedule-day-card__date {
   min-width: 0;
 }
@@ -1920,6 +2066,44 @@ export default defineComponent({
 
 :global(.body--dark) .schedule-day-card--today .schedule-day-card__header {
   background: rgb(33 150 243 / 13%);
+}
+
+:global(.body--dark) .schedule-day-card--filtered {
+  --schedule-status-surface: #1f1f1f;
+}
+
+:global(.body--dark) .schedule-day-card--status-diurno {
+  --schedule-status-header: #342020;
+}
+
+:global(.body--dark) .schedule-day-card--status-partida,
+:global(.body--dark) .schedule-day-card--status-libre {
+  --schedule-status-header: #342b1c;
+}
+
+:global(.body--dark) .schedule-day-card--status-mixto {
+  --schedule-status-header: #1d3020;
+}
+
+:global(.body--dark) .schedule-day-card--status-nocturno {
+  --schedule-status-header: #192a3d;
+}
+
+:global(.body--dark) .schedule-day-card--status-feriado,
+:global(.body--dark) .schedule-day-card--status-varios {
+  --schedule-status-header: #2d2135;
+}
+
+:global(.body--dark) .schedule-day-card--status-vacaciones {
+  --schedule-status-header: #16332f;
+}
+
+:global(.body--dark) .schedule-day-card--status-ausencia {
+  --schedule-status-header: #351d29;
+}
+
+:global(.body--dark) .schedule-day-card--status-otros {
+  --schedule-status-header: #2b2b2b;
 }
 
 .vacaciones-ios {

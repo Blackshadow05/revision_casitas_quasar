@@ -164,7 +164,6 @@ import { defineComponent, ref, reactive } from 'vue'
 import { notify } from '../utils/notify'
 import { useRouter } from 'vue-router'
 import { useQuasar, date } from 'quasar'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { supabase } from '../supabase'
 
 export default defineComponent({
@@ -231,13 +230,11 @@ export default defineComponent({
       })
     }
 
-    const fileToGenerativePart = async (file) => {
+    const fileToBase64 = async (file) => {
       return new Promise((resolve) => {
         const reader = new FileReader()
         reader.onloadend = () => {
-          resolve({
-            inlineData: { data: reader.result.split(',')[1], mimeType: file.type }
-          })
+          resolve(reader.result.split(',')[1])
         }
         reader.readAsDataURL(file)
       })
@@ -270,40 +267,28 @@ export default defineComponent({
       menusDiarios.value = []
 
       try {
-        const apiKey = import.meta.env.VITE_GEMINI_API_KEY
-        if (!apiKey) throw new Error('API Key no encontrada')
-
-        const genAI = new GoogleGenerativeAI(apiKey)
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' })
-
-        const imagePart = await fileToGenerativePart(selectedImage.value)
-        const prompt = `
-          Analiza esta imagen y extrae el menú de comida detallado por días.
-          
-          Devuelve estrictamente un JSON con esta estructura:
-          {
-            "menus": [
-              {
-                "dia_semana": "Lunes",
-                "fecha": "YYYY-MM-DD",
-                "comidas": ["Platillo 1", "Platillo 2"]
-              }
-            ]
+        const imageBase64 = await fileToBase64(selectedImage.value)
+        const { data, error } = await supabase.functions.invoke('scan-menu', {
+          body: {
+            imageBase64,
+            mimeType: selectedImage.value.type,
+            referenceDate: new Date().toISOString().split('T')[0]
           }
-          
-          Consideraciones:
-          - Si no hay fecha explícita, usa hoy (${new Date().toISOString().split('T')[0]}) como referencia para calcular el resto de la semana.
-          - Si la imagen muestra un menú semanal, extrae cada día por separado.
-          - Solo devuelve el JSON, sin texto adicional ni backticks.
-        `
+        })
 
-        const result = await model.generateContent([prompt, imagePart])
-        const text = result.response.text()
-        const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim()
-        
-        const extracted = JSON.parse(cleanJson)
-        if (extracted.menus) {
-          menusDiarios.value = extracted.menus
+        if (error) {
+          let message = error.message
+          try {
+            const errorPayload = await error.context?.json()
+            message = errorPayload?.error || message
+          } catch (_contextError) {
+            // La respuesta no contenía un cuerpo JSON utilizable.
+          }
+          throw new Error(message)
+        }
+
+        if (Array.isArray(data?.menus) && data.menus.length) {
+          menusDiarios.value = data.menus
         } else {
           throw new Error('No se detectaron menús')
         }

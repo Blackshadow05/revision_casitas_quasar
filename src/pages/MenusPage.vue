@@ -5,7 +5,6 @@
         <div class="menus-header__copy">
           <div class="menus-eyebrow">Comedor</div>
           <h1 class="menus-title">Menús</h1>
-          <p class="menus-subtitle">Lo que se sirve hoy y los próximos días.</p>
         </div>
 
         <div class="menus-header__actions">

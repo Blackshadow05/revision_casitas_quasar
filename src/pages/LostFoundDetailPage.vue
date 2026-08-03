@@ -24,10 +24,6 @@
         <section class="lf-detail-main">
           <template v-if="isNew || isDelivering">
             <div class="lf-form-card relative-position">
-              <q-inner-loading :showing="scanningImage" class="lf-scanning-overlay">
-                <q-spinner-dots size="50px" color="primary" />
-                <div class="lf-scanning-text">Analizando objeto...</div>
-              </q-inner-loading>
               <div class="lf-section-title">Información General</div>
               
               <div class="lf-field-group">
@@ -40,7 +36,7 @@
                   class="lf-input"
                   :rules="[val => !!val && val.trim().length > 0 || 'Campo obligatorio']"
                   lazy-rules
-                  :readonly="isDelivering || scanningImage"
+                  :readonly="isDelivering"
                 />
               </div>
 
@@ -54,7 +50,7 @@
                   autogrow
                   class="lf-input"
                   placeholder="Color, marca, detalles distintivos..."
-                  :readonly="isDelivering || scanningImage"
+                  :readonly="isDelivering"
                 />
               </div>
 
@@ -319,7 +315,6 @@ import { supabase } from '../supabase'
 import { useAuthStore } from '../stores/auth'
 import { CLOUDINARY_CONFIG } from '../cloudinary'
 import { useQuasar } from 'quasar'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 
 export default defineComponent({
   name: 'LostFoundDetailPage',
@@ -346,7 +341,6 @@ export default defineComponent({
     const usuario_entrega = ref('')
     const foundAt = ref('')
     const deliveredAt = ref('')
-    const scanningImage = ref(false)
 
     const statusOptions = ['Almacenado', 'Entregado', 'Desechado']
 
@@ -526,78 +520,12 @@ export default defineComponent({
         const compressed = await compressImage(file)
         const preview = URL.createObjectURL(compressed)
         newPhoto.value = { file: compressed, preview }
-        scanImageForDescription(compressed)
       } catch {
         const preview = URL.createObjectURL(file)
         newPhoto.value = { file, preview }
-        scanImageForDescription(file)
       }
       if (fileInputCamera.value) fileInputCamera.value.value = ''
       if (fileInputGallery.value) fileInputGallery.value.value = ''
-    }
-
-    const fileToGenerativePart = async (file) => {
-      return new Promise((resolve) => {
-        const reader = new FileReader()
-        reader.onloadend = () => {
-          resolve({
-            inlineData: { data: reader.result.split(',')[1], mimeType: file.type }
-          })
-        }
-        reader.readAsDataURL(file)
-      })
-    }
-
-    const scanImageForDescription = async (fileToScan) => {
-      scanningImage.value = true
-      notify({ type: 'info', message: 'Identificando objeto...', timeout: 2000 })
-      try {
-        const apiKey = import.meta.env.VITE_GEMINI_API_KEY
-        if (!apiKey) throw new Error('API Key no encontrada')
-
-        const genAI = new GoogleGenerativeAI(apiKey)
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' })
-
-        const imagePart = await fileToGenerativePart(fileToScan)
-        const prompt = `
-          Analiza esta imagen y describe el objeto de forma ultra-resumida.
-          Solo indica qué es, el color principal y un detalle esencial (marca o estado).
-          
-          Ejemplo: "Samsung Galaxy negro, pantalla quebrada", "Billetera de cuero café, marca Fossil".
-
-          Devuelve estrictamente un JSON:
-          {
-            "item_name": "Nombre corto",
-            "description": "Máximo 15 palabras con lo esencial"
-          }
-          
-          Solo devuelve el JSON, sin texto adicional ni backticks.
-        `
-        const result = await model.generateContent([prompt, imagePart])
-        const text = result.response.text()
-        const cleanJson = text
-          .replace(/```json/g, '')
-          .replace(/```/g, '')
-          .trim()
-          .match(/\{[\s\S]*\}/)?.[0]
-        
-        if (!cleanJson) throw new Error('Gemini no devolvio JSON')
-        const extracted = JSON.parse(cleanJson)
-        if (!extracted.item_name && !extracted.description) throw new Error('Gemini no detecto datos del objeto')
-        if (extracted.item_name) form.value.item_name = extracted.item_name
-        if (extracted.description) form.value.description = extracted.description
-        notify({ type: 'positive', message: 'Objeto identificado' })
-      } catch (error) {
-        console.error('Scan Error:', error)
-        notify({
-          type: 'warning',
-          message: 'No se pudo identificar el objeto',
-          caption: error?.message || 'Revisa la consola del navegador para mas detalle',
-          timeout: 4500
-        })
-      } finally {
-        scanningImage.value = false
-      }
     }
 
     function removeNewPhoto () {
@@ -733,7 +661,6 @@ export default defineComponent({
       isNew,
       loadingData,
       saving,
-      scanningImage,
       form,
       formValid,
       statusOptions,
@@ -907,21 +834,6 @@ export default defineComponent({
   border-radius: 12px;
   border-radius: 12px;
   overflow: hidden;
-}
-
-.lf-scanning-overlay {
-  background: rgba(255, 255, 255, 0.7);
-  z-index: 10;
-  border-radius: 20px;
-}
-
-.lf-scanning-text {
-  margin-top: 10px;
-  font-weight: 800;
-  color: #000;
-  text-transform: uppercase;
-  font-size: 11px;
-  letter-spacing: 1px;
 }
 
 .lf-photo-overlay {

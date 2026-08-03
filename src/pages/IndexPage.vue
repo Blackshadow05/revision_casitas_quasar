@@ -112,6 +112,96 @@
         </div>
       </div>
 
+      <!-- Resumen compacto de check-in y check-out para móvil -->
+      <section
+        v-if="$q.screen.lt.sm"
+        class="daily-operations-mobile q-mb-md"
+        aria-labelledby="daily-operations-title"
+      >
+        <div class="daily-operations-mobile__header row items-center no-wrap q-mb-sm">
+          <div class="daily-operations-mobile__title row items-center no-wrap">
+            <q-icon name="event_note" color="primary" size="19px" class="q-mr-xs" />
+            <span id="daily-operations-title" class="text-subtitle2 text-weight-bold">Movimientos</span>
+          </div>
+          <q-space />
+          <q-btn-toggle
+            v-model="operationDay"
+            :options="[
+              { label: 'Hoy', value: 'today' },
+              { label: 'Mañana', value: 'tomorrow' }
+            ]"
+            color="grey-2"
+            text-color="grey-8"
+            toggle-color="primary"
+            toggle-text-color="white"
+            dense
+            no-caps
+            rounded
+            unelevated
+            class="daily-operations-mobile__day-toggle"
+            aria-label="Elegir día de movimientos"
+          />
+        </div>
+
+        <div class="daily-operations-mobile__grid">
+          <article
+            v-for="grupo in operacionesHoy"
+            :key="grupo.key"
+            class="daily-operation-card"
+            :class="`daily-operation-card--${grupo.key}`"
+          >
+            <div class="row items-center no-wrap q-mb-sm">
+              <q-icon :name="grupo.icon" :color="grupo.color" size="18px" class="q-mr-xs" />
+              <span class="daily-operation-card__label">{{ grupo.label }}</span>
+              <q-space />
+              <q-badge :color="grupo.color" rounded :label="grupo.casitas.length" />
+            </div>
+
+            <div v-if="grupo.casitas.length" class="daily-operation-card__numbers">
+              <span
+                v-for="casita in grupo.casitas.slice(0, 8)"
+                :key="casita"
+                class="daily-operation-number"
+              >
+                {{ casita }}
+              </span>
+
+              <q-slide-transition v-if="grupo.casitas.length > 8">
+                <div
+                  v-show="operationExpanded[grupo.key]"
+                  class="daily-operation-card__numbers daily-operation-card__numbers--extra"
+                >
+                  <span
+                    v-for="casita in grupo.casitas.slice(8)"
+                    :key="casita"
+                    class="daily-operation-number"
+                  >
+                    {{ casita }}
+                  </span>
+                </div>
+              </q-slide-transition>
+            </div>
+            <div v-else class="daily-operation-card__empty">—</div>
+
+            <q-btn
+              v-if="grupo.casitas.length > 8"
+              flat
+              dense
+              no-caps
+              size="sm"
+              :color="grupo.color"
+              class="daily-operation-card__expand full-width q-mt-xs"
+              :icon-right="operationExpanded[grupo.key] ? 'expand_less' : 'expand_more'"
+              :label="operationExpanded[grupo.key]
+                ? 'Ver menos'
+                : `+${grupo.casitas.length - 8} más`"
+              :aria-expanded="operationExpanded[grupo.key]"
+              @click="operationExpanded[grupo.key] = !operationExpanded[grupo.key]"
+            />
+          </article>
+        </div>
+      </section>
+
       <!-- ==================== AVISOS DE OPERACIÓN ==================== -->
       <div v-if="avisos.length" class="avisos-wrapper q-mb-md">
         <div class="avisos-header row items-center justify-between no-wrap q-mb-xs">
@@ -799,6 +889,49 @@ export default defineComponent({
       return `Hay ${n} ${n === 1 ? 'notificación' : 'notificaciones'}`
     })
 
+    const operationDay = ref('today')
+    const operationExpanded = reactive({ checkin: false, checkout: false })
+
+    const casitasDeOperacionSeleccionada = (tipoOperacion) => {
+      const fechaSeleccionada = new Date(now.value)
+      if (operationDay.value === 'tomorrow') {
+        fechaSeleccionada.setDate(fechaSeleccionada.getDate() + 1)
+      }
+      const month = fechaSeleccionada.getMonth() + 1
+      const day = fechaSeleccionada.getDate()
+      const casitas = memoRows.value
+        .filter((row) => {
+          const fecha = memoParseFecha(row.fecha)
+          return fecha.month === month && fecha.day === day && memoNorm(row.tipo).includes(tipoOperacion)
+        })
+        .map((row) => String(row.casita == null ? '' : row.casita).match(/\d+/)?.[0] || '')
+        .filter(Boolean)
+
+      return [...new Set(casitas)].sort((a, b) => Number(a) - Number(b))
+    }
+
+    const operacionesHoy = computed(() => [
+      {
+        key: 'checkin',
+        label: 'Check-in',
+        icon: 'login',
+        color: 'green-7',
+        casitas: casitasDeOperacionSeleccionada('arrival')
+      },
+      {
+        key: 'checkout',
+        label: 'Check-out',
+        icon: 'logout',
+        color: 'red-6',
+        casitas: casitasDeOperacionSeleccionada('departure')
+      }
+    ])
+
+    watch(operationDay, () => {
+      operationExpanded.checkin = false
+      operationExpanded.checkout = false
+    })
+
     // Desktop table columns
     const tableColumns = [
       { name: 'casita', label: 'Casita', field: 'casita', align: 'left', sortable: true, style: 'font-weight: bold; width: 80px' },
@@ -1185,6 +1318,9 @@ export default defineComponent({
       avisos,
       avisosLabel,
       avisosOcultos,
+      operacionesHoy,
+      operationDay,
+      operationExpanded,
       casas,
       desktopCasas,
       canAdd,
@@ -1244,6 +1380,119 @@ export default defineComponent({
 </script>
 
 <style scoped>
+/* ===== Resumen móvil de check-in / check-out ===== */
+.daily-operations-mobile {
+  padding: 12px;
+  border: 1px solid rgba(25, 118, 210, 0.12);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 6px 18px rgba(25, 118, 210, 0.08);
+}
+
+.daily-operations-mobile__title {
+  color: #263238;
+}
+
+.daily-operations-mobile__day-toggle {
+  flex: 0 0 auto;
+  border: 1px solid rgba(25, 118, 210, 0.13);
+  font-size: 0.72rem;
+}
+
+.daily-operations-mobile__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.daily-operation-card {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: 13px;
+}
+
+.daily-operation-card--checkin {
+  border-color: rgba(46, 125, 50, 0.17);
+  background: rgba(76, 175, 80, 0.07);
+}
+
+.daily-operation-card--checkout {
+  border-color: rgba(198, 40, 40, 0.15);
+  background: rgba(244, 67, 54, 0.06);
+}
+
+.daily-operation-card__label {
+  overflow: hidden;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.daily-operation-card__numbers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.daily-operation-card__numbers--extra {
+  width: 100%;
+  padding-top: 5px;
+}
+
+.daily-operation-number {
+  display: inline-flex;
+  min-width: 32px;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 7px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #263238;
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.daily-operation-card__empty {
+  padding: 5px 0;
+  color: #9e9e9e;
+  font-size: 1.1rem;
+  text-align: center;
+}
+
+.daily-operation-card__expand {
+  min-height: 26px;
+  font-size: 0.7rem;
+}
+
+:global(.body--dark) .daily-operations-mobile {
+  border-color: rgba(100, 181, 246, 0.18);
+  background: #1e1e1e;
+}
+
+:global(.body--dark) .daily-operations-mobile__title,
+:global(.body--dark) .daily-operation-card__label,
+:global(.body--dark) .daily-operation-number {
+  color: #f5f5f5;
+}
+
+:global(.body--dark) .daily-operation-card--checkin {
+  background: rgba(76, 175, 80, 0.12);
+}
+
+:global(.body--dark) .daily-operation-card--checkout {
+  background: rgba(244, 67, 54, 0.11);
+}
+
+:global(.body--dark) .daily-operation-number {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.07);
+}
+
 /* ===== Avisos de operación ===== */
 .avisos-header {
   background: #fff8e1;

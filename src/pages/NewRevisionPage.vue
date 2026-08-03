@@ -1716,8 +1716,9 @@ export default defineComponent({
 
 .photo-preview-container {
   position: relative;
-  width: 100%;
-  padding-top: 60%;
+  width: 50%;
+  aspect-ratio: 5 / 3;
+  margin: 0 auto;
   background: #f5f5f5;
   border-radius: 12px;
   overflow: hidden;

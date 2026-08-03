@@ -18,8 +18,33 @@
 
     <!-- ==================== TAB HORARIOS ==================== -->
     <div v-show="activeTab === 'horarios'">
-      <!-- Date picker and 9 days selector -->
-      <div v-if="!$q.screen.gt.md" class="column q-mb-md q-gutter-y-sm">
+      <q-card flat bordered class="schedule-view-selector q-mb-md">
+        <q-card-section class="row items-center q-col-gutter-md q-py-sm">
+          <div class="col-12 col-sm">
+            <div class="text-subtitle2 text-weight-bold">¿Qué horario deseas consultar?</div>
+            <div class="text-caption text-grey-7">Elige una fecha o revisa la agenda completa desde hoy.</div>
+          </div>
+          <div class="col-12 col-sm-auto">
+            <q-btn-toggle
+              v-model="scheduleView"
+              :options="[
+                { label: 'Vista habitual', value: 'habitual', icon: 'today' },
+                { label: 'Próximos 15 días', value: 'proximos15', icon: 'view_agenda' }
+              ]"
+              color="white"
+              text-color="grey-8"
+              toggle-color="primary"
+              toggle-text-color="white"
+              unelevated
+              spread
+              class="schedule-view-toggle"
+            />
+          </div>
+        </q-card-section>
+      </q-card>
+
+      <!-- Date picker and quick selector -->
+      <div v-if="scheduleView === 'habitual' && !$q.screen.gt.md" class="column q-mb-md q-gutter-y-sm">
         <div class="row items-center q-gutter-sm">
           <q-icon name="event" size="sm" color="primary" />
           <q-input
@@ -61,6 +86,7 @@
       </q-banner>
 
       <template v-if="!loading">
+        <template v-if="scheduleView === 'habitual'">
         <!-- VISTA MÓVIL (Normal) -->
         <div v-if="!$q.screen.gt.md">
           <div class="q-mb-md">
@@ -294,6 +320,112 @@
             </div>
           </div>
         </div>
+        </template>
+
+        <!-- VISTA DE LOS PRÓXIMOS 15 DÍAS -->
+        <section v-else class="schedule-fortnight" aria-labelledby="schedule-fortnight-title">
+          <div class="schedule-fortnight__header q-mb-md">
+            <div>
+              <div id="schedule-fortnight-title" class="text-h6 text-weight-bold">Próximos 15 días</div>
+              <div class="text-body2 text-grey-7">
+                {{ formatFechaRango(horarios15Dias[0]?.fecha) }} al
+                {{ formatFechaRango(horarios15Dias[horarios15Dias.length - 1]?.fecha) }}
+              </div>
+            </div>
+            <q-badge color="primary" rounded class="q-px-sm q-py-xs">15 días</q-badge>
+          </div>
+
+          <q-card flat bordered class="schedule-user-filter q-mb-md">
+            <q-card-section class="row items-center q-col-gutter-sm q-py-sm">
+              <div class="col-12 col-sm">
+                <q-select
+                  v-model="scheduleUserFilter"
+                  :options="scheduleUserOptions"
+                  label="Filtrar por usuario"
+                  aria-label="Filtrar horario por usuario"
+                  outlined
+                  dense
+                  clearable
+                  options-dense
+                >
+                  <template #prepend>
+                    <q-icon name="person_search" color="primary" />
+                  </template>
+                </q-select>
+              </div>
+              <div v-if="scheduleUserFilter" class="col-12 col-sm-auto">
+                <q-btn
+                  flat
+                  no-caps
+                  color="primary"
+                  icon="group"
+                  label="Ver todos"
+                  @click="scheduleUserFilter = null"
+                />
+              </div>
+            </q-card-section>
+            <q-separator v-if="scheduleUserFilter" />
+            <q-card-section v-if="scheduleUserFilter" class="schedule-user-filter__active q-py-xs text-caption">
+              Mostrando únicamente el horario de <strong>{{ scheduleUserFilter }}</strong>
+            </q-card-section>
+          </q-card>
+
+          <div class="row q-col-gutter-md q-row-gutter-md">
+            <div
+              v-for="dia in horarios15Dias"
+              :key="dia.fecha"
+              class="col-12 col-sm-6 col-lg-4"
+            >
+              <q-card flat bordered class="schedule-day-card full-height" :class="{ 'schedule-day-card--today': dia.esHoy }">
+                <q-card-section class="schedule-day-card__header q-py-sm">
+                  <div class="row items-center no-wrap">
+                    <div class="schedule-day-card__date">
+                      <div class="text-subtitle1 text-weight-bold text-capitalize">{{ formatFechaLarga(dia.fecha) }}</div>
+                      <div v-if="dia.esHoy" class="text-caption text-primary text-weight-bold">Hoy</div>
+                      <div v-else-if="dia.esManana" class="text-caption text-grey-7 text-weight-medium">Mañana</div>
+                    </div>
+                    <q-space />
+                    <q-badge
+                      :color="dia.total ? 'primary' : 'grey-4'"
+                      :text-color="dia.total ? 'white' : 'grey-8'"
+                      rounded
+                      :label="scheduleUserFilter
+                        ? `${dia.total} ${dia.total === 1 ? 'turno' : 'turnos'}`
+                        : `${dia.total} ${dia.total === 1 ? 'persona' : 'personas'}`"
+                    />
+                  </div>
+                </q-card-section>
+
+                <q-separator />
+
+                <q-card-section v-if="dia.total === 0" class="column items-center justify-center schedule-day-card__empty">
+                  <q-icon name="event_busy" size="28px" color="grey-5" />
+                  <div class="text-body2 text-grey-6 q-mt-xs text-center">
+                    {{ scheduleUserFilter ? `Sin horario para ${scheduleUserFilter}` : 'Sin horarios registrados' }}
+                  </div>
+                </q-card-section>
+
+                <q-list v-else separator class="schedule-day-card__list">
+                  <template v-for="grupo in dia.grupos" :key="grupo.key">
+                    <q-item-label v-if="grupo.personas.length" header class="schedule-shift-header">
+                      <q-icon :name="grupo.icon" :color="grupo.color" size="16px" class="q-mr-xs" />
+                      {{ grupo.label }}
+                      <span class="text-grey-6">· {{ grupo.personas.length }}</span>
+                    </q-item-label>
+                    <q-item v-for="emp in grupo.personas" :key="emp.id" dense class="q-px-md">
+                      <q-item-section>
+                        <q-item-label class="text-weight-medium">{{ emp.empleado }}</q-item-label>
+                      </q-item-section>
+                      <q-item-section side>
+                        <q-badge outline :color="grupo.color" :label="emp.turno" />
+                      </q-item-section>
+                    </q-item>
+                  </template>
+                </q-list>
+              </q-card>
+            </div>
+          </div>
+        </section>
       </template>
     </div>
 
@@ -944,6 +1076,16 @@ export default defineComponent({
     }
 
     const activeTab = ref("horarios");
+    const scheduleView = ref("habitual");
+    const scheduleUserStorageKey = "dashboard-horario-user-filter";
+    const storedScheduleUser = (() => {
+      try {
+        return window.localStorage.getItem(scheduleUserStorageKey);
+      } catch {
+        return null;
+      }
+    })();
+    const scheduleUserFilter = ref(storedScheduleUser || null);
     const loading = ref(false);
     const horarios = ref([]);
     const errorMsg = ref("");
@@ -1387,7 +1529,22 @@ export default defineComponent({
       errorMsg.value = "";
 
       try {
-        if ($q.screen.gt.md) {
+        if (scheduleView.value === "proximos15") {
+          const desde = new Date();
+          const hasta = new Date(desde);
+          hasta.setDate(desde.getDate() + 14);
+
+          const { data, error } = await supabase
+            .from("horarios")
+            .select("id, empleado, turno, fecha")
+            .gte("fecha", formatDate(desde))
+            .lte("fecha", formatDate(hasta))
+            .order("fecha")
+            .order("empleado");
+
+          if (error) throw error;
+          horarios.value = data || [];
+        } else if ($q.screen.gt.md) {
           // Obtener fechas: hoy, mañana y pasado mañana
           const hoy = new Date();
           const fechas = [];
@@ -1423,6 +1580,53 @@ export default defineComponent({
       }
     }
 
+    const gruposTurno = [
+      { key: "diurno", label: "Diurno", icon: "wb_sunny", color: "red-7", turnos: turnosDiurno },
+      { key: "partida", label: "Partida", icon: "schedule", color: "orange-8", turnos: turnosPartida },
+      { key: "mixto", label: "Mixto", icon: "brightness_6", color: "green-7", turnos: turnosMixto },
+      { key: "nocturno", label: "Nocturno", icon: "nights_stay", color: "blue-8", turnos: turnosNocturno },
+      { key: "otros", label: "Otros", icon: "more_horiz", color: "amber-9", turnos: [] },
+    ];
+
+    function grupoDeTurno(turno) {
+      const turnoNormalizado = normalizar(turno);
+      return gruposTurno.find((grupo) => grupo.turnos.includes(turnoNormalizado)) || gruposTurno[4];
+    }
+
+    const scheduleUserOptions = computed(() =>
+      [...new Set(horarios.value.map((horario) => horario.empleado).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }))
+    );
+
+    const horarios15Dias = computed(() => {
+      const hoy = new Date();
+      const manana = new Date(hoy);
+      manana.setDate(hoy.getDate() + 1);
+      const fechaHoy = formatDate(hoy);
+      const fechaManana = formatDate(manana);
+
+      return Array.from({ length: 15 }, (_, index) => {
+        const fecha = new Date(hoy);
+        fecha.setDate(hoy.getDate() + index);
+        const fechaFormateada = formatDate(fecha);
+        const registros = horarios.value.filter((horario) =>
+          horario.fecha === fechaFormateada &&
+          (!scheduleUserFilter.value || horario.empleado === scheduleUserFilter.value)
+        );
+
+        return {
+          fecha: fechaFormateada,
+          esHoy: fechaFormateada === fechaHoy,
+          esManana: fechaFormateada === fechaManana,
+          total: registros.length,
+          grupos: gruposTurno.map((grupo) => ({
+            ...grupo,
+            personas: registros.filter((horario) => grupoDeTurno(horario.turno).key === grupo.key),
+          })),
+        };
+      });
+    });
+
     const horarios3Dias = computed(() => {
       if (!$q.screen.gt.md) return [];
       
@@ -1454,6 +1658,12 @@ export default defineComponent({
       const [y, m, d] = fechaStr.split("-").map(Number);
       const date = new Date(y, m - 1, d);
       return date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+    }
+
+    function formatFechaRango(fechaStr) {
+      if (!fechaStr) return "";
+      const [y, m, d] = fechaStr.split("-").map(Number);
+      return new Date(y, m - 1, d).toLocaleDateString("es-ES", { day: "numeric", month: "short" });
     }
 
     async function fetchExtras() {
@@ -1497,12 +1707,31 @@ export default defineComponent({
       }
     });
 
+    watch(scheduleView, () => {
+      fetchHorarios();
+    });
+
+    watch(scheduleUserFilter, (usuario) => {
+      try {
+        if (usuario) {
+          window.localStorage.setItem(scheduleUserStorageKey, usuario);
+        } else {
+          window.localStorage.removeItem(scheduleUserStorageKey);
+        }
+      } catch {
+        // La vista sigue funcionando aunque el navegador bloquee el almacenamiento local.
+      }
+    });
+
     onMounted(() => {
       fetchHorarios();
     });
 
     return {
       activeTab,
+      scheduleView,
+      scheduleUserFilter,
+      scheduleUserOptions,
       tipoOptions,
       mesOptions,
       periodoTipo,
@@ -1524,7 +1753,9 @@ export default defineComponent({
       turnoOtros,
       fetchHorarios,
       horarios3Dias,
+      horarios15Dias,
       formatFechaLarga,
+      formatFechaRango,
       showDiasDialog,
       selectedExtra,
       openDiasDialog,
@@ -1589,6 +1820,106 @@ export default defineComponent({
 
 .date-selector-scroll > .q-btn {
   flex: 0 0 auto;
+}
+
+.schedule-view-selector {
+  overflow: hidden;
+  border-color: rgb(25 118 210 / 18%);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgb(25 118 210 / 7%), rgb(25 118 210 / 2%));
+}
+
+.schedule-view-toggle {
+  width: 100%;
+  border: 1px solid rgb(0 0 0 / 8%);
+  border-radius: 9px;
+}
+
+.schedule-fortnight__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.schedule-user-filter {
+  overflow: hidden;
+  border-color: rgb(25 118 210 / 16%);
+  border-radius: 12px;
+}
+
+.schedule-user-filter__active {
+  color: #0d47a1;
+  background: rgb(25 118 210 / 7%);
+}
+
+.schedule-day-card {
+  overflow: hidden;
+  border-radius: 14px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.schedule-day-card--today {
+  border: 2px solid var(--q-primary);
+  box-shadow: 0 5px 18px rgb(25 118 210 / 13%);
+}
+
+.schedule-day-card__header {
+  min-height: 72px;
+  background: rgb(0 0 0 / 2%);
+}
+
+.schedule-day-card--today .schedule-day-card__header {
+  background: rgb(25 118 210 / 7%);
+}
+
+.schedule-day-card__date {
+  min-width: 0;
+}
+
+.schedule-day-card__empty {
+  min-height: 112px;
+}
+
+.schedule-day-card__list {
+  padding-bottom: 6px;
+}
+
+.schedule-shift-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px 5px;
+  color: inherit;
+  font-size: 0.73rem;
+  font-weight: 700;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+:global(.body--dark) .schedule-view-selector {
+  border-color: rgb(100 181 246 / 24%);
+  background: rgb(33 150 243 / 8%);
+}
+
+:global(.body--dark) .schedule-view-toggle {
+  border-color: rgb(255 255 255 / 12%);
+}
+
+:global(.body--dark) .schedule-user-filter {
+  border-color: rgb(100 181 246 / 22%);
+}
+
+:global(.body--dark) .schedule-user-filter__active {
+  color: #90caf9;
+  background: rgb(33 150 243 / 12%);
+}
+
+:global(.body--dark) .schedule-day-card__header {
+  background: rgb(255 255 255 / 4%);
+}
+
+:global(.body--dark) .schedule-day-card--today .schedule-day-card__header {
+  background: rgb(33 150 243 / 13%);
 }
 
 .vacaciones-ios {

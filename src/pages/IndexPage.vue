@@ -26,7 +26,7 @@
           <q-input
             v-model="loginData.password"
             label="Contraseña"
-            type="password"
+            :type="showLoginPassword ? 'text' : 'password'"
             outlined
             rounded
             dense
@@ -34,6 +34,14 @@
           >
             <template v-slot:prepend>
               <q-icon name="lock" color="primary" />
+            </template>
+            <template v-slot:append>
+              <q-icon
+                :name="showLoginPassword ? 'visibility' : 'visibility_off'"
+                class="cursor-pointer"
+                color="grey-7"
+                @click="showLoginPassword = !showLoginPassword"
+              />
             </template>
           </q-input>
 
@@ -971,6 +979,7 @@ export default defineComponent({
 
     const showFilterModal = ref(false)
     const showLoginModal = ref(false)
+    const showLoginPassword = ref(false)
 
     // Opciones de filtro
     const filterOptions = [
@@ -1349,6 +1358,7 @@ export default defineComponent({
       clearFilters,
       clearFiltersFromBadge,
       showLoginModal,
+      showLoginPassword,
       loginData,
       loginLoading,
       loginError,

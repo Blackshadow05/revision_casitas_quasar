@@ -87,6 +87,51 @@
 
       <template v-if="!loading">
         <template v-if="scheduleView === 'habitual'">
+        <!-- Mi horario (usuario en sesión) -->
+        <div v-if="currentUserName" class="q-mb-md">
+          <q-card flat bordered class="my-schedule-card">
+            <q-card-section class="row items-center bg-primary text-white q-py-sm">
+              <q-icon name="person" size="sm" class="q-mr-sm" />
+              <div class="text-subtitle1 text-weight-bold">Mi horario</div>
+              <q-space />
+              <q-badge color="white" text-color="primary" :label="empleadoDelUsuario || currentUserName" />
+            </q-card-section>
+            <q-list separator class="q-py-none">
+              <template v-if="currentUserScheduleHasTurno">
+                <q-item
+                  v-for="(item, index) in currentUserSchedule"
+                  :key="item.id || item.fecha || index"
+                  class="q-px-md"
+                  :class="{ 'my-schedule-card__item--today': item.esHoy }"
+                >
+                  <q-item-section v-if="item.fechaLabel">
+                    <q-item-label class="text-caption text-grey-7 text-capitalize">{{ item.fechaLabel }}</q-item-label>
+                    <q-item-label v-if="item.esHoy" class="text-primary text-weight-bold text-caption">Hoy</q-item-label>
+                  </q-item-section>
+                  <q-item-section v-else>
+                    <q-item-label class="text-weight-medium">{{ item.empleado }}</q-item-label>
+                  </q-item-section>
+                  <q-item-section side>
+                    <q-badge
+                      v-if="!item.sinHorario"
+                      outline
+                      :color="getTurnoBadgeColor(item.turno)"
+                      :label="item.turno"
+                      class="text-bold"
+                    />
+                    <span v-else class="text-grey-6 text-caption">Sin horario</span>
+                  </q-item-section>
+                </q-item>
+              </template>
+              <q-item v-else>
+                <q-item-section class="text-grey text-caption text-center q-py-md">
+                  Sin horario registrado para esta fecha
+                </q-item-section>
+              </q-item>
+            </q-list>
+          </q-card>
+        </div>
+
         <!-- VISTA MÓVIL (Normal) -->
         <div v-if="!$q.screen.gt.md">
           <div class="q-mb-md">
@@ -1105,7 +1150,7 @@ export default defineComponent({
         return null;
       }
     })();
-    const scheduleUserFilter = ref(storedScheduleUser || null);
+    const scheduleUserFilter = ref(storedScheduleUser || authStore.user?.Usuario || null);
     const loading = ref(false);
     const horarios = ref([]);
     const errorMsg = ref("");
@@ -1179,20 +1224,119 @@ export default defineComponent({
 
     const normalizar = (t) => (t || "").trim();
 
+    function sinTildes(str) {
+      return (str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    }
+
+    function normalizarNombre(n) {
+      return sinTildes((n || "").trim().toLowerCase());
+    }
+
+    function nombresCoinciden(empleado, usuario) {
+      const emp = normalizarNombre(empleado);
+      const usr = normalizarNombre(usuario);
+      if (!emp || !usr) return false;
+      if (emp === usr) return true;
+      if (emp.includes(usr) || usr.includes(emp)) return true;
+
+      const empFirst = emp.split(/\s+/).filter(Boolean)[0] || "";
+      const usrFirst = usr.split(/\s+/).filter(Boolean)[0] || "";
+      return empFirst.length >= 3 && usrFirst.length >= 3 && empFirst === usrFirst;
+    }
+
+    const currentUserName = computed(() => authStore.user?.Usuario || null);
+
+    const empleadosEnHorarios = computed(() =>
+      [...new Set(horarios.value.map((h) => h.empleado).filter(Boolean))]
+    );
+
+    const empleadoDelUsuario = computed(() => {
+      if (!currentUserName.value) return null;
+
+      const exacto = empleadosEnHorarios.value.find(
+        (empleado) => normalizarNombre(empleado) === normalizarNombre(currentUserName.value)
+      );
+      if (exacto) return exacto;
+
+      return empleadosEnHorarios.value.find((empleado) =>
+        nombresCoinciden(empleado, currentUserName.value)
+      ) || null;
+    });
+
+    function esUsuarioActual(empleado) {
+      if (!currentUserName.value || !empleado) return false;
+      if (empleadoDelUsuario.value) {
+        return normalizarNombre(empleado) === normalizarNombre(empleadoDelUsuario.value);
+      }
+      return nombresCoinciden(empleado, currentUserName.value);
+    }
+
+    function coincideConFiltro(empleado, filtro) {
+      if (!filtro) return true;
+      if (!empleado) return false;
+      return (
+        normalizarNombre(empleado) === normalizarNombre(filtro) ||
+        nombresCoinciden(empleado, filtro)
+      );
+    }
+
+    function sortUserFirst(list) {
+      if (!currentUserName.value) return list;
+      return [...list].sort((a, b) => {
+        const aMatch = esUsuarioActual(a.empleado) ? 0 : 1;
+        const bMatch = esUsuarioActual(b.empleado) ? 0 : 1;
+        if (aMatch !== bMatch) return aMatch - bMatch;
+        return (a.empleado || "").localeCompare(b.empleado || "", "es", { sensitivity: "base" });
+      });
+    }
+
+    function getTurnoBadgeColor(turno) {
+      const t = normalizar(turno);
+      if (turnosDiurno.includes(t)) return "red-8";
+      if (turnosPartida.includes(t)) return "orange-8";
+      if (turnosMixto.includes(t)) return "green-8";
+      if (turnosNocturno.includes(t)) return "blue-8";
+      return "amber-9";
+    }
+
+    const currentUserSchedule = computed(() => {
+      if (!currentUserName.value) return [];
+
+      if ($q.screen.gt.md) {
+        const hoy = new Date();
+        return Array.from({ length: 3 }, (_, index) => {
+          const d = new Date(hoy);
+          d.setDate(hoy.getDate() + index);
+          const fecha = formatDate(d);
+          const registro = horarios.value.find((h) => h.fecha === fecha && esUsuarioActual(h.empleado));
+
+          return registro
+            ? { ...registro, fechaLabel: formatFechaLarga(fecha), esHoy: index === 0 }
+            : { fecha, fechaLabel: formatFechaLarga(fecha), esHoy: index === 0, sinHorario: true };
+        });
+      }
+
+      return horarios.value.filter((h) => esUsuarioActual(h.empleado));
+    });
+
+    const currentUserScheduleHasTurno = computed(() =>
+      currentUserSchedule.value.some((item) => !item.sinHorario)
+    );
+
     const turnoDiurno = computed(() =>
-      horarios.value.filter((h) => turnosDiurno.includes(normalizar(h.turno)))
+      sortUserFirst(horarios.value.filter((h) => turnosDiurno.includes(normalizar(h.turno))))
     );
     const turnoPartida = computed(() =>
-      horarios.value.filter((h) => turnosPartida.includes(normalizar(h.turno)))
+      sortUserFirst(horarios.value.filter((h) => turnosPartida.includes(normalizar(h.turno))))
     );
     const turnoMixto = computed(() =>
-      horarios.value.filter((h) => turnosMixto.includes(normalizar(h.turno)))
+      sortUserFirst(horarios.value.filter((h) => turnosMixto.includes(normalizar(h.turno))))
     );
     const turnoNocturno = computed(() =>
-      horarios.value.filter((h) => turnosNocturno.includes(normalizar(h.turno)))
+      sortUserFirst(horarios.value.filter((h) => turnosNocturno.includes(normalizar(h.turno))))
     );
     const turnoOtros = computed(() =>
-      horarios.value.filter((h) => {
+      sortUserFirst(horarios.value.filter((h) => {
         const t = normalizar(h.turno);
         return (
           !turnosDiurno.includes(t) &&
@@ -1200,7 +1344,7 @@ export default defineComponent({
           !turnosMixto.includes(t) &&
           !turnosNocturno.includes(t)
         );
-      })
+      }))
     );
 
 
@@ -1241,10 +1385,6 @@ export default defineComponent({
     });
 
     // Normalizar texto quitando tildes para comparar "vacaciones"
-    function sinTildes(str) {
-      return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    }
-
     function esVacaciones(turno) {
       return sinTildes((turno || "").trim().toLowerCase()).includes("vacaciones");
     }
@@ -1667,7 +1807,7 @@ export default defineComponent({
         const fechaFormateada = formatDate(fecha);
         const registros = horarios.value.filter((horario) =>
           horario.fecha === fechaFormateada &&
-          (!scheduleUserFilter.value || horario.empleado === scheduleUserFilter.value)
+          coincideConFiltro(horario.empleado, scheduleUserFilter.value)
         );
 
         return {
@@ -1678,7 +1818,7 @@ export default defineComponent({
           estado: estadoVisualDelDia(registros),
           grupos: gruposTurno.map((grupo) => ({
             ...grupo,
-            personas: registros.filter((horario) => grupoDeTurno(horario.turno).key === grupo.key),
+            personas: sortUserFirst(registros.filter((horario) => grupoDeTurno(horario.turno).key === grupo.key)),
           })),
         };
       });
@@ -1697,14 +1837,14 @@ export default defineComponent({
         
         dias.push({
           fecha: f,
-          diurno: diaData.filter(h => turnosDiurno.includes(normalizar(h.turno))),
-          partida: diaData.filter(h => turnosPartida.includes(normalizar(h.turno))),
-          mixto: diaData.filter(h => turnosMixto.includes(normalizar(h.turno))),
-          nocturno: diaData.filter(h => turnosNocturno.includes(normalizar(h.turno))),
-          otros: diaData.filter(h => {
+          diurno: sortUserFirst(diaData.filter(h => turnosDiurno.includes(normalizar(h.turno)))),
+          partida: sortUserFirst(diaData.filter(h => turnosPartida.includes(normalizar(h.turno)))),
+          mixto: sortUserFirst(diaData.filter(h => turnosMixto.includes(normalizar(h.turno)))),
+          nocturno: sortUserFirst(diaData.filter(h => turnosNocturno.includes(normalizar(h.turno)))),
+          otros: sortUserFirst(diaData.filter(h => {
             const t = normalizar(h.turno);
             return !turnosDiurno.includes(t) && !turnosPartida.includes(t) && !turnosMixto.includes(t) && !turnosNocturno.includes(t);
-          })
+          }))
         });
       }
       return dias;
@@ -1780,6 +1920,15 @@ export default defineComponent({
       }
     });
 
+    watch(empleadoDelUsuario, (empleado) => {
+      if (!empleado) return;
+
+      const filtroActual = scheduleUserFilter.value;
+      if (!filtroActual || nombresCoinciden(filtroActual, currentUserName.value)) {
+        scheduleUserFilter.value = empleado;
+      }
+    });
+
     onMounted(() => {
       fetchHorarios();
     });
@@ -1808,6 +1957,11 @@ export default defineComponent({
       turnoMixto,
       turnoNocturno,
       turnoOtros,
+      currentUserName,
+      empleadoDelUsuario,
+      currentUserSchedule,
+      currentUserScheduleHasTurno,
+      getTurnoBadgeColor,
       fetchHorarios,
       horarios3Dias,
       horarios15Dias,
@@ -1890,6 +2044,17 @@ export default defineComponent({
   width: 100%;
   border: 1px solid rgb(0 0 0 / 8%);
   border-radius: 9px;
+}
+
+.my-schedule-card {
+  overflow: hidden;
+  border-color: rgb(25 118 210 / 28%);
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgb(25 118 210 / 10%);
+}
+
+.my-schedule-card__item--today {
+  background: rgb(25 118 210 / 6%);
 }
 
 .schedule-fortnight__header {

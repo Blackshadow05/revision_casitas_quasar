@@ -308,6 +308,9 @@
               </template>
               <template v-else>
                 <div class="casita-badge">Casita {{ report.numero_casita }}</div>
+                <div v-if="formatHabitacionesCortas(report.numero_casita)" class="casita-rooms-line">
+                  {{ formatHabitacionesCortas(report.numero_casita) }}
+                </div>
               </template>
               <div class="report-meta">
                 <span class="meta-item">
@@ -496,6 +499,7 @@ import { supabase } from '../supabase'
 import { generateReportePantallasPdf, getCloudinaryUrl } from '../utils/reportePantallasPdf'
 import {
   buildInventarioCasitas,
+  formatHabitacionesCortas,
   formatMovimientoResumen,
   formatUbicacion,
   inventoryForUbicacion,
@@ -1037,6 +1041,7 @@ export default defineComponent({
       estadoClass,
       isMovimiento,
       formatUbicacion,
+      formatHabitacionesCortas,
       getInventarios,
       getRelatedMovements,
       isSelected,
@@ -1269,7 +1274,7 @@ export default defineComponent({
 
 .inv-rooms {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
   gap: 6px;
 }
 
@@ -1496,6 +1501,13 @@ export default defineComponent({
   padding: 4px 10px;
   max-width: 100%;
   word-break: break-word;
+}
+
+.casita-rooms-line {
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #9e9e9e;
 }
 
 .report-title-row {
@@ -1845,6 +1857,10 @@ export default defineComponent({
 
 .body--dark .casita-badge--move {
   background: rgba(13, 71, 161, 0.28);
+}
+
+.body--dark .casita-rooms-line {
+  color: #9e9e9e;
 }
 
 .body--dark .expanded-title,

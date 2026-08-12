@@ -1,8 +1,23 @@
 export const TIPO_REPORTE = 'reporte'
 export const TIPO_MOVIMIENTO = 'movimiento'
 
-export const HABITACIONES_PANTALLA = ['Living', 'Cuarto Queen', 'Cuarto King']
+export const HABITACION_LIVING = 'Living'
+export const HABITACION_QUEEN = 'Cuarto Queen'
+export const HABITACION_KING = 'Cuarto King'
+export const HABITACIONES_PANTALLA = [HABITACION_LIVING, HABITACION_QUEEN, HABITACION_KING]
 export const ESTADO_NO_HAY_PANTALLA = 'no hay pantalla'
+
+const CASITAS_SOLO_LIVING = [5, 6, 16, 17, 18, 19, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 49, 50]
+const CASITAS_LIVING_KING = [11, 12, 13, 14, 15, 20, 21, 22, 23, 24, 25, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48]
+const CASITAS_LIVING_QUEEN_KING = [1, 2, 3, 4, 7, 8, 9, 10]
+
+function toCasitaSet (list) {
+  return new Set(list.map(String))
+}
+
+const SET_SOLO_LIVING = toCasitaSet(CASITAS_SOLO_LIVING)
+const SET_LIVING_KING = toCasitaSet(CASITAS_LIVING_KING)
+const SET_LIVING_QUEEN_KING = toCasitaSet(CASITAS_LIVING_QUEEN_KING)
 
 export const UBICACIONES_EXTRA = [
   { label: 'Bodega', value: 'bodega' },
@@ -26,6 +41,35 @@ export function buildUbicacionOptions () {
 
 export function isCasitaUbicacion (value) {
   return /^\d+$/.test(String(value || '').trim())
+}
+
+export function habitacionesForCasita (ubicacion) {
+  const key = casitaKey(ubicacion)
+  if (!isCasitaUbicacion(key)) return []
+  if (SET_SOLO_LIVING.has(key)) return [HABITACION_LIVING]
+  if (SET_LIVING_KING.has(key)) return [HABITACION_LIVING, HABITACION_KING]
+  if (SET_LIVING_QUEEN_KING.has(key)) return [HABITACION_LIVING, HABITACION_QUEEN, HABITACION_KING]
+  return [...HABITACIONES_PANTALLA]
+}
+
+export function habitacionOptionsForCasita (ubicacion) {
+  return habitacionesForCasita(ubicacion).map(value => ({ label: value, value }))
+}
+
+export function maxFotosForCasita (ubicacion) {
+  return habitacionesForCasita(ubicacion).length
+}
+
+export function formatHabitacionesResumen (ubicacion) {
+  const rooms = habitacionesForCasita(ubicacion)
+  if (rooms.length === 0) return ''
+  if (rooms.length === 1) return `Esta casita solo tiene ${rooms[0]}`
+  if (rooms.length === 2) return `Habitaciones: ${rooms[0]} y ${rooms[1]}`
+  return `Habitaciones: ${rooms.join(', ')}`
+}
+
+export function formatHabitacionesCortas (ubicacion) {
+  return habitacionesForCasita(ubicacion).join(' · ')
 }
 
 export function formatUbicacion (value) {
@@ -314,7 +358,7 @@ function roomsFromCounts (counts, ubicacion) {
   const key = casitaKey(ubicacion)
 
   if (isCasitaUbicacion(key)) {
-    return HABITACIONES_PANTALLA.map((habitacion) => ({
+    return habitacionesForCasita(key).map((habitacion) => ({
       habitacion,
       cantidad: counts.get(roomInventoryKey(key, habitacion)) || 0
     }))
@@ -344,7 +388,7 @@ export function inventoryForUbicacion (rows, ubicacion, reports = []) {
   }
 
   if (isCasitaUbicacion(key)) {
-    return HABITACIONES_PANTALLA.map((habitacion) => {
+    return habitacionesForCasita(key).map((habitacion) => {
       const row = matched.find(item => inventoryHabitacionKey(key, item.habitacion) === habitacion)
       return {
         habitacion,
@@ -405,7 +449,9 @@ export function inventarioToCsv (items) {
       continue
     }
 
-    const roomValues = HABITACIONES_PANTALLA.map(name => roomsByName.get(name) || 0)
+    const roomValues = HABITACIONES_PANTALLA.map((name) => (
+      roomsByName.has(name) ? roomsByName.get(name) : ''
+    ))
     lines.push([csvCell(item.label), ...roomValues, Number(item.total) || 0].join(','))
   }
 

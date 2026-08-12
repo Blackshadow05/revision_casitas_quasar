@@ -64,15 +64,17 @@
             <q-icon name="home" color="grey-6" />
           </template>
         </q-select>
+        <div v-if="numeroCasita" class="casita-rooms-hint">{{ habitacionesResumen }}</div>
       </section>
 
       <section v-if="esReporte" class="form-section">
         <div class="section-title-row">
           <h2 class="section-title">Fotos de pantallas</h2>
-          <span class="section-hint">Máx. 3</span>
+          <span class="section-hint">Máx. {{ maxFotos || 0 }}</span>
         </div>
-        <p class="section-copy">Indica ubicación y estado en cada foto.</p>
-        <div class="photos-grid">
+        <p v-if="!numeroCasita" class="section-copy">Primero elige la casita para ver sus habitaciones.</p>
+        <p v-else class="section-copy">Indica ubicación y estado en cada foto.</p>
+        <div v-if="numeroCasita" class="photos-grid">
           <div
             v-for="(photo, idx) in fotos"
             :key="photo.id"
@@ -105,7 +107,7 @@
           </div>
 
           <button
-            v-if="fotos.length < 3"
+            v-if="canAddPhoto"
             type="button"
             class="add-photo-btn"
             @click="openPhotoSheet"
@@ -139,7 +141,7 @@
           <q-select
             v-if="origenRequiereHabitacion"
             v-model="origenHabitacion"
-            :options="habitacionOptions"
+            :options="origenHabitacionOptions"
             outlined
             dense
             emit-value
@@ -179,7 +181,7 @@
           <q-select
             v-if="destinoRequiereHabitacion"
             v-model="destinoHabitacion"
-            :options="habitacionOptions"
+            :options="destinoHabitacionOptions"
             outlined
             dense
             emit-value
@@ -287,7 +289,7 @@
             <div class="text-subtitle2 text-weight-medium q-mb-sm">Toca la ubicación para continuar</div>
             <div class="ubicacion-options">
               <q-btn
-                v-for="opcion in ubicacionOptions"
+                v-for="opcion in ubicacionOptionsDisponibles"
                 :key="opcion.value"
                 unelevated
                 no-caps
@@ -353,17 +355,19 @@ import { useAuthStore } from '../stores/auth'
 import { supabase } from '../supabase'
 import { CLOUDINARY_CONFIG } from '../cloudinary'
 import {
-  HABITACIONES_PANTALLA,
   TIPO_MOVIMIENTO,
   TIPO_REPORTE,
   aplicarInventarioDesdeReporte,
   buildCasitaOptions,
   buildUbicacionOptions,
+  formatHabitacionesResumen,
+  habitacionOptionsForCasita,
+  habitacionesForCasita,
   isCasitaUbicacion,
+  maxFotosForCasita,
   registrarMovimientoPantalla
 } from '../utils/pantallasInventario'
 
-const UBICACIONES = HABITACIONES_PANTALLA
 const ESTADOS = ['defectuosa', 'en buen estado', 'no hay pantalla']
 
 export default defineComponent({
@@ -394,8 +398,6 @@ export default defineComponent({
 
     const casitaOptions = buildCasitaOptions()
     const ubicacionMovimientoOptions = buildUbicacionOptions()
-    const habitacionOptions = UBICACIONES.map(u => ({ label: u, value: u }))
-    const ubicacionOptions = habitacionOptions
     const estadoOptions = ESTADOS.map(e => ({ label: e, value: e }))
     const tipoOptions = [
       { label: 'Reporte pantalla', value: TIPO_REPORTE, icon: 'photo_camera' },
@@ -406,6 +408,18 @@ export default defineComponent({
     const destinoRequiereHabitacion = computed(() => isCasitaUbicacion(destinoUbicacion.value))
     const esReporte = computed(() => tipo.value === TIPO_REPORTE)
     const esMovimiento = computed(() => tipo.value === TIPO_MOVIMIENTO)
+    const habitacionesResumen = computed(() => formatHabitacionesResumen(numeroCasita.value))
+    const maxFotos = computed(() => maxFotosForCasita(numeroCasita.value))
+    const origenHabitacionOptions = computed(() => habitacionOptionsForCasita(origenUbicacion.value))
+    const destinoHabitacionOptions = computed(() => habitacionOptionsForCasita(destinoUbicacion.value))
+    const ubicacionOptionsDisponibles = computed(() => {
+      const used = new Set(fotos.value.map(foto => foto.ubicacion))
+      return habitacionOptionsForCasita(numeroCasita.value).filter(opcion => !used.has(opcion.value))
+    })
+    const canAddPhoto = computed(() => {
+      if (!esReporte.value || !numeroCasita.value) return false
+      return fotos.value.length < maxFotos.value
+    })
 
     function selectTipo (value) {
       if (tipo.value === value) return
@@ -473,8 +487,9 @@ export default defineComponent({
 
       if (!esReporte.value) return false
       if (!numeroCasita.value) return false
-      if (fotos.value.length === 0 || fotos.value.length > 3) return false
-      return fotos.value.every(f => f.file && f.ubicacion && f.estado)
+      if (fotos.value.length === 0 || fotos.value.length > maxFotos.value) return false
+      const allowed = new Set(habitacionesForCasita(numeroCasita.value))
+      return fotos.value.every(f => f.file && allowed.has(f.ubicacion) && f.estado)
     })
 
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
@@ -636,8 +651,17 @@ export default defineComponent({
 
     function openPhotoSheet () {
       if (!esReporte.value) return
-      if (fotos.value.length >= 3) {
-        notify({ type: 'warning', message: 'Máximo 3 fotos permitidas' })
+      if (!numeroCasita.value) {
+        notify({ type: 'warning', message: 'Primero selecciona la casita' })
+        return
+      }
+      if (!canAddPhoto.value) {
+        notify({
+          type: 'warning',
+          message: maxFotos.value === 1
+            ? 'Esta casita solo tiene Living'
+            : `Máximo ${maxFotos.value} fotos para esta casita`
+        })
         return
       }
       photoSheetOpen.value = true
@@ -653,8 +677,13 @@ export default defineComponent({
       const file = e.target.files?.[0]
       if (!file) return
 
-      if (fotos.value.length >= 3) {
-        notify({ type: 'warning', message: 'Máximo 3 fotos permitidas' })
+      if (!canAddPhoto.value) {
+        notify({
+          type: 'warning',
+          message: maxFotos.value === 1
+            ? 'Esta casita solo tiene Living'
+            : `Máximo ${maxFotos.value} fotos para esta casita`
+        })
         e.target.value = ''
         return
       }
@@ -685,8 +714,14 @@ export default defineComponent({
         URL.revokeObjectURL(pendingPhoto.value.preview)
       }
       pendingPhoto.value = photo
-      pendingUbicacion.value = null
-      photoMetaStep.value = 'ubicacion'
+      const remaining = ubicacionOptionsDisponibles.value
+      if (remaining.length === 1) {
+        pendingUbicacion.value = remaining[0].value
+        photoMetaStep.value = 'estado'
+      } else {
+        pendingUbicacion.value = null
+        photoMetaStep.value = 'ubicacion'
+      }
       photoMetaDialogOpen.value = true
     }
 
@@ -703,6 +738,11 @@ export default defineComponent({
     function selectUbicacion (ubicacion) {
       if (!pendingPhoto.value || !ubicacion) {
         notify({ type: 'warning', message: 'Selecciona la ubicación de la pantalla' })
+        return
+      }
+      const allowed = habitacionesForCasita(numeroCasita.value)
+      if (!allowed.includes(ubicacion)) {
+        notify({ type: 'warning', message: 'Esta casita no tiene esa habitación' })
         return
       }
       pendingUbicacion.value = ubicacion
@@ -759,12 +799,43 @@ export default defineComponent({
       return resData.secure_url
     }
 
+    watch(numeroCasita, (value) => {
+      const allowed = new Set(habitacionesForCasita(value))
+      const kept = []
+      for (const foto of fotos.value) {
+        if (allowed.has(foto.ubicacion)) {
+          kept.push(foto)
+        } else if (foto.preview) {
+          URL.revokeObjectURL(foto.preview)
+        }
+      }
+      fotos.value = kept
+    })
+
     watch(origenUbicacion, (value) => {
-      if (!isCasitaUbicacion(value)) origenHabitacion.value = null
+      if (!isCasitaUbicacion(value)) {
+        origenHabitacion.value = null
+        return
+      }
+      const rooms = habitacionesForCasita(value)
+      if (rooms.length === 1) {
+        origenHabitacion.value = rooms[0]
+        return
+      }
+      if (!rooms.includes(origenHabitacion.value)) origenHabitacion.value = null
     })
 
     watch(destinoUbicacion, (value) => {
-      if (!isCasitaUbicacion(value)) destinoHabitacion.value = null
+      if (!isCasitaUbicacion(value)) {
+        destinoHabitacion.value = null
+        return
+      }
+      const rooms = habitacionesForCasita(value)
+      if (rooms.length === 1) {
+        destinoHabitacion.value = rooms[0]
+        return
+      }
+      if (!rooms.includes(destinoHabitacion.value)) destinoHabitacion.value = null
     })
 
     async function saveMovimiento () {
@@ -908,11 +979,15 @@ export default defineComponent({
       destinoHabitacion,
       origenRequiereHabitacion,
       destinoRequiereHabitacion,
+      origenHabitacionOptions,
+      destinoHabitacionOptions,
+      habitacionesResumen,
+      maxFotos,
+      canAddPhoto,
       notas,
       casitaOptions,
       ubicacionMovimientoOptions,
-      habitacionOptions,
-      ubicacionOptions,
+      ubicacionOptionsDisponibles,
       estadoOptions,
       estadoClass,
       fotos,
@@ -1026,6 +1101,13 @@ export default defineComponent({
   font-size: 12px;
   color: #757575;
   line-height: 1.4;
+}
+
+.casita-rooms-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #616161;
 }
 
 .tipo-grid {
@@ -1244,7 +1326,8 @@ export default defineComponent({
 
 .body--dark .section-title,
 .body--dark .meta-value,
-.body--dark .photo-ubicacion-chip {
+.body--dark .photo-ubicacion-chip,
+.body--dark .casita-rooms-hint {
   color: #e0e0e0;
 }
 

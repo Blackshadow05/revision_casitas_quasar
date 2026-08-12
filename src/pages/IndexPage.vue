@@ -211,32 +211,12 @@
             class="daily-operation-card daily-operation-card--ocupacion"
             aria-label="Ocupación del día"
           >
-            <div class="row items-center no-wrap q-mb-sm">
+            <div class="row items-center no-wrap">
               <q-icon name="hotel" color="indigo-6" size="18px" class="q-mr-xs" />
-              <span class="daily-operation-card__label">Ocupación del día</span>
+              <span class="daily-operation-card__label">Ocupación</span>
               <q-space />
-              <q-badge color="indigo-6" rounded :label="ocupacionCasitas.length" />
+              <span class="ocupacion-count">{{ ocupacionCount }}</span>
             </div>
-
-            <div v-if="ocupacionZonas.length" class="ocupacion-zonas">
-              <div
-                v-for="zona in ocupacionZonas"
-                :key="zona.nombre"
-                class="ocupacion-zona"
-              >
-                <span class="ocupacion-zona__name">{{ zona.corto }}</span>
-                <div class="daily-operation-card__numbers">
-                  <span
-                    v-for="casita in zona.numeros"
-                    :key="zona.nombre + '-' + casita"
-                    class="daily-operation-number"
-                  >
-                    {{ casita }}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div v-else class="daily-operation-card__empty">Sin ocupación</div>
           </article>
         </div>
       </section>
@@ -931,15 +911,6 @@ export default defineComponent({
     const operationDay = ref('today')
     const operationExpanded = reactive({ checkin: false, checkout: false })
 
-    const OCUPACION_ZONAS = [
-      { nombre: 'Zona A', corto: 'A', min: 1, max: 6 },
-      { nombre: 'Zona B', corto: 'B', min: 7, max: 14 },
-      { nombre: 'Zona C', corto: 'C', min: 15, max: 22 },
-      { nombre: 'Zona D', corto: 'D', min: 23, max: 31 },
-      { nombre: 'Zona E', corto: 'E', min: 32, max: 40 },
-      { nombre: 'Zona F', corto: 'F', min: 41, max: 50 }
-    ]
-
     const coincideTipoOperacion = (row, tipoOperacion) => {
       const tipo = memoNorm(row.tipo)
       if (tipoOperacion === 'in house') {
@@ -966,18 +937,7 @@ export default defineComponent({
       return [...new Set(casitas)].sort((a, b) => Number(a) - Number(b))
     }
 
-    const ocupacionCasitas = computed(() => casitasDeOperacionSeleccionada('in house'))
-
-    const ocupacionZonas = computed(() =>
-      OCUPACION_ZONAS.map((zona) => ({
-        nombre: zona.nombre,
-        corto: zona.corto,
-        numeros: ocupacionCasitas.value.filter((n) => {
-          const num = Number(n)
-          return num >= zona.min && num <= zona.max
-        })
-      })).filter((zona) => zona.numeros.length > 0)
-    )
+    const ocupacionCount = computed(() => casitasDeOperacionSeleccionada('in house').length)
 
     const operacionesHoy = computed(() => [
       {
@@ -1389,8 +1349,7 @@ export default defineComponent({
       avisosLabel,
       avisosOcultos,
       operacionesHoy,
-      ocupacionCasitas,
-      ocupacionZonas,
+      ocupacionCount,
       operationDay,
       operationExpanded,
       casas,
@@ -1501,29 +1460,11 @@ export default defineComponent({
   background: rgba(63, 81, 181, 0.07);
 }
 
-.ocupacion-zonas {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.ocupacion-zona {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.ocupacion-zona__name {
-  flex: 0 0 16px;
-  margin-top: 5px;
+.ocupacion-count {
   color: #3949ab;
-  font-size: 0.72rem;
+  font-size: 1.35rem;
   font-weight: 800;
   line-height: 1;
-}
-
-.ocupacion-zona .daily-operation-card__numbers {
-  flex: 1;
 }
 
 .daily-operation-card__label {
@@ -1596,7 +1537,7 @@ export default defineComponent({
   background: rgba(92, 107, 192, 0.16);
 }
 
-:global(.body--dark) .ocupacion-zona__name {
+:global(.body--dark) .ocupacion-count {
   color: #c5cae9;
 }
 

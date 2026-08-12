@@ -5,43 +5,17 @@
       <div class="text-h5 q-ml-sm">Administrar Usuarios</div>
     </div>
 
-    <!-- Sección para cambiar mi propia contraseña (todos los usuarios) -->
-    <q-card class="q-mb-md">
-      <q-card-section>
-        <div class="text-subtitle1">Mi Cuenta</div>
-        <div class="text-caption">Cambiar mi propia contraseña</div>
-      </q-card-section>
-      <q-card-section>
-        <div class="row items-center">
-          <div class="col">
-            <span class="text-weight-bold">{{ currentUser?.Usuario }}</span>
-            <q-chip size="sm" color="primary" text-color="white" class="q-ml-sm">
-              {{ currentUser?.Rol }}
-            </q-chip>
-          </div>
-          <q-btn
-            color="primary"
-            icon="lock"
-            label="Cambiar mi contraseña"
-            @click="openMyPasswordDialog"
-          />
-        </div>
-      </q-card-section>
-    </q-card>
-
-    <!-- Botón para agregar nuevo usuario (solo SuperAdmin) -->
     <q-btn
-      v-if="isSuperAdmin"
       color="primary"
       icon="add"
       label="Nuevo Usuario"
       class="full-width q-mb-md desktop-btn"
-      @click="showAddDialog = true"
+      @click="openAddDialog"
     />
 
     <!-- Vista Móvil: Lista de usuarios -->
     <q-list bordered separator class="rounded-borders mobile-only">
-      <q-item v-for="user in users" :key="user.id">
+      <q-item v-for="user in users" :key="user.id" class="q-py-md">
         <q-item-section avatar>
           <q-avatar color="primary" text-color="white">
             {{ user.Usuario.charAt(0).toUpperCase() }}
@@ -49,48 +23,57 @@
         </q-item-section>
         <q-item-section>
           <q-item-label>{{ user.Usuario }}</q-item-label>
-          <q-item-label caption>{{ user.Rol || 'Sin rol' }}</q-item-label>
+          <q-item-label caption>
+            <q-chip
+              :color="getRolColor(user.Rol)"
+              text-color="white"
+              size="sm"
+              dense
+              class="q-mt-xs"
+            >
+              {{ user.Rol || 'Sin rol' }}
+            </q-chip>
+          </q-item-label>
+          <q-item-label caption class="q-mt-sm row items-center no-wrap">
+            <q-icon name="lock" size="14px" class="q-mr-xs" />
+            <span class="password-text">
+              {{ isPasswordVisible(user.id) ? (user.password_hash || 'Sin contraseña') : '••••••••' }}
+            </span>
+            <q-btn
+              flat
+              round
+              dense
+              size="sm"
+              :icon="isPasswordVisible(user.id) ? 'visibility_off' : 'visibility'"
+              @click="togglePassword(user.id)"
+            >
+              <q-tooltip>{{ isPasswordVisible(user.id) ? 'Ocultar contraseña' : 'Ver contraseña' }}</q-tooltip>
+            </q-btn>
+          </q-item-label>
         </q-item-section>
         <q-item-section side>
           <div class="row q-gutter-xs">
-            <!-- Si es SuperAdmin puede editar cualquier usuario -->
-            <template v-if="isSuperAdmin">
-              <q-btn
-                flat
-                round
-                dense
-                icon="edit"
-                color="primary"
-                @click="openEditDialog(user)"
-              >
-                <q-tooltip>Cambiar contraseña</q-tooltip>
-              </q-btn>
-              <!-- Solo Esteban B puede eliminar -->
-              <q-btn
-                v-if="canDeleteUsers"
-                flat
-                round
-                dense
-                icon="delete"
-                color="negative"
-                @click="confirmDelete(user)"
-              >
-                <q-tooltip>Eliminar usuario</q-tooltip>
-              </q-btn>
-            </template>
-            <!-- Si no es SuperAdmin, solo puede ver el botón de editar su propia contraseña -->
-            <template v-else-if="user.id === currentUser?.id">
-              <q-btn
-                flat
-                round
-                dense
-                icon="edit"
-                color="primary"
-                @click="openEditDialog(user)"
-              >
-                <q-tooltip>Cambiar mi contraseña</q-tooltip>
-              </q-btn>
-            </template>
+            <q-btn
+              flat
+              round
+              dense
+              icon="edit"
+              color="primary"
+              @click="openEditDialog(user)"
+            >
+              <q-tooltip>Editar contraseña y rol</q-tooltip>
+            </q-btn>
+            <q-btn
+              v-if="canDeleteUsers"
+              flat
+              round
+              dense
+              icon="delete"
+              color="negative"
+              @click="confirmDelete(user)"
+            >
+              <q-tooltip>Eliminar usuario</q-tooltip>
+            </q-btn>
           </div>
         </q-item-section>
       </q-item>
@@ -127,47 +110,50 @@
           </q-td>
         </template>
 
+        <template v-slot:body-cell-password="props">
+          <q-td :props="props">
+            <div class="row items-center no-wrap">
+              <span class="password-text">
+                {{ isPasswordVisible(props.row.id) ? (props.row.password_hash || 'Sin contraseña') : '••••••••' }}
+              </span>
+              <q-btn
+                flat
+                round
+                dense
+                size="sm"
+                :icon="isPasswordVisible(props.row.id) ? 'visibility_off' : 'visibility'"
+                @click="togglePassword(props.row.id)"
+              >
+                <q-tooltip>{{ isPasswordVisible(props.row.id) ? 'Ocultar contraseña' : 'Ver contraseña' }}</q-tooltip>
+              </q-btn>
+            </div>
+          </q-td>
+        </template>
+
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
             <div class="row q-gutter-xs justify-center">
-              <!-- Si es SuperAdmin puede editar cualquier usuario -->
-              <template v-if="isSuperAdmin">
-                <q-btn
-                  flat
-                  round
-                  dense
-                  icon="edit"
-                  color="primary"
-                  @click="openEditDialog(props.row)"
-                >
-                  <q-tooltip>Cambiar contraseña</q-tooltip>
-                </q-btn>
-                <!-- Solo Esteban B puede eliminar -->
-                <q-btn
-                  v-if="canDeleteUsers"
-                  flat
-                  round
-                  dense
-                  icon="delete"
-                  color="negative"
-                  @click="confirmDelete(props.row)"
-                >
-                  <q-tooltip>Eliminar usuario</q-tooltip>
-                </q-btn>
-              </template>
-              <!-- Si no es SuperAdmin, solo puede ver el botón de editar su propia contraseña -->
-              <template v-else-if="props.row.id === currentUser?.id">
-                <q-btn
-                  flat
-                  round
-                  dense
-                  icon="edit"
-                  color="primary"
-                  @click="openEditDialog(props.row)"
-                >
-                  <q-tooltip>Cambiar mi contraseña</q-tooltip>
-                </q-btn>
-              </template>
+              <q-btn
+                flat
+                round
+                dense
+                icon="edit"
+                color="primary"
+                @click="openEditDialog(props.row)"
+              >
+                <q-tooltip>Editar contraseña y rol</q-tooltip>
+              </q-btn>
+              <q-btn
+                v-if="canDeleteUsers"
+                flat
+                round
+                dense
+                icon="delete"
+                color="negative"
+                @click="confirmDelete(props.row)"
+              >
+                <q-tooltip>Eliminar usuario</q-tooltip>
+              </q-btn>
             </div>
           </q-td>
         </template>
@@ -227,16 +213,14 @@
     <q-dialog v-model="showEditDialog">
       <q-card style="min-width: 350px">
         <q-card-section>
-          <div class="text-h6">
-            {{ isEditingSelf ? 'Cambiar Mi Contraseña' : 'Cambiar Contraseña' }}
-          </div>
+          <div class="text-h6">Editar usuario</div>
           <div class="text-caption">Usuario: {{ editingUser?.Usuario }}</div>
         </q-card-section>
 
         <q-card-section>
           <q-input
             v-model="editingUser.password_hash"
-            label="Nueva contraseña"
+            label="Contraseña"
             :type="showPassword ? 'text' : 'password'"
             filled
             class="q-mb-md"
@@ -249,9 +233,7 @@
               />
             </template>
           </q-input>
-          <!-- Selector de rol (solo SuperAdmin) -->
           <q-select
-            v-if="isSuperAdmin"
             v-model="editingUser.Rol"
             :options="rolOptions"
             label="Rol"
@@ -300,14 +282,12 @@ import { defineComponent, ref, onMounted, computed } from "vue";
 import { notify } from '../utils/notify'
 import { useRouter } from "vue-router";
 import { supabase } from "../supabase";
-import { useQuasar } from "quasar";
 import { useAuthStore } from "../stores/auth";
 
 export default defineComponent({
   name: "AdminUsersPage",
   setup() {
     const router = useRouter();
-    const $q = useQuasar();
     const authStore = useAuthStore();
 
     const users = ref([]);
@@ -316,11 +296,12 @@ export default defineComponent({
     const showEditDialog = ref(false);
     const showDeleteDialog = ref(false);
     const showPassword = ref(false);
+    const visiblePasswords = ref({});
 
     const newUser = ref({
       Usuario: "",
       password_hash: "",
-      Rol: null,
+      Rol: "user",
     });
 
     const editingUser = ref(null);
@@ -328,7 +309,6 @@ export default defineComponent({
 
     const rolOptions = ["SuperAdmin", "admin", "user", "inactivo"];
 
-    // Columnas para la tabla de usuarios (vista desktop)
     const columns = [
       {
         name: "avatar",
@@ -352,6 +332,12 @@ export default defineComponent({
         sortable: true,
       },
       {
+        name: "password",
+        label: "Contraseña",
+        field: "password_hash",
+        align: "left",
+      },
+      {
         name: "actions",
         label: "Acciones",
         field: "actions",
@@ -360,30 +346,25 @@ export default defineComponent({
       },
     ];
 
-    // Obtener el usuario actual del store
     const currentUser = computed(() => authStore.user);
+    const canManageUsers = computed(() => authStore.canManageUsers);
+    const canDeleteUsers = computed(() => currentUser.value?.Usuario === "Esteban B");
 
-    // Verificar si el usuario actual es SuperAdmin
-    const isSuperAdmin = computed(() => {
-      return currentUser.value?.Rol === "SuperAdmin";
-    });
+    const isPasswordVisible = (userId) => Boolean(visiblePasswords.value[userId]);
 
-    // Verificar si es el usuario Esteban B (puede eliminar usuarios)
-    const canDeleteUsers = computed(() => {
-      return currentUser.value?.Usuario === "Esteban B";
-    });
-
-    // Verificar si está editando su propia contraseña
-    const isEditingSelf = computed(() => {
-      return editingUser.value && editingUser.value.id === currentUser.value?.id;
-    });
+    const togglePassword = (userId) => {
+      visiblePasswords.value = {
+        ...visiblePasswords.value,
+        [userId]: !visiblePasswords.value[userId],
+      };
+    };
 
     const loadUsers = async () => {
       loading.value = true;
       try {
         const { data, error } = await supabase
           .from("Usuarios")
-          .select("*")
+          .select("id, Usuario, Rol, password_hash")
           .order("Usuario", { ascending: true });
 
         if (error) throw error;
@@ -399,11 +380,17 @@ export default defineComponent({
       }
     };
 
+    const openAddDialog = () => {
+      showPassword.value = false;
+      newUser.value = { Usuario: "", password_hash: "", Rol: "user" };
+      showAddDialog.value = true;
+    };
+
     const addUser = async () => {
-      if (!newUser.value.Usuario || !newUser.value.password_hash) {
+      if (!newUser.value.Usuario || !newUser.value.password_hash || !newUser.value.Rol) {
         notify({
           color: "warning",
-          message: "El nombre de usuario y contraseña son obligatorios",
+          message: "El nombre de usuario, contraseña y rol son obligatorios",
         });
         return;
       }
@@ -411,7 +398,7 @@ export default defineComponent({
       loading.value = true;
       try {
         const { error } = await supabase.from("Usuarios").insert({
-          Usuario: newUser.value.Usuario,
+          Usuario: newUser.value.Usuario.trim(),
           password_hash: newUser.value.password_hash,
           Rol: newUser.value.Rol,
         });
@@ -424,7 +411,7 @@ export default defineComponent({
         });
 
         showAddDialog.value = false;
-        newUser.value = { Usuario: "", password_hash: "", Rol: null };
+        newUser.value = { Usuario: "", password_hash: "", Rol: "user" };
         loadUsers();
       } catch (error) {
         console.error("Error adding user:", error);
@@ -439,19 +426,12 @@ export default defineComponent({
 
     const openEditDialog = (user) => {
       editingUser.value = { ...user };
+      showPassword.value = true;
       showEditDialog.value = true;
     };
 
-    // Abrir diálogo para cambiar mi propia contraseña
-    const openMyPasswordDialog = () => {
-      if (currentUser.value) {
-        editingUser.value = { ...currentUser.value };
-        showEditDialog.value = true;
-      }
-    };
-
     const updateUser = async () => {
-      if (!editingUser.value.password_hash && !isSuperAdmin.value) {
+      if (!editingUser.value.password_hash) {
         notify({
           color: "warning",
           message: "La contraseña no puede estar vacía",
@@ -459,31 +439,29 @@ export default defineComponent({
         return;
       }
 
+      if (!editingUser.value.Rol) {
+        notify({
+          color: "warning",
+          message: "Debe asignar un rol",
+        });
+        return;
+      }
+
       loading.value = true;
       try {
-        const updateData = {};
-
-        // SuperAdmin puede cambiar la contraseña (si no está vacía) y el rol
-        if (isSuperAdmin.value) {
-          if (editingUser.value.password_hash) {
-            updateData.password_hash = editingUser.value.password_hash;
-          }
-          updateData.Rol = editingUser.value.Rol;
-        } else {
-          // Usuario normal solo puede cambiar su propia contraseña
-          updateData.password_hash = editingUser.value.password_hash;
-        }
-
         const { error } = await supabase
           .from("Usuarios")
-          .update(updateData)
+          .update({
+            password_hash: editingUser.value.password_hash,
+            Rol: editingUser.value.Rol,
+          })
           .eq("id", editingUser.value.id);
 
         if (error) throw error;
 
         notify({
           color: "positive",
-          message: isSuperAdmin.value ? "Usuario actualizado correctamente" : "Contraseña actualizada correctamente",
+          message: "Usuario actualizado correctamente",
         });
 
         showEditDialog.value = false;
@@ -538,7 +516,6 @@ export default defineComponent({
       router.back();
     };
 
-    // Función para obtener el color del rol
     const getRolColor = (rol) => {
       const colors = {
         SuperAdmin: "red",
@@ -550,6 +527,15 @@ export default defineComponent({
     };
 
     onMounted(() => {
+      if (!canManageUsers.value) {
+        notify({
+          type: "negative",
+          message: "No tienes permiso para acceder a esta sección.",
+        });
+        router.replace("/config");
+        return;
+      }
+
       loadUsers();
     });
 
@@ -565,13 +551,12 @@ export default defineComponent({
       userToDelete,
       rolOptions,
       columns,
-      currentUser,
-      isSuperAdmin,
       canDeleteUsers,
-      isEditingSelf,
+      isPasswordVisible,
+      togglePassword,
       addUser,
+      openAddDialog,
       openEditDialog,
-      openMyPasswordDialog,
       updateUser,
       confirmDelete,
       deleteUser,
@@ -583,7 +568,11 @@ export default defineComponent({
 </script>
 
 <style scoped>
-/* Responsive visibility classes */
+.password-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  letter-spacing: 0.04em;
+}
+
 .mobile-only {
   display: block;
 }
@@ -592,7 +581,6 @@ export default defineComponent({
   display: none;
 }
 
-/* Desktop: proper desktop layout for Admin Users */
 @media (min-width: 1024px) {
   .mobile-only {
     display: none !important;

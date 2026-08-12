@@ -120,9 +120,8 @@
         </div>
       </div>
 
-      <!-- Resumen compacto de check-in y check-out para móvil -->
+      <!-- Resumen de check-in, check-out y ocupación del día -->
       <section
-        v-if="$q.screen.lt.sm"
         class="daily-operations-mobile q-mb-md"
         aria-labelledby="daily-operations-title"
       >
@@ -206,6 +205,18 @@
               :aria-expanded="operationExpanded[grupo.key]"
               @click="operationExpanded[grupo.key] = !operationExpanded[grupo.key]"
             />
+          </article>
+
+          <article
+            class="daily-operation-card daily-operation-card--ocupacion"
+            aria-label="Ocupación del día"
+          >
+            <div class="row items-center no-wrap">
+              <q-icon name="hotel" color="indigo-6" size="18px" class="q-mr-xs" />
+              <span class="daily-operation-card__label">Ocupación</span>
+              <q-space />
+              <span class="ocupacion-count">{{ ocupacionCount }}</span>
+            </div>
           </article>
         </div>
       </section>
@@ -900,6 +911,14 @@ export default defineComponent({
     const operationDay = ref('today')
     const operationExpanded = reactive({ checkin: false, checkout: false })
 
+    const coincideTipoOperacion = (row, tipoOperacion) => {
+      const tipo = memoNorm(row.tipo)
+      if (tipoOperacion === 'in house') {
+        return tipo.includes('in house') || tipo.includes('in-house') || tipo.includes('inhouse')
+      }
+      return tipo.includes(tipoOperacion)
+    }
+
     const casitasDeOperacionSeleccionada = (tipoOperacion) => {
       const fechaSeleccionada = new Date(now.value)
       if (operationDay.value === 'tomorrow') {
@@ -910,13 +929,15 @@ export default defineComponent({
       const casitas = memoRows.value
         .filter((row) => {
           const fecha = memoParseFecha(row.fecha)
-          return fecha.month === month && fecha.day === day && memoNorm(row.tipo).includes(tipoOperacion)
+          return fecha.month === month && fecha.day === day && coincideTipoOperacion(row, tipoOperacion)
         })
         .map((row) => String(row.casita == null ? '' : row.casita).match(/\d+/)?.[0] || '')
         .filter(Boolean)
 
       return [...new Set(casitas)].sort((a, b) => Number(a) - Number(b))
     }
+
+    const ocupacionCount = computed(() => casitasDeOperacionSeleccionada('in house').length)
 
     const operacionesHoy = computed(() => [
       {
@@ -1328,6 +1349,7 @@ export default defineComponent({
       avisosLabel,
       avisosOcultos,
       operacionesHoy,
+      ocupacionCount,
       operationDay,
       operationExpanded,
       casas,
@@ -1432,6 +1454,19 @@ export default defineComponent({
   background: rgba(244, 67, 54, 0.06);
 }
 
+.daily-operation-card--ocupacion {
+  grid-column: 1 / -1;
+  border-color: rgba(63, 81, 181, 0.18);
+  background: rgba(63, 81, 181, 0.07);
+}
+
+.ocupacion-count {
+  color: #3949ab;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
 .daily-operation-card__label {
   overflow: hidden;
   font-size: 0.78rem;
@@ -1496,6 +1531,14 @@ export default defineComponent({
 
 :global(.body--dark) .daily-operation-card--checkout {
   background: rgba(244, 67, 54, 0.11);
+}
+
+:global(.body--dark) .daily-operation-card--ocupacion {
+  background: rgba(92, 107, 192, 0.16);
+}
+
+:global(.body--dark) .ocupacion-count {
+  color: #c5cae9;
 }
 
 :global(.body--dark) .daily-operation-number {

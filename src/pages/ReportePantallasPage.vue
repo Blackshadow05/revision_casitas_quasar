@@ -4,7 +4,7 @@
       <q-btn flat round dense icon="arrow_back" color="grey-8" class="q-mr-sm" @click="goBack" />
       <div>
         <div class="text-h5 text-weight-bold">Revisión de pantallas</div>
-        <div class="text-caption text-grey-6">Reporta el estado o registra un movimiento entre casitas</div>
+        <div class="text-caption text-grey-6">Elige un tipo de registro para continuar</div>
       </div>
     </div>
 
@@ -13,54 +13,42 @@
     </q-banner>
 
     <q-form class="form-card" @submit.prevent="saveReport">
-      <label class="field-label">Usuario</label>
-      <q-input
-        :model-value="nombreUsuario"
-        outlined
-        dense
-        readonly
-        class="q-mb-md"
-        bg-color="grey-1"
-      >
-        <template #prepend>
-          <q-icon name="person" color="grey-6" />
-        </template>
-      </q-input>
-
-      <label class="field-label">Fecha y hora (Costa Rica)</label>
-      <q-input
-        :model-value="fechaHoraDisplay"
-        outlined
-        dense
-        readonly
-        class="q-mb-md"
-        bg-color="grey-1"
-      >
-        <template #prepend>
-          <q-icon name="schedule" color="grey-6" />
-        </template>
-      </q-input>
-
-      <label class="field-label">Tipo de registro *</label>
-      <div class="tipo-grid q-mb-md">
-        <q-btn
-          v-for="opcion in tipoOptions"
-          :key="opcion.value"
-          unelevated
-          no-caps
-          class="tipo-option-btn"
-          :class="{ 'tipo-option-btn--active': tipo === opcion.value }"
-          :color="tipo === opcion.value ? 'primary' : 'grey-2'"
-          :text-color="tipo === opcion.value ? 'white' : 'grey-9'"
-          :icon="opcion.icon"
-          :label="opcion.label"
-          type="button"
-          @click="tipo = opcion.value"
-        />
+      <div class="meta-row">
+        <div class="meta-item">
+          <q-icon name="person" size="16px" color="grey-6" />
+          <div>
+            <div class="meta-label">Usuario</div>
+            <div class="meta-value">{{ nombreUsuario || '—' }}</div>
+          </div>
+        </div>
+        <div class="meta-item">
+          <q-icon name="schedule" size="16px" color="grey-6" />
+          <div>
+            <div class="meta-label">Fecha y hora</div>
+            <div class="meta-value">{{ fechaHoraDisplay }}</div>
+          </div>
+        </div>
       </div>
 
-      <template v-if="tipo === 'reporte'">
-        <label class="field-label">Número de casita *</label>
+      <section class="form-section">
+        <h2 class="section-title">Tipo de registro</h2>
+        <div class="tipo-grid">
+          <button
+            v-for="opcion in tipoOptions"
+            :key="opcion.value"
+            type="button"
+            class="tipo-card"
+            :class="{ 'tipo-card--active': tipo === opcion.value }"
+            @click="selectTipo(opcion.value)"
+          >
+            <q-icon :name="opcion.icon" size="22px" />
+            <span>{{ opcion.label }}</span>
+          </button>
+        </div>
+      </section>
+
+      <section v-if="esReporte" class="form-section">
+        <h2 class="section-title">Casita</h2>
         <q-select
           v-model="numeroCasita"
           :options="casitaOptions"
@@ -68,7 +56,6 @@
           dense
           emit-value
           map-options
-          class="q-mb-md"
           placeholder="Selecciona 1 a 50"
           :rules="[val => !!val || 'Selecciona una casita']"
           lazy-rules
@@ -77,173 +64,182 @@
             <q-icon name="home" color="grey-6" />
           </template>
         </q-select>
+      </section>
 
-        <label class="field-label">Fotos de pantallas (máx. 3) *</label>
-        <div class="text-caption text-grey-6 q-mb-sm">
-          Por cada foto indica ubicación y estado: defectuosa, en buen estado o no hay pantalla.
+      <section v-if="esReporte" class="form-section">
+        <div class="section-title-row">
+          <h2 class="section-title">Fotos de pantallas</h2>
+          <span class="section-hint">Máx. 3</span>
         </div>
-      </template>
-
-      <template v-else>
-        <label class="field-label">De qué casita se mueve *</label>
-        <q-select
-          v-model="origenUbicacion"
-          :options="ubicacionMovimientoOptions"
-          outlined
-          dense
-          emit-value
-          map-options
-          class="q-mb-md"
-          placeholder="Casita, bodega o casa verde"
-          :rules="[val => !!val || 'Selecciona el origen']"
-          lazy-rules
-        >
-          <template #prepend>
-            <q-icon name="logout" color="grey-6" />
-          </template>
-        </q-select>
-
-        <label v-if="origenRequiereHabitacion" class="field-label">De qué habitación *</label>
-        <q-select
-          v-if="origenRequiereHabitacion"
-          v-model="origenHabitacion"
-          :options="habitacionOptions"
-          outlined
-          dense
-          emit-value
-          map-options
-          class="q-mb-md"
-          placeholder="Living, Queen o King"
-          :rules="[val => !!val || 'Selecciona la habitación de origen']"
-          lazy-rules
-        >
-          <template #prepend>
-            <q-icon name="bed" color="grey-6" />
-          </template>
-        </q-select>
-
-        <label class="field-label">Hacia qué casita se mueve *</label>
-        <q-select
-          v-model="destinoUbicacion"
-          :options="ubicacionMovimientoOptions"
-          outlined
-          dense
-          emit-value
-          map-options
-          class="q-mb-md"
-          placeholder="Casita, bodega o casa verde"
-          :rules="[val => !!val || 'Selecciona el destino']"
-          lazy-rules
-        >
-          <template #prepend>
-            <q-icon name="login" color="grey-6" />
-          </template>
-        </q-select>
-
-        <label v-if="destinoRequiereHabitacion" class="field-label">A qué habitación *</label>
-        <q-select
-          v-if="destinoRequiereHabitacion"
-          v-model="destinoHabitacion"
-          :options="habitacionOptions"
-          outlined
-          dense
-          emit-value
-          map-options
-          class="q-mb-md"
-          placeholder="Living, Queen o King"
-          :rules="[val => !!val || 'Selecciona la habitación de destino']"
-          lazy-rules
-        >
-          <template #prepend>
-            <q-icon name="weekend" color="grey-6" />
-          </template>
-        </q-select>
-      </template>
-
-      <div v-if="tipo === 'reporte'" class="photos-grid q-mb-md">
-        <div
-          v-for="(photo, idx) in fotos"
-          :key="photo.id"
-          class="photo-card"
-        >
-          <div class="photo-preview">
-            <q-img :src="photo.preview" fit="cover" class="preview-img" />
-            <q-btn
-              round
-              flat
-              dense
-              icon="close"
-              size="xs"
-              color="white"
-              class="remove-photo-btn"
-              @click="removePhoto(idx)"
-            />
-            <div
-              class="photo-estado-bar"
-              :class="estadoClass(photo.estado)"
-            />
-          </div>
-          <div class="photo-ubicacion-chip">{{ photo.ubicacion }}</div>
+        <p class="section-copy">Indica ubicación y estado en cada foto.</p>
+        <div class="photos-grid">
           <div
-            class="photo-estado-chip"
-            :class="estadoClass(photo.estado)"
+            v-for="(photo, idx) in fotos"
+            :key="photo.id"
+            class="photo-card"
           >
-            {{ photo.estado }}
+            <div class="photo-preview">
+              <q-img :src="photo.preview" fit="cover" class="preview-img" />
+              <q-btn
+                round
+                flat
+                dense
+                icon="close"
+                size="xs"
+                color="white"
+                class="remove-photo-btn"
+                @click="removePhoto(idx)"
+              />
+              <div
+                class="photo-estado-bar"
+                :class="estadoClass(photo.estado)"
+              />
+            </div>
+            <div class="photo-ubicacion-chip">{{ photo.ubicacion }}</div>
+            <div
+              class="photo-estado-chip"
+              :class="estadoClass(photo.estado)"
+            >
+              {{ photo.estado }}
+            </div>
           </div>
+
+          <button
+            v-if="fotos.length < 3"
+            type="button"
+            class="add-photo-btn"
+            @click="openPhotoSheet"
+          >
+            <q-icon name="add_a_photo" size="26px" color="grey-5" />
+            <span class="add-photo-text">Tomar foto</span>
+          </button>
+        </div>
+      </section>
+
+      <section v-if="esMovimiento" class="form-section">
+        <h2 class="section-title">Trayecto</h2>
+        <div class="move-block">
+          <div class="move-kicker">Sale de</div>
+          <q-select
+            v-model="origenUbicacion"
+            :options="ubicacionMovimientoOptions"
+            outlined
+            dense
+            emit-value
+            map-options
+            class="q-mb-sm"
+            placeholder="Casita, bodega o casa verde"
+            :rules="[val => !!val || 'Selecciona el origen']"
+            lazy-rules
+          >
+            <template #prepend>
+              <q-icon name="logout" color="grey-6" />
+            </template>
+          </q-select>
+          <q-select
+            v-if="origenRequiereHabitacion"
+            v-model="origenHabitacion"
+            :options="habitacionOptions"
+            outlined
+            dense
+            emit-value
+            map-options
+            placeholder="Habitación"
+            :rules="[val => !!val || 'Selecciona la habitación de origen']"
+            lazy-rules
+          >
+            <template #prepend>
+              <q-icon name="bed" color="grey-6" />
+            </template>
+          </q-select>
         </div>
 
-        <div
-          v-if="fotos.length < 3"
-          class="add-photo-btn"
-          @click="openPhotoSheet"
-        >
-          <q-icon name="add_a_photo" size="28px" color="grey-5" />
-          <span class="add-photo-text">Agregar foto</span>
+        <div class="move-divider">
+          <q-icon name="arrow_downward" color="primary" size="20px" />
         </div>
-      </div>
 
-      <label class="field-label">Notas</label>
-      <q-input
-        v-model="notas"
-        type="textarea"
-        outlined
-        dense
-        autogrow
-        :input-style="{ minHeight: '72px' }"
-        :placeholder="tipo === 'movimiento' ? 'Detalle del movimiento (opcional)' : 'Nota general de la revisión (opcional)'"
-        class="q-mb-md"
-      />
+        <div class="move-block">
+          <div class="move-kicker">Llega a</div>
+          <q-select
+            v-model="destinoUbicacion"
+            :options="ubicacionMovimientoOptions"
+            outlined
+            dense
+            emit-value
+            map-options
+            class="q-mb-sm"
+            placeholder="Casita, bodega o casa verde"
+            :rules="[val => !!val || 'Selecciona el destino']"
+            lazy-rules
+          >
+            <template #prepend>
+              <q-icon name="login" color="grey-6" />
+            </template>
+          </q-select>
+          <q-select
+            v-if="destinoRequiereHabitacion"
+            v-model="destinoHabitacion"
+            :options="habitacionOptions"
+            outlined
+            dense
+            emit-value
+            map-options
+            placeholder="Habitación"
+            :rules="[val => !!val || 'Selecciona la habitación de destino']"
+            lazy-rules
+          >
+            <template #prepend>
+              <q-icon name="weekend" color="grey-6" />
+            </template>
+          </q-select>
+        </div>
+      </section>
 
-      <q-btn
-        type="submit"
-        unelevated
-        rounded
-        color="primary"
-        class="full-width save-btn"
-        :label="tipo === 'movimiento' ? 'Guardar movimiento' : 'Guardar reporte'"
-        icon="save"
-        :loading="saving"
-        :disable="!canSubmit"
-      />
+      <section v-if="tipo" class="form-section form-section--last">
+        <h2 class="section-title">Notas</h2>
+        <q-input
+          v-model="notas"
+          type="textarea"
+          outlined
+          dense
+          autogrow
+          :input-style="{ minHeight: '64px' }"
+          :placeholder="esMovimiento ? 'Detalle del movimiento (opcional)' : 'Nota general (opcional)'"
+          class="q-mb-md"
+        />
+        <q-btn
+          type="submit"
+          unelevated
+          rounded
+          color="primary"
+          class="full-width save-btn"
+          :label="esMovimiento ? 'Guardar movimiento' : 'Guardar reporte'"
+          icon="save"
+          :loading="saving"
+          :disable="!canSubmit"
+        />
+      </section>
     </q-form>
 
-    <input
-      ref="fileInputCamera"
-      type="file"
-      accept="image/*"
-      capture="environment"
-      style="display:none"
-      @change="onFileSelected"
-    />
-    <input
-      ref="fileInputGallery"
-      type="file"
-      accept="image/*"
-      style="display:none"
-      @change="onFileSelected"
-    />
+    <template v-if="esReporte">
+      <input
+        ref="fileInputCamera"
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style="display:none"
+        @change="onFileSelected"
+      />
+      <input
+        ref="fileInputGallery"
+        type="file"
+        accept="image/*"
+        style="display:none"
+        @change="onFileSelected"
+      />
+    </template>
 
-    <q-dialog v-model="photoSheetOpen" position="bottom">
+    <q-dialog v-if="esReporte" v-model="photoSheetOpen" position="bottom">
       <q-card class="photo-sheet">
         <q-card-section class="q-pb-none">
           <div class="text-subtitle1 text-weight-bold">Agregar foto</div>
@@ -271,7 +267,7 @@
       </q-card>
     </q-dialog>
 
-    <q-dialog v-model="photoMetaDialogOpen" persistent position="bottom">
+    <q-dialog v-if="esReporte" v-model="photoMetaDialogOpen" persistent position="bottom">
       <q-card class="ubicacion-dialog">
         <q-toolbar class="ubicacion-toolbar">
           <q-btn flat round dense icon="close" color="grey-7" @click="cancelPendingPhoto" />
@@ -375,7 +371,7 @@ export default defineComponent({
     const router = useRouter()
     const authStore = useAuthStore()
 
-    const tipo = ref(TIPO_REPORTE)
+    const tipo = ref(null)
     const numeroCasita = ref(null)
     const origenUbicacion = ref(null)
     const origenHabitacion = ref(null)
@@ -407,6 +403,18 @@ export default defineComponent({
 
     const origenRequiereHabitacion = computed(() => isCasitaUbicacion(origenUbicacion.value))
     const destinoRequiereHabitacion = computed(() => isCasitaUbicacion(destinoUbicacion.value))
+    const esReporte = computed(() => tipo.value === TIPO_REPORTE)
+    const esMovimiento = computed(() => tipo.value === TIPO_MOVIMIENTO)
+
+    function selectTipo (value) {
+      if (tipo.value === value) return
+      tipo.value = value
+      photoSheetOpen.value = false
+      photoMetaDialogOpen.value = false
+      if (value !== TIPO_REPORTE) {
+        cancelPendingPhoto()
+      }
+    }
 
     function estadoClass (estado) {
       const value = String(estado || '').trim().toLowerCase()
@@ -453,7 +461,7 @@ export default defineComponent({
       if (!authStore.isLoggedIn || !authStore.canAdd) return false
       if (!nombreUsuario.value) return false
 
-      if (tipo.value === TIPO_MOVIMIENTO) {
+      if (esMovimiento.value) {
         if (!origenUbicacion.value || !destinoUbicacion.value) return false
         if (origenRequiereHabitacion.value && !origenHabitacion.value) return false
         if (destinoRequiereHabitacion.value && !destinoHabitacion.value) return false
@@ -462,6 +470,7 @@ export default defineComponent({
         return origenKey !== destinoKey
       }
 
+      if (!esReporte.value) return false
       if (!numeroCasita.value) return false
       if (fotos.value.length === 0 || fotos.value.length > 3) return false
       return fotos.value.every(f => f.file && f.ubicacion && f.estado)
@@ -625,6 +634,7 @@ export default defineComponent({
     }
 
     function openPhotoSheet () {
+      if (!esReporte.value) return
       if (fotos.value.length >= 3) {
         notify({ type: 'warning', message: 'Máximo 3 fotos permitidas' })
         return
@@ -787,7 +797,7 @@ export default defineComponent({
       if (!canSubmit.value) {
         notify({
           type: 'warning',
-          message: tipo.value === TIPO_MOVIMIENTO
+          message: esMovimiento.value
             ? 'Completa origen, habitación y destino del movimiento'
             : 'Completa casita, fotos, ubicaciones y estados'
         })
@@ -796,7 +806,7 @@ export default defineComponent({
 
       saving.value = true
       try {
-        if (tipo.value === TIPO_MOVIMIENTO) {
+        if (esMovimiento.value) {
           await saveMovimiento()
           return
         }
@@ -847,7 +857,7 @@ export default defineComponent({
         console.error('Error saving reporte pantallas:', err)
         notify({
           type: 'negative',
-          message: tipo.value === TIPO_MOVIMIENTO ? 'Error al guardar el movimiento' : 'Error al guardar el reporte',
+          message: esMovimiento.value ? 'Error al guardar el movimiento' : 'Error al guardar el reporte',
           caption: err.message
         })
       } finally {
@@ -881,6 +891,9 @@ export default defineComponent({
       fechaHoraDisplay,
       tipo,
       tipoOptions,
+      esReporte,
+      esMovimiento,
+      selectTipo,
       numeroCasita,
       origenUbicacion,
       origenHabitacion,
@@ -922,7 +935,7 @@ export default defineComponent({
 
 <style scoped>
 .reporte-pantallas-page {
-  max-width: 600px;
+  max-width: 560px;
   margin: 0 auto;
 }
 
@@ -934,18 +947,78 @@ export default defineComponent({
 
 .form-card {
   background: white;
-  border-radius: 16px;
-  padding: 16px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border-radius: 20px;
+  padding: 18px 16px 20px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
   border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
-.field-label {
-  display: block;
+.meta-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.meta-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: #f7f7f8;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.meta-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #9e9e9e;
+  line-height: 1.2;
+}
+
+.meta-value {
   font-size: 13px;
   font-weight: 600;
   color: #424242;
-  margin-bottom: 6px;
+  line-height: 1.3;
+  margin-top: 2px;
+}
+
+.form-section {
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.form-section--last {
+  padding-bottom: 0;
+}
+
+.section-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.section-title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #212121;
+  letter-spacing: 0.02em;
+}
+
+.section-hint {
+  font-size: 11px;
+  font-weight: 600;
+  color: #9e9e9e;
+}
+
+.section-copy {
+  margin: -4px 0 12px;
+  font-size: 12px;
+  color: #757575;
+  line-height: 1.4;
 }
 
 .tipo-grid {
@@ -954,14 +1027,49 @@ export default defineComponent({
   gap: 8px;
 }
 
-.tipo-option-btn {
-  height: 48px;
-  border-radius: 12px;
+.tipo-card {
+  appearance: none;
+  font-family: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 76px;
+  border: 1px solid #ececec;
+  border-radius: 14px;
+  background: #fafafa;
+  color: #616161;
+  font-size: 13px;
   font-weight: 600;
+  cursor: pointer;
 }
 
-.tipo-option-btn--active {
-  box-shadow: 0 4px 12px rgba(211, 47, 47, 0.22);
+.tipo-card--active {
+  background: #fff5f5;
+  border-color: #e57373;
+  color: #c62828;
+}
+
+.move-block {
+  background: #f7f7f8;
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.move-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  color: #757575;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.move-divider {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
 }
 
 .photos-grid {
@@ -1046,9 +1154,11 @@ export default defineComponent({
 }
 
 .add-photo-btn {
+  appearance: none;
+  font-family: inherit;
   min-height: 96px;
   aspect-ratio: 1;
-  border: 1.5px dashed #cfcfcf;
+  border: 1.5px dashed #d6d6d6;
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -1120,9 +1230,27 @@ export default defineComponent({
   border-color: rgba(255, 255, 255, 0.06);
 }
 
-.body--dark .field-label,
+.body--dark .meta-item,
+.body--dark .move-block {
+  background: #2a2a2a;
+}
+
+.body--dark .section-title,
+.body--dark .meta-value,
 .body--dark .photo-ubicacion-chip {
   color: #e0e0e0;
+}
+
+.body--dark .tipo-card {
+  background: #2a2a2a;
+  border-color: #3a3a3a;
+  color: #e0e0e0;
+}
+
+.body--dark .tipo-card--active {
+  background: rgba(198, 40, 40, 0.16);
+  border-color: #e57373;
+  color: #ef9a9a;
 }
 
 .body--dark .add-photo-btn {

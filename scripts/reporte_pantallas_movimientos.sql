@@ -23,10 +23,14 @@ ALTER TABLE public.reporte_pantallas
   ADD COLUMN IF NOT EXISTS destino_habitacion text;
 
 ALTER TABLE public.reporte_pantallas
+  DROP CONSTRAINT IF EXISTS reporte_pantallas_numero_casita_check;
+
+ALTER TABLE public.reporte_pantallas
   ALTER COLUMN numero_casita DROP NOT NULL;
 
 ALTER TABLE public.reporte_pantallas
-  ALTER COLUMN fotos SET DEFAULT '[]';
+  ADD CONSTRAINT reporte_pantallas_numero_casita_check
+  CHECK (numero_casita IS NULL OR (numero_casita >= 1 AND numero_casita <= 50));
 
 CREATE INDEX IF NOT EXISTS reporte_pantallas_tipo_idx
   ON public.reporte_pantallas (tipo);
@@ -86,6 +90,7 @@ CREATE OR REPLACE FUNCTION public.ajustar_inventario_pantalla(
 )
 RETURNS void
 LANGUAGE plpgsql
+SET search_path = public
 AS $$
 DECLARE
   v_hab text := COALESCE(p_habitacion, '');
@@ -120,6 +125,7 @@ CREATE OR REPLACE FUNCTION public.registrar_movimiento_pantalla(
 )
 RETURNS public.reporte_pantallas
 LANGUAGE plpgsql
+SET search_path = public
 AS $$
 DECLARE
   v_row public.reporte_pantallas;

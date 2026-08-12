@@ -376,6 +376,7 @@ function drawCasitaBlock (doc, reporte, images, rect) {
 export async function generateReportePantallasPdf (reportes) {
   const items = (Array.isArray(reportes) ? reportes : [reportes])
     .filter(Boolean)
+    .filter((reporte) => String(reporte.tipo || 'reporte') !== 'movimiento')
     .slice()
     .sort((a, b) => Number(a.numero_casita || 0) - Number(b.numero_casita || 0))
 

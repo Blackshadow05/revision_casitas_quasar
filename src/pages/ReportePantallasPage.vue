@@ -3,8 +3,8 @@
     <div class="page-header q-mb-md">
       <q-btn flat round dense icon="arrow_back" color="grey-8" class="q-mr-sm" @click="goBack" />
       <div>
-        <div class="text-h5 text-weight-bold">Reporte de pantallas</div>
-        <div class="text-caption text-grey-6">Registra pantallas dañadas por casita</div>
+        <div class="text-h5 text-weight-bold">Revisión de pantallas</div>
+        <div class="text-caption text-grey-6">Elige un tipo de registro para continuar</div>
       </div>
     </div>
 
@@ -13,141 +13,235 @@
     </q-banner>
 
     <q-form class="form-card" @submit.prevent="saveReport">
-      <label class="field-label">Usuario</label>
-      <q-input
-        :model-value="nombreUsuario"
-        outlined
-        dense
-        readonly
-        class="q-mb-md"
-        bg-color="grey-1"
-      >
-        <template #prepend>
-          <q-icon name="person" color="grey-6" />
-        </template>
-      </q-input>
-
-      <label class="field-label">Fecha y hora (Costa Rica)</label>
-      <q-input
-        :model-value="fechaHoraDisplay"
-        outlined
-        dense
-        readonly
-        class="q-mb-md"
-        bg-color="grey-1"
-      >
-        <template #prepend>
-          <q-icon name="schedule" color="grey-6" />
-        </template>
-      </q-input>
-
-      <label class="field-label">Número de casita *</label>
-      <q-select
-        v-model="numeroCasita"
-        :options="casitaOptions"
-        outlined
-        dense
-        emit-value
-        map-options
-        class="q-mb-md"
-        placeholder="Selecciona 1 a 50"
-        :rules="[val => !!val || 'Selecciona una casita']"
-        lazy-rules
-      >
-        <template #prepend>
-          <q-icon name="home" color="grey-6" />
-        </template>
-      </q-select>
-
-      <label class="field-label">Fotos de pantallas (máx. 3) *</label>
-      <div class="text-caption text-grey-6 q-mb-sm">
-        Por cada foto indica ubicación y estado: defectuosa, en buen estado o no hay pantalla.
+      <div class="meta-row">
+        <div class="meta-item">
+          <q-icon name="person" size="16px" color="grey-6" />
+          <div>
+            <div class="meta-label">Usuario</div>
+            <div class="meta-value">{{ nombreUsuario || '—' }}</div>
+          </div>
+        </div>
+        <div class="meta-item">
+          <q-icon name="schedule" size="16px" color="grey-6" />
+          <div>
+            <div class="meta-label">Fecha y hora</div>
+            <div class="meta-value">{{ fechaHoraDisplay }}</div>
+          </div>
+        </div>
       </div>
 
-      <div class="photos-grid q-mb-md">
-        <div
-          v-for="(photo, idx) in fotos"
-          :key="photo.id"
-          class="photo-card"
-        >
-          <div class="photo-preview">
-            <q-img :src="photo.preview" fit="cover" class="preview-img" />
-            <q-btn
-              round
-              flat
-              dense
-              icon="close"
-              size="xs"
-              color="white"
-              class="remove-photo-btn"
-              @click="removePhoto(idx)"
-            />
-            <div
-              class="photo-estado-bar"
-              :class="estadoClass(photo.estado)"
-            />
-          </div>
-          <div class="photo-ubicacion-chip">{{ photo.ubicacion }}</div>
-          <div
-            class="photo-estado-chip"
-            :class="estadoClass(photo.estado)"
+      <section class="form-section">
+        <h2 class="section-title">Tipo de registro</h2>
+        <div class="tipo-grid">
+          <button
+            v-for="opcion in tipoOptions"
+            :key="opcion.value"
+            type="button"
+            class="tipo-card"
+            :class="{ 'tipo-card--active': tipo === opcion.value }"
+            @click="selectTipo(opcion.value)"
           >
-            {{ photo.estado }}
-          </div>
+            <q-icon :name="opcion.icon" size="22px" />
+            <span>{{ opcion.label }}</span>
+          </button>
         </div>
+      </section>
 
-        <div
-          v-if="fotos.length < 3"
-          class="add-photo-btn"
-          @click="openPhotoSheet"
+      <section v-if="esReporte" class="form-section">
+        <h2 class="section-title">Casita</h2>
+        <q-select
+          v-model="numeroCasita"
+          :options="casitaOptions"
+          outlined
+          dense
+          emit-value
+          map-options
+          placeholder="Selecciona 1 a 50"
+          :rules="[val => !!val || 'Selecciona una casita']"
+          lazy-rules
         >
-          <q-icon name="add_a_photo" size="28px" color="grey-5" />
-          <span class="add-photo-text">Agregar foto</span>
+          <template #prepend>
+            <q-icon name="home" color="grey-6" />
+          </template>
+        </q-select>
+        <div v-if="numeroCasita" class="casita-rooms-hint">{{ habitacionesResumen }}</div>
+      </section>
+
+      <section v-if="esReporte" class="form-section">
+        <div class="section-title-row">
+          <h2 class="section-title">Fotos de pantallas</h2>
+          <span class="section-hint">Máx. {{ maxFotos || 0 }}</span>
         </div>
-      </div>
+        <p v-if="!numeroCasita" class="section-copy">Primero elige la casita para ver sus habitaciones.</p>
+        <p v-else class="section-copy">Indica ubicación y estado en cada foto.</p>
+        <div v-if="numeroCasita" class="photos-grid">
+          <div
+            v-for="(photo, idx) in fotos"
+            :key="photo.id"
+            class="photo-card"
+          >
+            <div class="photo-preview">
+              <q-img :src="photo.preview" fit="cover" class="preview-img" />
+              <q-btn
+                round
+                flat
+                dense
+                icon="close"
+                size="xs"
+                color="white"
+                class="remove-photo-btn"
+                @click="removePhoto(idx)"
+              />
+              <div
+                class="photo-estado-bar"
+                :class="estadoClass(photo.estado)"
+              />
+            </div>
+            <div class="photo-ubicacion-chip">{{ photo.ubicacion }}</div>
+            <div
+              class="photo-estado-chip"
+              :class="estadoClass(photo.estado)"
+            >
+              {{ photo.estado }}
+            </div>
+          </div>
 
-      <label class="field-label">Notas</label>
-      <q-input
-        v-model="notas"
-        type="textarea"
-        outlined
-        dense
-        autogrow
-        :input-style="{ minHeight: '72px' }"
-        placeholder="Nota general de la revisión (opcional)"
-        class="q-mb-md"
-      />
+          <button
+            v-if="canAddPhoto"
+            type="button"
+            class="add-photo-btn"
+            @click="openPhotoSheet"
+          >
+            <q-icon name="add_a_photo" size="26px" color="grey-5" />
+            <span class="add-photo-text">Tomar foto</span>
+          </button>
+        </div>
+      </section>
 
-      <q-btn
-        type="submit"
-        unelevated
-        rounded
-        color="primary"
-        class="full-width save-btn"
-        label="Guardar reporte"
-        icon="save"
-        :loading="saving"
-        :disable="!canSubmit"
-      />
+      <section v-if="esMovimiento" class="form-section">
+        <h2 class="section-title">Trayecto</h2>
+        <div class="move-block">
+          <div class="move-kicker">Sale de</div>
+          <q-select
+            v-model="origenUbicacion"
+            :options="ubicacionMovimientoOptions"
+            outlined
+            dense
+            emit-value
+            map-options
+            class="q-mb-sm"
+            placeholder="Casita, bodega o casa verde"
+            :rules="[val => !!val || 'Selecciona el origen']"
+            lazy-rules
+          >
+            <template #prepend>
+              <q-icon name="logout" color="grey-6" />
+            </template>
+          </q-select>
+          <q-select
+            v-if="origenRequiereHabitacion"
+            v-model="origenHabitacion"
+            :options="origenHabitacionOptions"
+            outlined
+            dense
+            emit-value
+            map-options
+            placeholder="Habitación"
+            :rules="[val => !!val || 'Selecciona la habitación de origen']"
+            lazy-rules
+          >
+            <template #prepend>
+              <q-icon name="bed" color="grey-6" />
+            </template>
+          </q-select>
+        </div>
+
+        <div class="move-divider">
+          <q-icon name="arrow_downward" color="primary" size="20px" />
+        </div>
+
+        <div class="move-block">
+          <div class="move-kicker">Llega a</div>
+          <q-select
+            v-model="destinoUbicacion"
+            :options="ubicacionMovimientoOptions"
+            outlined
+            dense
+            emit-value
+            map-options
+            class="q-mb-sm"
+            placeholder="Casita, bodega o casa verde"
+            :rules="[val => !!val || 'Selecciona el destino']"
+            lazy-rules
+          >
+            <template #prepend>
+              <q-icon name="login" color="grey-6" />
+            </template>
+          </q-select>
+          <q-select
+            v-if="destinoRequiereHabitacion"
+            v-model="destinoHabitacion"
+            :options="destinoHabitacionOptions"
+            outlined
+            dense
+            emit-value
+            map-options
+            placeholder="Habitación"
+            :rules="[val => !!val || 'Selecciona la habitación de destino']"
+            lazy-rules
+          >
+            <template #prepend>
+              <q-icon name="weekend" color="grey-6" />
+            </template>
+          </q-select>
+        </div>
+      </section>
+
+      <section v-if="tipo" class="form-section form-section--last">
+        <h2 class="section-title">Notas</h2>
+        <q-input
+          v-model="notas"
+          type="textarea"
+          outlined
+          dense
+          autogrow
+          :input-style="{ minHeight: '64px' }"
+          :placeholder="esMovimiento ? 'Detalle del movimiento (opcional)' : 'Nota general (opcional)'"
+          class="q-mb-md"
+        />
+        <q-btn
+          type="submit"
+          unelevated
+          rounded
+          color="primary"
+          class="full-width save-btn"
+          :label="esMovimiento ? 'Guardar movimiento' : 'Guardar reporte'"
+          icon="save"
+          :loading="saving"
+          :disable="!canSubmit"
+        />
+      </section>
     </q-form>
 
-    <input
-      ref="fileInputCamera"
-      type="file"
-      accept="image/*"
-      capture="environment"
-      style="display:none"
-      @change="onFileSelected"
-    />
-    <input
-      ref="fileInputGallery"
-      type="file"
-      accept="image/*"
-      style="display:none"
-      @change="onFileSelected"
-    />
+    <template v-if="esReporte">
+      <input
+        ref="fileInputCamera"
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style="display:none"
+        @change="onFileSelected"
+      />
+      <input
+        ref="fileInputGallery"
+        type="file"
+        accept="image/*"
+        style="display:none"
+        @change="onFileSelected"
+      />
+    </template>
 
-    <q-dialog v-model="photoSheetOpen" position="bottom">
+    <q-dialog v-if="esReporte" v-model="photoSheetOpen" position="bottom">
       <q-card class="photo-sheet">
         <q-card-section class="q-pb-none">
           <div class="text-subtitle1 text-weight-bold">Agregar foto</div>
@@ -175,7 +269,7 @@
       </q-card>
     </q-dialog>
 
-    <q-dialog v-model="photoMetaDialogOpen" persistent position="bottom">
+    <q-dialog v-if="esReporte" v-model="photoMetaDialogOpen" persistent position="bottom">
       <q-card class="ubicacion-dialog">
         <q-toolbar class="ubicacion-toolbar">
           <q-btn flat round dense icon="close" color="grey-7" @click="cancelPendingPhoto" />
@@ -195,7 +289,7 @@
             <div class="text-subtitle2 text-weight-medium q-mb-sm">Toca la ubicación para continuar</div>
             <div class="ubicacion-options">
               <q-btn
-                v-for="opcion in ubicacionOptions"
+                v-for="opcion in ubicacionOptionsDisponibles"
                 :key="opcion.value"
                 unelevated
                 no-caps
@@ -254,14 +348,26 @@
 </template>
 
 <script>
-import { computed, defineComponent, onMounted, onUnmounted, ref } from 'vue'
+import { computed, defineComponent, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { notify } from '../utils/notify'
 import { useAuthStore } from '../stores/auth'
 import { supabase } from '../supabase'
 import { CLOUDINARY_CONFIG } from '../cloudinary'
+import {
+  TIPO_MOVIMIENTO,
+  TIPO_REPORTE,
+  aplicarInventarioDesdeReporte,
+  buildCasitaOptions,
+  buildUbicacionOptions,
+  formatHabitacionesResumen,
+  habitacionOptionsForCasita,
+  habitacionesForCasita,
+  isCasitaUbicacion,
+  maxFotosForCasita,
+  registrarMovimientoPantalla
+} from '../utils/pantallasInventario'
 
-const UBICACIONES = ['Living', 'Cuarto Queen', 'Cuarto King']
 const ESTADOS = ['defectuosa', 'en buen estado', 'no hay pantalla']
 
 export default defineComponent({
@@ -270,7 +376,12 @@ export default defineComponent({
     const router = useRouter()
     const authStore = useAuthStore()
 
+    const tipo = ref(null)
     const numeroCasita = ref(null)
+    const origenUbicacion = ref(null)
+    const origenHabitacion = ref(null)
+    const destinoUbicacion = ref(null)
+    const destinoHabitacion = ref(null)
     const notas = ref('')
     const fotos = ref([])
     const saving = ref(false)
@@ -285,13 +396,40 @@ export default defineComponent({
     const ahoraCR = ref(new Date())
     let clockTimer = null
 
-    const casitaOptions = Array.from({ length: 50 }, (_, i) => ({
-      label: `Casita ${i + 1}`,
-      value: i + 1
-    }))
-
-    const ubicacionOptions = UBICACIONES.map(u => ({ label: u, value: u }))
+    const casitaOptions = buildCasitaOptions()
+    const ubicacionMovimientoOptions = buildUbicacionOptions()
     const estadoOptions = ESTADOS.map(e => ({ label: e, value: e }))
+    const tipoOptions = [
+      { label: 'Reporte pantalla', value: TIPO_REPORTE, icon: 'photo_camera' },
+      { label: 'Movimiento pantalla', value: TIPO_MOVIMIENTO, icon: 'swap_horiz' }
+    ]
+
+    const origenRequiereHabitacion = computed(() => isCasitaUbicacion(origenUbicacion.value))
+    const destinoRequiereHabitacion = computed(() => isCasitaUbicacion(destinoUbicacion.value))
+    const esReporte = computed(() => tipo.value === TIPO_REPORTE)
+    const esMovimiento = computed(() => tipo.value === TIPO_MOVIMIENTO)
+    const habitacionesResumen = computed(() => formatHabitacionesResumen(numeroCasita.value))
+    const maxFotos = computed(() => maxFotosForCasita(numeroCasita.value))
+    const origenHabitacionOptions = computed(() => habitacionOptionsForCasita(origenUbicacion.value))
+    const destinoHabitacionOptions = computed(() => habitacionOptionsForCasita(destinoUbicacion.value))
+    const ubicacionOptionsDisponibles = computed(() => {
+      const used = new Set(fotos.value.map(foto => foto.ubicacion))
+      return habitacionOptionsForCasita(numeroCasita.value).filter(opcion => !used.has(opcion.value))
+    })
+    const canAddPhoto = computed(() => {
+      if (!esReporte.value || !numeroCasita.value) return false
+      return fotos.value.length < maxFotos.value
+    })
+
+    function selectTipo (value) {
+      if (tipo.value === value) return
+      tipo.value = value
+      photoSheetOpen.value = false
+      photoMetaDialogOpen.value = false
+      if (value !== TIPO_REPORTE) {
+        cancelPendingPhoto()
+      }
+    }
 
     function estadoClass (estado) {
       const value = String(estado || '').trim().toLowerCase()
@@ -337,9 +475,21 @@ export default defineComponent({
     const canSubmit = computed(() => {
       if (!authStore.isLoggedIn || !authStore.canAdd) return false
       if (!nombreUsuario.value) return false
+
+      if (esMovimiento.value) {
+        if (!origenUbicacion.value || !destinoUbicacion.value) return false
+        if (origenRequiereHabitacion.value && !origenHabitacion.value) return false
+        if (destinoRequiereHabitacion.value && !destinoHabitacion.value) return false
+        const origenKey = `${origenUbicacion.value}|${origenRequiereHabitacion.value ? origenHabitacion.value : ''}`
+        const destinoKey = `${destinoUbicacion.value}|${destinoRequiereHabitacion.value ? destinoHabitacion.value : ''}`
+        return origenKey !== destinoKey
+      }
+
+      if (!esReporte.value) return false
       if (!numeroCasita.value) return false
-      if (fotos.value.length === 0 || fotos.value.length > 3) return false
-      return fotos.value.every(f => f.file && f.ubicacion && f.estado)
+      if (fotos.value.length === 0 || fotos.value.length > maxFotos.value) return false
+      const allowed = new Set(habitacionesForCasita(numeroCasita.value))
+      return fotos.value.every(f => f.file && allowed.has(f.ubicacion) && f.estado)
     })
 
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
@@ -500,8 +650,18 @@ export default defineComponent({
     }
 
     function openPhotoSheet () {
-      if (fotos.value.length >= 3) {
-        notify({ type: 'warning', message: 'Máximo 3 fotos permitidas' })
+      if (!esReporte.value) return
+      if (!numeroCasita.value) {
+        notify({ type: 'warning', message: 'Primero selecciona la casita' })
+        return
+      }
+      if (!canAddPhoto.value) {
+        notify({
+          type: 'warning',
+          message: maxFotos.value === 1
+            ? 'Esta casita solo tiene Living'
+            : `Máximo ${maxFotos.value} fotos para esta casita`
+        })
         return
       }
       photoSheetOpen.value = true
@@ -517,8 +677,13 @@ export default defineComponent({
       const file = e.target.files?.[0]
       if (!file) return
 
-      if (fotos.value.length >= 3) {
-        notify({ type: 'warning', message: 'Máximo 3 fotos permitidas' })
+      if (!canAddPhoto.value) {
+        notify({
+          type: 'warning',
+          message: maxFotos.value === 1
+            ? 'Esta casita solo tiene Living'
+            : `Máximo ${maxFotos.value} fotos para esta casita`
+        })
         e.target.value = ''
         return
       }
@@ -549,8 +714,14 @@ export default defineComponent({
         URL.revokeObjectURL(pendingPhoto.value.preview)
       }
       pendingPhoto.value = photo
-      pendingUbicacion.value = null
-      photoMetaStep.value = 'ubicacion'
+      const remaining = ubicacionOptionsDisponibles.value
+      if (remaining.length === 1) {
+        pendingUbicacion.value = remaining[0].value
+        photoMetaStep.value = 'estado'
+      } else {
+        pendingUbicacion.value = null
+        photoMetaStep.value = 'ubicacion'
+      }
       photoMetaDialogOpen.value = true
     }
 
@@ -567,6 +738,11 @@ export default defineComponent({
     function selectUbicacion (ubicacion) {
       if (!pendingPhoto.value || !ubicacion) {
         notify({ type: 'warning', message: 'Selecciona la ubicación de la pantalla' })
+        return
+      }
+      const allowed = habitacionesForCasita(numeroCasita.value)
+      if (!allowed.includes(ubicacion)) {
+        notify({ type: 'warning', message: 'Esta casita no tiene esa habitación' })
         return
       }
       pendingUbicacion.value = ubicacion
@@ -623,14 +799,90 @@ export default defineComponent({
       return resData.secure_url
     }
 
+    watch(numeroCasita, (value) => {
+      const allowed = new Set(habitacionesForCasita(value))
+      const kept = []
+      for (const foto of fotos.value) {
+        if (allowed.has(foto.ubicacion)) {
+          kept.push(foto)
+        } else if (foto.preview) {
+          URL.revokeObjectURL(foto.preview)
+        }
+      }
+      fotos.value = kept
+    })
+
+    watch(origenUbicacion, (value) => {
+      if (!isCasitaUbicacion(value)) {
+        origenHabitacion.value = null
+        return
+      }
+      const rooms = habitacionesForCasita(value)
+      if (rooms.length === 1) {
+        origenHabitacion.value = rooms[0]
+        return
+      }
+      if (!rooms.includes(origenHabitacion.value)) origenHabitacion.value = null
+    })
+
+    watch(destinoUbicacion, (value) => {
+      if (!isCasitaUbicacion(value)) {
+        destinoHabitacion.value = null
+        return
+      }
+      const rooms = habitacionesForCasita(value)
+      if (rooms.length === 1) {
+        destinoHabitacion.value = rooms[0]
+        return
+      }
+      if (!rooms.includes(destinoHabitacion.value)) destinoHabitacion.value = null
+    })
+
+    async function saveMovimiento () {
+      const origenHab = origenRequiereHabitacion.value ? origenHabitacion.value : null
+      const destinoHab = destinoRequiereHabitacion.value ? destinoHabitacion.value : null
+      const numeroOrigen = isCasitaUbicacion(origenUbicacion.value) ? Number(origenUbicacion.value) : null
+      const numeroDestino = isCasitaUbicacion(destinoUbicacion.value) ? Number(destinoUbicacion.value) : null
+
+      await registrarMovimientoPantalla(supabase, {
+        nombre_usuario: nombreUsuario.value,
+        fecha_hora: formatCostaRica(new Date()),
+        notas: notas.value.trim() || null,
+        numero_casita: numeroOrigen || numeroDestino,
+        origen_ubicacion: String(origenUbicacion.value),
+        origen_habitacion: origenHab,
+        destino_ubicacion: String(destinoUbicacion.value),
+        destino_habitacion: destinoHab
+      })
+
+      notify({ type: 'positive', message: 'Movimiento guardado y inventario actualizado', icon: 'swap_horiz' })
+      origenUbicacion.value = null
+      origenHabitacion.value = null
+      destinoUbicacion.value = null
+      destinoHabitacion.value = null
+      notas.value = ''
+      ahoraCR.value = new Date()
+      router.push({ path: '/reporte-pantallas', query: { vista: 'movimiento' } })
+    }
+
     async function saveReport () {
       if (!canSubmit.value) {
-        notify({ type: 'warning', message: 'Completa casita, fotos, ubicaciones y estados' })
+        notify({
+          type: 'warning',
+          message: esMovimiento.value
+            ? 'Completa origen, habitación y destino del movimiento'
+            : 'Completa casita, fotos, ubicaciones y estados'
+        })
         return
       }
 
       saving.value = true
       try {
+        if (esMovimiento.value) {
+          await saveMovimiento()
+          return
+        }
+
         const fotosPayload = []
         for (let i = 0; i < fotos.value.length; i++) {
           const photo = fotos.value[i]
@@ -647,16 +899,29 @@ export default defineComponent({
           fecha_hora: formatCostaRica(new Date()),
           numero_casita: numeroCasita.value,
           notas: notas.value.trim() || null,
-          fotos: fotosPayload
+          fotos: fotosPayload,
+          tipo: TIPO_REPORTE
         }
 
-        const { error } = await supabase
+        let { error } = await supabase
           .from('reporte_pantallas')
           .insert(record)
 
+        if (error && String(error.message || '').toLowerCase().includes('tipo')) {
+          const { tipo: _tipo, ...legacyRecord } = record
+          const retry = await supabase.from('reporte_pantallas').insert(legacyRecord)
+          error = retry.error
+        }
+
         if (error) throw error
 
-        notify({ type: 'positive', message: 'Reporte guardado correctamente', icon: 'check_circle' })
+        try {
+          await aplicarInventarioDesdeReporte(supabase, numeroCasita.value, fotosPayload)
+        } catch (inventoryError) {
+          console.error('Reporte guardado, pero el inventario no se actualizó', inventoryError)
+        }
+
+        notify({ type: 'positive', message: 'Reporte guardado e inventario actualizado', icon: 'check_circle' })
 
         fotos.value.forEach(f => {
           if (f.preview) URL.revokeObjectURL(f.preview)
@@ -665,10 +930,14 @@ export default defineComponent({
         numeroCasita.value = null
         notas.value = ''
         ahoraCR.value = new Date()
-        router.push('/reporte-pantallas')
+        router.push({ path: '/reporte-pantallas', query: { vista: 'reporte' } })
       } catch (err) {
         console.error('Error saving reporte pantallas:', err)
-        notify({ type: 'negative', message: 'Error al guardar el reporte', caption: err.message })
+        notify({
+          type: 'negative',
+          message: esMovimiento.value ? 'Error al guardar el movimiento' : 'Error al guardar el reporte',
+          caption: err.message
+        })
       } finally {
         saving.value = false
       }
@@ -698,10 +967,27 @@ export default defineComponent({
       authStore,
       nombreUsuario,
       fechaHoraDisplay,
+      tipo,
+      tipoOptions,
+      esReporte,
+      esMovimiento,
+      selectTipo,
       numeroCasita,
+      origenUbicacion,
+      origenHabitacion,
+      destinoUbicacion,
+      destinoHabitacion,
+      origenRequiereHabitacion,
+      destinoRequiereHabitacion,
+      origenHabitacionOptions,
+      destinoHabitacionOptions,
+      habitacionesResumen,
+      maxFotos,
+      canAddPhoto,
       notas,
       casitaOptions,
-      ubicacionOptions,
+      ubicacionMovimientoOptions,
+      ubicacionOptionsDisponibles,
       estadoOptions,
       estadoClass,
       fotos,
@@ -731,7 +1017,7 @@ export default defineComponent({
 
 <style scoped>
 .reporte-pantallas-page {
-  max-width: 600px;
+  max-width: 560px;
   margin: 0 auto;
 }
 
@@ -743,18 +1029,136 @@ export default defineComponent({
 
 .form-card {
   background: white;
-  border-radius: 16px;
-  padding: 16px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border-radius: 20px;
+  padding: 18px 16px 20px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
   border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
-.field-label {
-  display: block;
+.meta-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.meta-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: #f7f7f8;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.meta-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #9e9e9e;
+  line-height: 1.2;
+}
+
+.meta-value {
   font-size: 13px;
   font-weight: 600;
   color: #424242;
-  margin-bottom: 6px;
+  line-height: 1.3;
+  margin-top: 2px;
+}
+
+.form-section {
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.form-section--last {
+  padding-bottom: 0;
+}
+
+.section-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.section-title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #212121;
+  letter-spacing: 0.02em;
+}
+
+.section-hint {
+  font-size: 11px;
+  font-weight: 600;
+  color: #9e9e9e;
+}
+
+.section-copy {
+  margin: -4px 0 12px;
+  font-size: 12px;
+  color: #757575;
+  line-height: 1.4;
+}
+
+.casita-rooms-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #616161;
+}
+
+.tipo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.tipo-card {
+  appearance: none;
+  font-family: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 76px;
+  border: 1px solid #ececec;
+  border-radius: 14px;
+  background: #fafafa;
+  color: #616161;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tipo-card--active {
+  background: #fff5f5;
+  border-color: #e57373;
+  color: #c62828;
+}
+
+.move-block {
+  background: #f7f7f8;
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.move-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  color: #757575;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.move-divider {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
 }
 
 .photos-grid {
@@ -839,9 +1243,11 @@ export default defineComponent({
 }
 
 .add-photo-btn {
+  appearance: none;
+  font-family: inherit;
   min-height: 96px;
   aspect-ratio: 1;
-  border: 1.5px dashed #cfcfcf;
+  border: 1.5px dashed #d6d6d6;
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -913,9 +1319,28 @@ export default defineComponent({
   border-color: rgba(255, 255, 255, 0.06);
 }
 
-.body--dark .field-label,
-.body--dark .photo-ubicacion-chip {
+.body--dark .meta-item,
+.body--dark .move-block {
+  background: #2a2a2a;
+}
+
+.body--dark .section-title,
+.body--dark .meta-value,
+.body--dark .photo-ubicacion-chip,
+.body--dark .casita-rooms-hint {
   color: #e0e0e0;
+}
+
+.body--dark .tipo-card {
+  background: #2a2a2a;
+  border-color: #3a3a3a;
+  color: #e0e0e0;
+}
+
+.body--dark .tipo-card--active {
+  background: rgba(198, 40, 40, 0.16);
+  border-color: #e57373;
+  color: #ef9a9a;
 }
 
 .body--dark .add-photo-btn {

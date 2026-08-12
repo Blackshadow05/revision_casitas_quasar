@@ -43,6 +43,8 @@
           <div class="vista-card-title">Movimientos</div>
           <div class="vista-card-copy">De qué casita salió y a cuál llegó</div>
         </div>
+        <div class="vista-card-count">{{ movimientosCount }}</div>
+      </button>
       <button
         type="button"
         class="vista-card vista-card--inv"
@@ -1278,6 +1280,22 @@ export default defineComponent({
 .inv-total {
   text-align: right;
   min-width: 52px;
+}
+
+@media (max-width: 560px) {
+  .inv-card {
+    grid-template-columns: 56px 1fr;
+  }
+
+  .inv-total {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: baseline;
+    text-align: left;
+    padding-top: 4px;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+  }
 }
 
 .inv-card--extra .inv-casita {

@@ -236,6 +236,61 @@ export function inventoryFromMovements (reports, ubicacion) {
   }]
 }
 
+export function buildInventarioCasitas (rows, reports = []) {
+  const casitas = Array.from({ length: 50 }, (_, i) => {
+    const key = String(i + 1)
+    const rooms = inventoryForUbicacion(rows, key, reports)
+    const total = rooms.reduce((sum, room) => sum + (Number(room.cantidad) || 0), 0)
+    return {
+      key,
+      numero: i + 1,
+      label: `Casita ${i + 1}`,
+      rooms,
+      total,
+      extra: false
+    }
+  })
+
+  const extras = UBICACIONES_EXTRA.map((item) => {
+    const rooms = inventoryForUbicacion(rows, item.value, reports)
+    const total = rooms.reduce((sum, room) => sum + (Number(room.cantidad) || 0), 0)
+    return {
+      key: item.value,
+      numero: null,
+      label: item.label,
+      rooms,
+      total,
+      extra: true
+    }
+  })
+
+  return [...casitas, ...extras]
+}
+
+export function inventarioToCsv (items) {
+  const header = ['Ubicación', ...HABITACIONES_PANTALLA, 'Total']
+  const lines = [header.join(',')]
+
+  for (const item of items) {
+    const roomsByName = new Map((item.rooms || []).map(room => [room.habitacion, Number(room.cantidad) || 0]))
+    if (item.extra && roomsByName.has('General') && HABITACIONES_PANTALLA.every(name => !roomsByName.has(name))) {
+      lines.push([csvCell(item.label), '', '', '', Number(item.total) || 0].join(','))
+      continue
+    }
+
+    const roomValues = HABITACIONES_PANTALLA.map(name => roomsByName.get(name) || 0)
+    lines.push([csvCell(item.label), ...roomValues, Number(item.total) || 0].join(','))
+  }
+
+  return `\uFEFF${lines.join('\n')}`
+}
+
+function csvCell (value) {
+  const text = String(value ?? '')
+  if (/[",\n]/.test(text)) return `"${text.replace(/"/g, '""')}"`
+  return text
+}
+
 function isMissingRpc (error) {
   const code = String(error?.code || '')
   const message = String(error?.message || '').toLowerCase()

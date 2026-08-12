@@ -43,15 +43,32 @@
           <div class="vista-card-title">Movimientos</div>
           <div class="vista-card-copy">De qué casita salió y a cuál llegó</div>
         </div>
-        <div class="vista-card-count">{{ movimientosCount }}</div>
+      <button
+        type="button"
+        class="vista-card vista-card--inv"
+        :class="{ 'vista-card--active': vistaModo === 'inventario' }"
+        @click="selectVista('inventario')"
+      >
+        <q-icon name="inventory_2" size="26px" />
+        <div class="vista-card-text">
+          <div class="vista-card-title">Inventario</div>
+          <div class="vista-card-copy">Pantallas actuales por casita 1 a 50</div>
+        </div>
+        <div class="vista-card-count">{{ inventarioTotalPantallas }}</div>
       </button>
+    </div>
+
+    <div v-if="errorMsg && !vistaModo" class="empty-state q-pa-md">
+      <q-icon name="error_outline" size="40px" color="red-4" />
+      <div class="q-mt-sm text-body2 text-grey-7">{{ errorMsg }}</div>
+      <q-btn flat dense color="primary" label="Reintentar" class="q-mt-sm" @click="fetchReports" />
     </div>
 
     <div v-if="!vistaModo" class="chooser-empty">
       <q-icon name="touch_app" size="40px" color="grey-4" />
       <div class="chooser-title">Primero elige una opción</div>
       <div class="chooser-copy">
-        Toca <strong>Reportes</strong> para ver fotos y estado, o <strong>Movimientos</strong> para ver traslados de pantallas.
+        Toca <strong>Reportes</strong>, <strong>Movimientos</strong> o <strong>Inventario</strong> para ver la información.
       </div>
     </div>
 
@@ -62,7 +79,7 @@
         outlined
         dense
         clearable
-        :placeholder="esVistaMovimientos ? 'Buscar casita de origen o destino...' : 'Buscar por casita o usuario...'"
+        :placeholder="searchPlaceholder"
         class="q-mb-sm"
         bg-color="white"
       >
@@ -71,7 +88,24 @@
         </template>
       </q-input>
 
-      <div class="filters-toolbar q-mb-md">
+      <div v-if="esVistaInventario" class="inv-toolbar q-mb-md">
+        <div class="inv-toolbar-copy">
+          Casitas 1 a 50 · {{ inventarioTotalPantallas }} pantallas en total
+        </div>
+        <q-btn
+          unelevated
+          rounded
+          no-caps
+          color="primary"
+          icon="download"
+          label="Exportar CSV"
+          :loading="csvLoading"
+          :disable="filteredInventario.length === 0"
+          @click="exportInventarioCsv"
+        />
+      </div>
+
+      <div v-else class="filters-toolbar q-mb-md">
         <q-btn
           outline
           rounded
@@ -188,6 +222,40 @@
         <q-icon name="error_outline" size="48px" color="red-4" />
         <div class="q-mt-sm text-body2 text-grey-7">{{ errorMsg }}</div>
         <q-btn flat dense color="primary" label="Reintentar" class="q-mt-sm" @click="fetchReports" />
+      </div>
+
+      <div v-else-if="esVistaInventario" class="inventory-list">
+        <div
+          v-for="item in filteredInventario"
+          :key="item.key"
+          class="inv-card"
+          :class="{ 'inv-card--empty': item.total === 0, 'inv-card--extra': item.extra }"
+        >
+          <div class="inv-card-head">
+            <div class="inv-casita">{{ item.extra ? item.label : item.numero }}</div>
+            <div class="inv-casita-label">{{ item.extra ? 'Ubicación' : 'Casita' }}</div>
+          </div>
+          <div class="inv-rooms">
+            <div
+              v-for="room in item.rooms"
+              :key="`${item.key}_${room.habitacion}`"
+              class="inv-room"
+              :class="{ 'has-screen': room.cantidad > 0 }"
+            >
+              <span>{{ room.habitacion }}</span>
+              <strong>{{ room.cantidad }}</strong>
+            </div>
+          </div>
+          <div class="inv-total" :class="{ 'has-screen': item.total > 0 }">
+            <span>Total</span>
+            <strong>{{ item.total }}</strong>
+          </div>
+        </div>
+        <div v-if="filteredInventario.length === 0" class="empty-state q-pa-xl">
+          <q-icon name="search_off" size="48px" color="grey-4" />
+          <div class="q-mt-sm text-body1 text-weight-medium text-grey-7">Sin resultados</div>
+          <div class="text-caption text-grey-5">Prueba otro número de casita</div>
+        </div>
       </div>
 
       <div v-else-if="filteredReports.length === 0" class="empty-state q-pa-xl">
@@ -425,9 +493,11 @@ import { useAuthStore } from '../stores/auth'
 import { supabase } from '../supabase'
 import { generateReportePantallasPdf, getCloudinaryUrl } from '../utils/reportePantallasPdf'
 import {
+  buildInventarioCasitas,
   formatMovimientoResumen,
   formatUbicacion,
   inventoryForUbicacion,
+  inventarioToCsv,
   isMovimiento,
   relatedMovements,
   reportInvolvesUbicacion
@@ -458,6 +528,7 @@ export default defineComponent({
     const viewerSourceUrl = ref('')
     const viewerMeta = ref({ casita: null, ubicacion: null, index: 0 })
     const inventarioRows = ref([])
+    const csvLoading = ref(false)
 
     const ordenFechaOptions = [
       { label: 'Más reciente → más antigua', value: 'reciente' },
@@ -466,8 +537,33 @@ export default defineComponent({
 
     const esVistaReportes = computed(() => vistaModo.value === 'reporte')
     const esVistaMovimientos = computed(() => vistaModo.value === 'movimiento')
+    const esVistaInventario = computed(() => vistaModo.value === 'inventario')
     const reportesCount = computed(() => reports.value.filter(report => !isMovimiento(report)).length)
     const movimientosCount = computed(() => reports.value.filter(isMovimiento).length)
+
+    const inventarioCompleto = computed(() => {
+      return buildInventarioCasitas(inventarioRows.value, reports.value)
+    })
+
+    const inventarioTotalPantallas = computed(() => {
+      return inventarioCompleto.value.reduce((sum, item) => sum + (Number(item.total) || 0), 0)
+    })
+
+    const filteredInventario = computed(() => {
+      const term = searchTerm.value.trim().toLowerCase()
+      if (!term) return inventarioCompleto.value
+      return inventarioCompleto.value.filter((item) => {
+        const numero = String(item.numero || '')
+        const label = String(item.label || '').toLowerCase()
+        return numero.includes(term) || label.includes(term)
+      })
+    })
+
+    const searchPlaceholder = computed(() => {
+      if (esVistaInventario.value) return 'Buscar casita 1 a 50, bodega o casa verde...'
+      if (esVistaMovimientos.value) return 'Buscar casita de origen o destino...'
+      return 'Buscar por casita o usuario...'
+    })
 
     function selectVista (mode) {
       vistaModo.value = mode
@@ -572,15 +668,17 @@ export default defineComponent({
     }
 
     const filteredReports = computed(() => {
-      if (!vistaModo.value) return []
+      if (!vistaModo.value || esVistaInventario.value) return []
 
       const term = searchTerm.value.trim().toLowerCase()
       let list = reports.value.slice()
 
       if (esVistaReportes.value) {
         list = list.filter(report => !isMovimiento(report))
-      } else {
+      } else if (esVistaMovimientos.value) {
         list = list.filter(isMovimiento)
+      } else {
+        return []
       }
 
       if (term) {
@@ -849,13 +947,46 @@ export default defineComponent({
       }
     }
 
+    function exportInventarioCsv () {
+      const rows = filteredInventario.value
+      if (rows.length === 0) {
+        notify({ type: 'warning', message: 'No hay inventario para exportar' })
+        return
+      }
+
+      csvLoading.value = true
+      try {
+        const csv = inventarioToCsv(rows)
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        const stamp = new Date().toISOString().slice(0, 10)
+        link.href = url
+        link.download = `inventario_pantallas_${stamp}.csv`
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        URL.revokeObjectURL(url)
+        notify({
+          type: 'positive',
+          message: `CSV exportado (${rows.length} ubicaciones)`,
+          icon: 'download'
+        })
+      } catch (err) {
+        console.error('CSV export failed:', err)
+        notify({ type: 'negative', message: 'No se pudo exportar el CSV', caption: err.message })
+      } finally {
+        csvLoading.value = false
+      }
+    }
+
     function goToNuevo () {
       router.push('/reporte-pantallas/nuevo')
     }
 
     onMounted(() => {
       const vista = route.query.vista
-      if (vista === 'reporte' || vista === 'movimiento') {
+      if (vista === 'reporte' || vista === 'movimiento' || vista === 'inventario') {
         vistaModo.value = vista
       }
       fetchReports()
@@ -875,8 +1006,14 @@ export default defineComponent({
       vistaModo,
       esVistaReportes,
       esVistaMovimientos,
+      esVistaInventario,
       reportesCount,
       movimientosCount,
+      inventarioTotalPantallas,
+      filteredInventario,
+      searchPlaceholder,
+      csvLoading,
+      exportInventarioCsv,
       selectVista,
       verMovimientosDeCasita,
       filtrosActivosCount,
@@ -966,7 +1103,7 @@ export default defineComponent({
 
 .vista-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   margin-bottom: 16px;
 }
@@ -1009,7 +1146,7 @@ export default defineComponent({
 
 .vista-card-copy {
   margin-top: 4px;
-  font-size: 12px;
+  font-size: 11px;
   color: #757575;
   line-height: 1.35;
 }
@@ -1039,6 +1176,113 @@ export default defineComponent({
   border-color: #64b5f6;
   background: #e3f2fd;
   color: #0d47a1;
+}
+
+.vista-card--inv.vista-card--active {
+  border-color: #81c784;
+  background: #e8f5e9;
+  color: #1b5e20;
+}
+
+.inv-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: white;
+  border-radius: 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.inv-toolbar-copy {
+  font-size: 13px;
+  font-weight: 600;
+  color: #616161;
+}
+
+.inventory-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inv-card {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  background: white;
+  border-radius: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  padding: 10px 12px;
+}
+
+.inv-card--empty {
+  opacity: 0.72;
+}
+
+.inv-card--extra {
+  border-color: rgba(46, 125, 50, 0.18);
+  background: #f9fff9;
+}
+
+.inv-casita {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+  color: #212121;
+}
+
+.inv-casita-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #9e9e9e;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+}
+
+.inv-rooms {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.inv-room,
+.inv-total {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  color: #9e9e9e;
+}
+
+.inv-room strong,
+.inv-total strong {
+  font-size: 16px;
+  color: #9e9e9e;
+}
+
+.inv-room.has-screen,
+.inv-total.has-screen {
+  color: #2e7d32;
+}
+
+.inv-room.has-screen strong,
+.inv-total.has-screen strong {
+  color: #1b5e20;
+}
+
+.inv-total {
+  text-align: right;
+  min-width: 52px;
+}
+
+.inv-card--extra .inv-casita {
+  font-size: 13px;
+  line-height: 1.15;
 }
 
 .chooser-empty {
@@ -1526,6 +1770,12 @@ export default defineComponent({
   color: #90caf9;
 }
 
+.body--dark .vista-card--inv.vista-card--active {
+  background: rgba(46, 125, 50, 0.2);
+  border-color: #81c784;
+  color: #a5d6a7;
+}
+
 .body--dark .chooser-title,
 .body--dark .move-stop-name {
   color: #e0e0e0;
@@ -1535,8 +1785,19 @@ export default defineComponent({
   background: #2a2a2a;
 }
 
-.body--dark .related-cta {
-  background: rgba(13, 71, 161, 0.28);
+.body--dark .inv-toolbar,
+.body--dark .inv-card {
+  background: #1e1e1e;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.body--dark .inv-casita,
+.body--dark .inv-toolbar-copy {
+  color: #e0e0e0;
+}
+
+.body--dark .inv-card--extra {
+  background: rgba(46, 125, 50, 0.12);
 }
 
 .body--dark .casita-badge--move {

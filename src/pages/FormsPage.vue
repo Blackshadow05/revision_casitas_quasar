@@ -8,6 +8,28 @@
       </div>
 
       <div class="settings-card">
+        <template v-if="canManageUsers">
+          <q-item
+            clickable
+            v-ripple
+            class="settings-item"
+            @click="goToAdminUsers"
+          >
+            <q-item-section avatar>
+              <div class="settings-icon-wrap bg-teal">
+                <q-icon name="people" color="white" size="20px" />
+              </div>
+            </q-item-section>
+            <q-item-section>
+              <q-item-label class="text-weight-medium">Administrar Usuarios</q-item-label>
+              <q-item-label caption>Ver contraseñas, roles y crear usuarios</q-item-label>
+            </q-item-section>
+            <q-item-section side>
+              <q-icon name="chevron_right" color="grey-4" size="18px" />
+            </q-item-section>
+          </q-item>
+          <q-separator inset="72px" />
+        </template>
         <q-item
           clickable
           v-ripple
@@ -138,13 +160,20 @@
 </template>
 
 <script>
-import { defineComponent, ref } from 'vue';
+import { computed, defineComponent, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { useAuthStore } from '../stores/auth';
 
 export default defineComponent({
   name: 'FormsPage',
   setup() {
     const router = useRouter();
+    const authStore = useAuthStore();
+    const canManageUsers = computed(() => authStore.canManageUsers);
+
+    const goToAdminUsers = () => {
+      router.push('/admin-users');
+    };
 
     const goToReportePantallas = () => {
       router.push('/reporte-pantallas');
@@ -239,6 +268,8 @@ export default defineComponent({
       closeForm,
       openExternal,
       onIFrameLoad,
+      canManageUsers,
+      goToAdminUsers,
       goToReportePantallas,
     };
   },

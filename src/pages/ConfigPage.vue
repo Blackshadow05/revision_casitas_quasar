@@ -87,7 +87,7 @@
         </q-item-section>
         <q-item-section>
           <q-item-label class="text-weight-medium">Reporte de pantallas</q-item-label>
-          <q-item-label caption>Ver reportes, fotos y generar PDF</q-item-label>
+          <q-item-label caption>Reportes, movimientos, fotos y PDF</q-item-label>
         </q-item-section>
         <q-item-section side>
           <q-icon name="chevron_right" color="grey-4" size="18px" />

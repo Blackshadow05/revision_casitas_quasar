@@ -2,8 +2,8 @@
   <q-page class="reporte-list-page q-pa-md">
     <div class="page-header q-mb-md">
       <div>
-        <div class="text-h5 text-weight-bold">Reportes de pantallas</div>
-        <div class="text-caption text-grey-6">Selecciona casitas y genera un PDF compacto con fotos</div>
+        <div class="text-h5 text-weight-bold">Revisión de pantallas</div>
+        <div class="text-caption text-grey-6">Reportes, movimientos e inventario por casita</div>
       </div>
       <q-btn
         unelevated
@@ -24,7 +24,7 @@
       outlined
       dense
       clearable
-      placeholder="Buscar por casita o usuario..."
+      placeholder="Buscar por casita, movimiento o usuario..."
       class="q-mb-sm"
       bg-color="white"
     >
@@ -88,6 +88,15 @@
             dense
             color="negative"
             label="Solo pantallas defectuosas"
+            class="q-mb-md"
+          />
+
+          <label class="field-label">Tipo de registro</label>
+          <q-option-group
+            v-model="tipoFiltro"
+            :options="tipoFiltroOptions"
+            color="primary"
+            dense
           />
         </q-card-section>
         <q-card-actions class="q-pa-md">
@@ -177,7 +186,17 @@
           />
 
           <div class="report-main" @click="toggleExpand(report.id)">
-            <div class="casita-badge">Casita {{ report.numero_casita }}</div>
+            <div class="report-title-row">
+              <div
+                class="casita-badge"
+                :class="isMovimiento(report) ? 'casita-badge--move' : ''"
+              >
+                {{ cardTitle(report) }}
+              </div>
+              <div class="report-type-chip" :class="isMovimiento(report) ? 'is-move' : 'is-report'">
+                {{ isMovimiento(report) ? 'Movimiento' : 'Reporte' }}
+              </div>
+            </div>
             <div class="report-meta">
               <span class="meta-item">
                 <q-icon name="person_outline" size="14px" />
@@ -245,7 +264,60 @@
         </div>
 
         <div v-show="expandedId === report.id" class="report-expanded">
-          <div class="expanded-grid">
+          <div v-if="isMovimiento(report)" class="movement-panel q-mb-md">
+            <div class="expanded-title">Trayecto de la pantalla</div>
+            <div class="movement-path">
+              <div class="movement-stop">
+                <div class="movement-stop-label">Salió de</div>
+                <div class="movement-stop-value">{{ formatUbicacion(report.origen_ubicacion) }}</div>
+                <div v-if="report.origen_habitacion" class="movement-stop-room">{{ report.origen_habitacion }}</div>
+              </div>
+              <q-icon name="arrow_forward" color="primary" size="22px" />
+              <div class="movement-stop">
+                <div class="movement-stop-label">Llegó a</div>
+                <div class="movement-stop-value">{{ formatUbicacion(report.destino_ubicacion) }}</div>
+                <div v-if="report.destino_habitacion" class="movement-stop-room">{{ report.destino_habitacion }}</div>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="getInventarios(report).length" class="inventory-panel q-mb-md">
+            <div class="expanded-title">Inventario actual</div>
+            <div
+              v-for="inv in getInventarios(report)"
+              :key="`${report.id}_${inv.key}`"
+              class="inventory-card"
+            >
+              <div class="inventory-location">{{ inv.label }}</div>
+              <div class="inventory-rooms">
+                <div
+                  v-for="room in inv.rooms"
+                  :key="`${inv.key}_${room.habitacion}`"
+                  class="inventory-room"
+                  :class="{ 'has-screen': room.cantidad > 0 }"
+                >
+                  <span>{{ room.habitacion }}</span>
+                  <strong>{{ room.cantidad }} {{ room.cantidad === 1 ? 'pantalla' : 'pantallas' }}</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="getRelatedMovements(report).length" class="related-panel q-mb-md">
+            <div class="expanded-title">Movimientos de esta casita</div>
+            <div
+              v-for="move in getRelatedMovements(report)"
+              :key="`rel_${report.id}_${move.id}`"
+              class="related-move"
+            >
+              <div class="related-move-path">{{ formatMovimientoResumen(move) }}</div>
+              <div class="related-move-meta">
+                {{ move.nombre_usuario }} · {{ formatDate(move.fecha_hora) }}
+              </div>
+            </div>
+          </div>
+
+          <div v-if="getFotos(report).length" class="expanded-grid">
             <div
               v-for="(foto, idx) in getFotos(report)"
               :key="`exp_${report.id}_${idx}`"
@@ -319,6 +391,14 @@ import { notify } from '../utils/notify'
 import { useAuthStore } from '../stores/auth'
 import { supabase } from '../supabase'
 import { generateReportePantallasPdf, getCloudinaryUrl } from '../utils/reportePantallasPdf'
+import {
+  formatMovimientoResumen,
+  formatUbicacion,
+  inventoryForUbicacion,
+  isMovimiento,
+  relatedMovements,
+  reportInvolvesUbicacion
+} from '../utils/pantallasInventario'
 
 export default defineComponent({
   name: 'ReportePantallasListPage',
@@ -334,6 +414,7 @@ export default defineComponent({
     const ordenFecha = ref('reciente')
     const ordenarPorCasita = ref(false)
     const soloDefectuosas = ref(false)
+    const tipoFiltro = ref('todos')
     const expandedId = ref(null)
     const selectedIds = ref([])
     const pdfBulkLoading = ref(false)
@@ -342,11 +423,61 @@ export default defineComponent({
     const viewerUrl = ref('')
     const viewerSourceUrl = ref('')
     const viewerMeta = ref({ casita: null, ubicacion: null, index: 0 })
+    const inventarioRows = ref([])
 
     const ordenFechaOptions = [
       { label: 'Más reciente → más antigua', value: 'reciente' },
       { label: 'Más antigua → más reciente', value: 'antigua' }
     ]
+
+    const tipoFiltroOptions = [
+      { label: 'Todos', value: 'todos' },
+      { label: 'Solo reportes', value: 'reporte' },
+      { label: 'Solo movimientos', value: 'movimiento' }
+    ]
+
+    function cardTitle (report) {
+      if (isMovimiento(report)) return formatMovimientoResumen(report)
+      return `Casita ${report.numero_casita}`
+    }
+
+    function involvedUbicaciones (report) {
+      if (isMovimiento(report)) {
+        return [report.origen_ubicacion, report.destino_ubicacion].filter(Boolean)
+      }
+      return report?.numero_casita != null ? [String(report.numero_casita)] : []
+    }
+
+    function getInventarios (report) {
+      const seen = new Set()
+      const result = []
+      for (const ubicacion of involvedUbicaciones(report)) {
+        const key = String(ubicacion)
+        if (seen.has(key)) continue
+        seen.add(key)
+        result.push({
+          key,
+          label: formatUbicacion(key),
+          rooms: inventoryForUbicacion(inventarioRows.value, key, reports.value)
+        })
+      }
+      return result
+    }
+
+    function getRelatedMovements (report) {
+      const keys = involvedUbicaciones(report)
+      const seen = new Set()
+      const result = []
+      for (const key of keys) {
+        for (const move of relatedMovements(reports.value, key, report.id)) {
+          if (seen.has(move.id)) continue
+          seen.add(move.id)
+          result.push(move)
+        }
+      }
+      result.sort((a, b) => getFechaValue(b) - getFechaValue(a))
+      return result
+    }
 
     function getFotos (report) {
       return Array.isArray(report?.fotos) ? report.fotos : []
@@ -385,7 +516,7 @@ export default defineComponent({
 
     /** Una revisión por casita según orden de fecha, luego casitas 1→50 */
     function uniqueByCasita (list) {
-      const byDate = sortByFecha(list)
+      const byDate = sortByFecha(list.filter(report => !isMovimiento(report)))
       const seen = new Set()
       const unique = []
       for (const report of byDate) {
@@ -402,12 +533,27 @@ export default defineComponent({
       const term = searchTerm.value.trim().toLowerCase()
       let list = reports.value.slice()
 
+      if (tipoFiltro.value === 'reporte') {
+        list = list.filter(report => !isMovimiento(report))
+      } else if (tipoFiltro.value === 'movimiento') {
+        list = list.filter(isMovimiento)
+      }
+
       if (term) {
         list = list.filter((r) => {
           const casita = String(r.numero_casita || '')
           const usuario = String(r.nombre_usuario || '').toLowerCase()
           const notas = String(r.notas || '').toLowerCase()
-          return casita.includes(term) || usuario.includes(term) || notas.includes(term)
+          const movimiento = formatMovimientoResumen(r).toLowerCase()
+          const origen = formatUbicacion(r.origen_ubicacion).toLowerCase()
+          const destino = formatUbicacion(r.destino_ubicacion).toLowerCase()
+          return casita.includes(term)
+            || usuario.includes(term)
+            || notas.includes(term)
+            || movimiento.includes(term)
+            || origen.includes(term)
+            || destino.includes(term)
+            || reportInvolvesUbicacion(r, term)
         })
       }
 
@@ -427,6 +573,7 @@ export default defineComponent({
       if (ordenFecha.value !== 'reciente') count++
       if (ordenarPorCasita.value) count++
       if (soloDefectuosas.value) count++
+      if (tipoFiltro.value !== 'todos') count++
       return count
     })
 
@@ -439,6 +586,8 @@ export default defineComponent({
         chips.push('Antigua → reciente')
       }
       if (soloDefectuosas.value) chips.push('Solo defectuosas')
+      if (tipoFiltro.value === 'reporte') chips.push('Solo reportes')
+      if (tipoFiltro.value === 'movimiento') chips.push('Solo movimientos')
       return chips
     })
 
@@ -449,6 +598,7 @@ export default defineComponent({
 
     const emptyCaption = computed(() => {
       if (reports.value.length === 0) return 'Crea el primero con el botón Nuevo'
+      if (tipoFiltro.value === 'movimiento') return 'No hay movimientos de pantallas con esos filtros'
       if (soloDefectuosas.value) return 'No hay reportes con pantallas defectuosas'
       if (searchTerm.value.trim()) return 'Prueba otro término de búsqueda o cambia los filtros'
       return 'Ajusta los filtros para ver reportes'
@@ -458,6 +608,7 @@ export default defineComponent({
       ordenFecha.value = 'reciente'
       ordenarPorCasita.value = false
       soloDefectuosas.value = false
+      tipoFiltro.value = 'todos'
     }
 
     const allFilteredSelected = computed(() => {
@@ -527,6 +678,11 @@ export default defineComponent({
         if (error) throw error
         reports.value = data || []
         selectedIds.value = selectedIds.value.filter(id => reports.value.some(r => r.id === id))
+
+        const inventarioRes = await supabase
+          .from('inventario_pantallas')
+          .select('*')
+        inventarioRows.value = inventarioRes.error ? [] : (inventarioRes.data || [])
       } catch (err) {
         console.error('Error fetching reporte_pantallas:', err)
         errorMsg.value = 'No se pudieron cargar los reportes'
@@ -620,9 +776,9 @@ export default defineComponent({
     }
 
     async function downloadSelectedPdf () {
-      const selectedReports = reports.value.filter(r => selectedIds.value.includes(r.id))
+      const selectedReports = reports.value.filter(r => selectedIds.value.includes(r.id) && !isMovimiento(r) && getFotos(r).length > 0)
       if (selectedReports.length === 0) {
-        notify({ type: 'warning', message: 'Selecciona al menos un reporte' })
+        notify({ type: 'warning', message: 'Selecciona al menos un reporte con fotos. Los movimientos no se incluyen en el PDF.' })
         return
       }
 
@@ -664,6 +820,8 @@ export default defineComponent({
       ordenFechaOptions,
       ordenarPorCasita,
       soloDefectuosas,
+      tipoFiltro,
+      tipoFiltroOptions,
       filtrosActivosCount,
       filtrosResumen,
       filteredReports,
@@ -681,6 +839,12 @@ export default defineComponent({
       getFotos,
       isDefectuosa,
       estadoClass,
+      isMovimiento,
+      cardTitle,
+      formatUbicacion,
+      formatMovimientoResumen,
+      getInventarios,
+      getRelatedMovements,
       isSelected,
       toggleSelection,
       toggleSelectAllFiltered,
@@ -828,7 +992,129 @@ export default defineComponent({
   background: #ffebee;
   border-radius: 999px;
   padding: 4px 10px;
+  max-width: 100%;
+  word-break: break-word;
+}
+
+.report-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
   margin-bottom: 6px;
+}
+
+.casita-badge--move {
+  color: #0d47a1;
+  background: #e3f2fd;
+}
+
+.report-type-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.report-type-chip.is-report {
+  color: #c62828;
+}
+
+.report-type-chip.is-move {
+  color: #1565c0;
+}
+
+.expanded-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #424242;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.movement-path {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.movement-stop {
+  flex: 1;
+  background: #f5f5f5;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.movement-stop-label {
+  font-size: 11px;
+  color: #757575;
+  margin-bottom: 2px;
+}
+
+.movement-stop-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #212121;
+}
+
+.movement-stop-room {
+  font-size: 12px;
+  color: #616161;
+  margin-top: 2px;
+}
+
+.inventory-card {
+  background: #fafafa;
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.inventory-location {
+  font-size: 13px;
+  font-weight: 700;
+  color: #212121;
+  margin-bottom: 6px;
+}
+
+.inventory-rooms {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inventory-room {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #757575;
+}
+
+.inventory-room.has-screen {
+  color: #2e7d32;
+}
+
+.related-move {
+  padding: 8px 0;
+}
+
+.related-move + .related-move {
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.related-move-path {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1565c0;
+}
+
+.related-move-meta {
+  font-size: 11px;
+  color: #757575;
+  margin-top: 2px;
 }
 
 .report-meta {
@@ -1005,6 +1291,22 @@ export default defineComponent({
 
 .body--dark .casita-badge {
   background: rgba(183, 28, 28, 0.25);
+}
+
+.body--dark .casita-badge--move {
+  background: rgba(13, 71, 161, 0.28);
+}
+
+.body--dark .expanded-title,
+.body--dark .movement-stop-value,
+.body--dark .inventory-location,
+.body--dark .related-move-path {
+  color: #e0e0e0;
+}
+
+.body--dark .movement-stop,
+.body--dark .inventory-card {
+  background: #2a2a2a;
 }
 
 .body--dark .expanded-caption,

@@ -3,8 +3,8 @@
     <div class="page-header q-mb-md">
       <q-btn flat round dense icon="arrow_back" color="grey-8" class="q-mr-sm" @click="goBack" />
       <div>
-        <div class="text-h5 text-weight-bold">Reporte de pantallas</div>
-        <div class="text-caption text-grey-6">Registra pantallas dañadas por casita</div>
+        <div class="text-h5 text-weight-bold">Revisión de pantallas</div>
+        <div class="text-caption text-grey-6">Reporta el estado o registra un movimiento entre casitas</div>
       </div>
     </div>
 
@@ -41,30 +41,126 @@
         </template>
       </q-input>
 
-      <label class="field-label">Número de casita *</label>
-      <q-select
-        v-model="numeroCasita"
-        :options="casitaOptions"
-        outlined
-        dense
-        emit-value
-        map-options
-        class="q-mb-md"
-        placeholder="Selecciona 1 a 50"
-        :rules="[val => !!val || 'Selecciona una casita']"
-        lazy-rules
-      >
-        <template #prepend>
-          <q-icon name="home" color="grey-6" />
-        </template>
-      </q-select>
-
-      <label class="field-label">Fotos de pantallas (máx. 3) *</label>
-      <div class="text-caption text-grey-6 q-mb-sm">
-        Por cada foto indica ubicación y estado: defectuosa, en buen estado o no hay pantalla.
+      <label class="field-label">Tipo de registro *</label>
+      <div class="tipo-grid q-mb-md">
+        <q-btn
+          v-for="opcion in tipoOptions"
+          :key="opcion.value"
+          unelevated
+          no-caps
+          class="tipo-option-btn"
+          :class="{ 'tipo-option-btn--active': tipo === opcion.value }"
+          :color="tipo === opcion.value ? 'primary' : 'grey-2'"
+          :text-color="tipo === opcion.value ? 'white' : 'grey-9'"
+          :icon="opcion.icon"
+          :label="opcion.label"
+          type="button"
+          @click="tipo = opcion.value"
+        />
       </div>
 
-      <div class="photos-grid q-mb-md">
+      <template v-if="tipo === 'reporte'">
+        <label class="field-label">Número de casita *</label>
+        <q-select
+          v-model="numeroCasita"
+          :options="casitaOptions"
+          outlined
+          dense
+          emit-value
+          map-options
+          class="q-mb-md"
+          placeholder="Selecciona 1 a 50"
+          :rules="[val => !!val || 'Selecciona una casita']"
+          lazy-rules
+        >
+          <template #prepend>
+            <q-icon name="home" color="grey-6" />
+          </template>
+        </q-select>
+
+        <label class="field-label">Fotos de pantallas (máx. 3) *</label>
+        <div class="text-caption text-grey-6 q-mb-sm">
+          Por cada foto indica ubicación y estado: defectuosa, en buen estado o no hay pantalla.
+        </div>
+      </template>
+
+      <template v-else>
+        <label class="field-label">De qué casita se mueve *</label>
+        <q-select
+          v-model="origenUbicacion"
+          :options="ubicacionMovimientoOptions"
+          outlined
+          dense
+          emit-value
+          map-options
+          class="q-mb-md"
+          placeholder="Casita, bodega o casa verde"
+          :rules="[val => !!val || 'Selecciona el origen']"
+          lazy-rules
+        >
+          <template #prepend>
+            <q-icon name="logout" color="grey-6" />
+          </template>
+        </q-select>
+
+        <label v-if="origenRequiereHabitacion" class="field-label">De qué habitación *</label>
+        <q-select
+          v-if="origenRequiereHabitacion"
+          v-model="origenHabitacion"
+          :options="habitacionOptions"
+          outlined
+          dense
+          emit-value
+          map-options
+          class="q-mb-md"
+          placeholder="Living, Queen o King"
+          :rules="[val => !!val || 'Selecciona la habitación de origen']"
+          lazy-rules
+        >
+          <template #prepend>
+            <q-icon name="bed" color="grey-6" />
+          </template>
+        </q-select>
+
+        <label class="field-label">Hacia qué casita se mueve *</label>
+        <q-select
+          v-model="destinoUbicacion"
+          :options="ubicacionMovimientoOptions"
+          outlined
+          dense
+          emit-value
+          map-options
+          class="q-mb-md"
+          placeholder="Casita, bodega o casa verde"
+          :rules="[val => !!val || 'Selecciona el destino']"
+          lazy-rules
+        >
+          <template #prepend>
+            <q-icon name="login" color="grey-6" />
+          </template>
+        </q-select>
+
+        <label v-if="destinoRequiereHabitacion" class="field-label">A qué habitación *</label>
+        <q-select
+          v-if="destinoRequiereHabitacion"
+          v-model="destinoHabitacion"
+          :options="habitacionOptions"
+          outlined
+          dense
+          emit-value
+          map-options
+          class="q-mb-md"
+          placeholder="Living, Queen o King"
+          :rules="[val => !!val || 'Selecciona la habitación de destino']"
+          lazy-rules
+        >
+          <template #prepend>
+            <q-icon name="weekend" color="grey-6" />
+          </template>
+        </q-select>
+      </template>
+
+      <div v-if="tipo === 'reporte'" class="photos-grid q-mb-md">
         <div
           v-for="(photo, idx) in fotos"
           :key="photo.id"
@@ -114,7 +210,7 @@
         dense
         autogrow
         :input-style="{ minHeight: '72px' }"
-        placeholder="Nota general de la revisión (opcional)"
+        :placeholder="tipo === 'movimiento' ? 'Detalle del movimiento (opcional)' : 'Nota general de la revisión (opcional)'"
         class="q-mb-md"
       />
 
@@ -124,7 +220,7 @@
         rounded
         color="primary"
         class="full-width save-btn"
-        label="Guardar reporte"
+        :label="tipo === 'movimiento' ? 'Guardar movimiento' : 'Guardar reporte'"
         icon="save"
         :loading="saving"
         :disable="!canSubmit"
@@ -254,14 +350,23 @@
 </template>
 
 <script>
-import { computed, defineComponent, onMounted, onUnmounted, ref } from 'vue'
+import { computed, defineComponent, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { notify } from '../utils/notify'
 import { useAuthStore } from '../stores/auth'
 import { supabase } from '../supabase'
 import { CLOUDINARY_CONFIG } from '../cloudinary'
+import {
+  HABITACIONES_PANTALLA,
+  TIPO_MOVIMIENTO,
+  TIPO_REPORTE,
+  buildCasitaOptions,
+  buildUbicacionOptions,
+  isCasitaUbicacion,
+  registrarMovimientoPantalla
+} from '../utils/pantallasInventario'
 
-const UBICACIONES = ['Living', 'Cuarto Queen', 'Cuarto King']
+const UBICACIONES = HABITACIONES_PANTALLA
 const ESTADOS = ['defectuosa', 'en buen estado', 'no hay pantalla']
 
 export default defineComponent({
@@ -270,7 +375,12 @@ export default defineComponent({
     const router = useRouter()
     const authStore = useAuthStore()
 
+    const tipo = ref(TIPO_REPORTE)
     const numeroCasita = ref(null)
+    const origenUbicacion = ref(null)
+    const origenHabitacion = ref(null)
+    const destinoUbicacion = ref(null)
+    const destinoHabitacion = ref(null)
     const notas = ref('')
     const fotos = ref([])
     const saving = ref(false)
@@ -285,13 +395,18 @@ export default defineComponent({
     const ahoraCR = ref(new Date())
     let clockTimer = null
 
-    const casitaOptions = Array.from({ length: 50 }, (_, i) => ({
-      label: `Casita ${i + 1}`,
-      value: i + 1
-    }))
-
-    const ubicacionOptions = UBICACIONES.map(u => ({ label: u, value: u }))
+    const casitaOptions = buildCasitaOptions()
+    const ubicacionMovimientoOptions = buildUbicacionOptions()
+    const habitacionOptions = UBICACIONES.map(u => ({ label: u, value: u }))
+    const ubicacionOptions = habitacionOptions
     const estadoOptions = ESTADOS.map(e => ({ label: e, value: e }))
+    const tipoOptions = [
+      { label: 'Reporte pantalla', value: TIPO_REPORTE, icon: 'photo_camera' },
+      { label: 'Movimiento pantalla', value: TIPO_MOVIMIENTO, icon: 'swap_horiz' }
+    ]
+
+    const origenRequiereHabitacion = computed(() => isCasitaUbicacion(origenUbicacion.value))
+    const destinoRequiereHabitacion = computed(() => isCasitaUbicacion(destinoUbicacion.value))
 
     function estadoClass (estado) {
       const value = String(estado || '').trim().toLowerCase()
@@ -337,6 +452,16 @@ export default defineComponent({
     const canSubmit = computed(() => {
       if (!authStore.isLoggedIn || !authStore.canAdd) return false
       if (!nombreUsuario.value) return false
+
+      if (tipo.value === TIPO_MOVIMIENTO) {
+        if (!origenUbicacion.value || !destinoUbicacion.value) return false
+        if (origenRequiereHabitacion.value && !origenHabitacion.value) return false
+        if (destinoRequiereHabitacion.value && !destinoHabitacion.value) return false
+        const origenKey = `${origenUbicacion.value}|${origenRequiereHabitacion.value ? origenHabitacion.value : ''}`
+        const destinoKey = `${destinoUbicacion.value}|${destinoRequiereHabitacion.value ? destinoHabitacion.value : ''}`
+        return origenKey !== destinoKey
+      }
+
       if (!numeroCasita.value) return false
       if (fotos.value.length === 0 || fotos.value.length > 3) return false
       return fotos.value.every(f => f.file && f.ubicacion && f.estado)
@@ -623,14 +748,59 @@ export default defineComponent({
       return resData.secure_url
     }
 
+    watch(origenUbicacion, (value) => {
+      if (!isCasitaUbicacion(value)) origenHabitacion.value = null
+    })
+
+    watch(destinoUbicacion, (value) => {
+      if (!isCasitaUbicacion(value)) destinoHabitacion.value = null
+    })
+
+    async function saveMovimiento () {
+      const origenHab = origenRequiereHabitacion.value ? origenHabitacion.value : null
+      const destinoHab = destinoRequiereHabitacion.value ? destinoHabitacion.value : null
+      const numeroOrigen = isCasitaUbicacion(origenUbicacion.value) ? Number(origenUbicacion.value) : null
+      const numeroDestino = isCasitaUbicacion(destinoUbicacion.value) ? Number(destinoUbicacion.value) : null
+
+      await registrarMovimientoPantalla(supabase, {
+        nombre_usuario: nombreUsuario.value,
+        fecha_hora: formatCostaRica(new Date()),
+        notas: notas.value.trim() || null,
+        numero_casita: numeroOrigen || numeroDestino,
+        origen_ubicacion: String(origenUbicacion.value),
+        origen_habitacion: origenHab,
+        destino_ubicacion: String(destinoUbicacion.value),
+        destino_habitacion: destinoHab
+      })
+
+      notify({ type: 'positive', message: 'Movimiento guardado y inventario actualizado', icon: 'swap_horiz' })
+      origenUbicacion.value = null
+      origenHabitacion.value = null
+      destinoUbicacion.value = null
+      destinoHabitacion.value = null
+      notas.value = ''
+      ahoraCR.value = new Date()
+      router.push('/reporte-pantallas')
+    }
+
     async function saveReport () {
       if (!canSubmit.value) {
-        notify({ type: 'warning', message: 'Completa casita, fotos, ubicaciones y estados' })
+        notify({
+          type: 'warning',
+          message: tipo.value === TIPO_MOVIMIENTO
+            ? 'Completa origen, habitación y destino del movimiento'
+            : 'Completa casita, fotos, ubicaciones y estados'
+        })
         return
       }
 
       saving.value = true
       try {
+        if (tipo.value === TIPO_MOVIMIENTO) {
+          await saveMovimiento()
+          return
+        }
+
         const fotosPayload = []
         for (let i = 0; i < fotos.value.length; i++) {
           const photo = fotos.value[i]
@@ -647,12 +817,19 @@ export default defineComponent({
           fecha_hora: formatCostaRica(new Date()),
           numero_casita: numeroCasita.value,
           notas: notas.value.trim() || null,
-          fotos: fotosPayload
+          fotos: fotosPayload,
+          tipo: TIPO_REPORTE
         }
 
-        const { error } = await supabase
+        let { error } = await supabase
           .from('reporte_pantallas')
           .insert(record)
+
+        if (error && String(error.message || '').toLowerCase().includes('tipo')) {
+          const { tipo: _tipo, ...legacyRecord } = record
+          const retry = await supabase.from('reporte_pantallas').insert(legacyRecord)
+          error = retry.error
+        }
 
         if (error) throw error
 
@@ -668,7 +845,11 @@ export default defineComponent({
         router.push('/reporte-pantallas')
       } catch (err) {
         console.error('Error saving reporte pantallas:', err)
-        notify({ type: 'negative', message: 'Error al guardar el reporte', caption: err.message })
+        notify({
+          type: 'negative',
+          message: tipo.value === TIPO_MOVIMIENTO ? 'Error al guardar el movimiento' : 'Error al guardar el reporte',
+          caption: err.message
+        })
       } finally {
         saving.value = false
       }
@@ -698,9 +879,19 @@ export default defineComponent({
       authStore,
       nombreUsuario,
       fechaHoraDisplay,
+      tipo,
+      tipoOptions,
       numeroCasita,
+      origenUbicacion,
+      origenHabitacion,
+      destinoUbicacion,
+      destinoHabitacion,
+      origenRequiereHabitacion,
+      destinoRequiereHabitacion,
       notas,
       casitaOptions,
+      ubicacionMovimientoOptions,
+      habitacionOptions,
       ubicacionOptions,
       estadoOptions,
       estadoClass,
@@ -755,6 +946,22 @@ export default defineComponent({
   font-weight: 600;
   color: #424242;
   margin-bottom: 6px;
+}
+
+.tipo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.tipo-option-btn {
+  height: 48px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.tipo-option-btn--active {
+  box-shadow: 0 4px 12px rgba(211, 47, 47, 0.22);
 }
 
 .photos-grid {

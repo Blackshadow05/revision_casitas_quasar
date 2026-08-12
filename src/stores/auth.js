@@ -2,6 +2,8 @@ import { defineStore } from 'pinia'
 import { supabase } from '../supabase'
 import { useCasasStore } from './casas'
 
+export const USER_MANAGERS = ['Esteban B', 'JosephR', 'Ramiro Q']
+
 const loadStoredUser = () => {
   try {
     const stored = JSON.parse(localStorage.getItem('user'))
@@ -67,6 +69,9 @@ export const useAuthStore = defineStore('auth', {
     },
     isSuperAdmin: (state) => {
       return state.user?.Rol === 'SuperAdmin'
+    },
+    canManageUsers: (state) => {
+      return USER_MANAGERS.includes(state.user?.Usuario)
     }
   },
   

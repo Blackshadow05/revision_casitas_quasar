@@ -94,27 +94,29 @@
         </q-item-section>
       </q-item>
 
-      <q-separator inset="72px" />
+      <template v-if="canManageUsers">
+        <q-separator inset="72px" />
 
-      <q-item
-        clickable
-        v-ripple
-        class="settings-item"
-        @click="goToAdminUsers"
-      >
-        <q-item-section avatar>
-          <div class="settings-icon-wrap bg-teal">
-            <q-icon name="people" color="white" size="20px" />
-          </div>
-        </q-item-section>
-        <q-item-section>
-          <q-item-label class="text-weight-medium">Administrar Usuarios</q-item-label>
-          <q-item-label caption>Gestionar usuarios del sistema</q-item-label>
-        </q-item-section>
-        <q-item-section side>
-          <q-icon name="chevron_right" color="grey-4" size="18px" />
-        </q-item-section>
-      </q-item>
+        <q-item
+          clickable
+          v-ripple
+          class="settings-item"
+          @click="goToAdminUsers"
+        >
+          <q-item-section avatar>
+            <div class="settings-icon-wrap bg-teal">
+              <q-icon name="people" color="white" size="20px" />
+            </div>
+          </q-item-section>
+          <q-item-section>
+            <q-item-label class="text-weight-medium">Administrar Usuarios</q-item-label>
+            <q-item-label caption>Ver contraseñas, roles y crear usuarios</q-item-label>
+          </q-item-section>
+          <q-item-section side>
+            <q-icon name="chevron_right" color="grey-4" size="18px" />
+          </q-item-section>
+        </q-item>
+      </template>
 
       <q-separator inset="72px" />
 
@@ -164,11 +166,15 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
 
 defineOptions({ name: 'ConfigPage' })
 
 const router = useRouter()
+const authStore = useAuthStore()
+const canManageUsers = computed(() => authStore.canManageUsers)
 
 const goToAdminUsers = () => router.push('/admin-users')
 const goToReportes = () => router.push('/reportes')

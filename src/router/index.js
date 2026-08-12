@@ -40,8 +40,14 @@ export default function (/* { store, ssrContext } */) {
   });
 
   Router.beforeEach((to) => {
-    if (to.meta.requiresAuth && !useAuthStore().isLoggedIn) {
+    const authStore = useAuthStore()
+
+    if (to.meta.requiresAuth && !authStore.isLoggedIn) {
       return { path: "/" };
+    }
+
+    if (to.meta.requiresUserManager && !authStore.canManageUsers) {
+      return { path: "/config" };
     }
 
     return true;

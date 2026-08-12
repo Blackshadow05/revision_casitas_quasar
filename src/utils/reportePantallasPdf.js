@@ -6,8 +6,9 @@ const LAYOUT = {
   margin: 12,
   casitasPerPage: 5,
   cellGapY: 4,
-  headerHeight: 16,
+  headerHeight: 24,
   summaryHeight: 28,
+  footerHeight: 9,
   photoGap: 2.5,
   photoHeight: 36,
   photoMaxWidth: 54,
@@ -17,6 +18,13 @@ const LAYOUT = {
   labelHeight: 6.5,
   estadoBarHeight: 1.4,
   noteLineHeight: 3.2
+}
+
+const BRAND = {
+  name: 'CASA BAMBÚ',
+  place: 'PUNTA UVA',
+  ink: [17, 17, 17],
+  muted: [118, 118, 118]
 }
 
 const ESTADO_DEFECTUOSA = 'defectuosa'
@@ -139,6 +147,80 @@ function measureCaptionWidth (doc, ubicacion, estado) {
   return Math.max(ubicacionWidth, estadoWidth) + (LAYOUT.captionPaddingX * 2)
 }
 
+function roundRectPath (ctx, x, y, width, height, radius) {
+  const r = Math.min(radius, width / 2, height / 2)
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.arcTo(x + width, y, x + width, y + height, r)
+  ctx.arcTo(x + width, y + height, x, y + height, r)
+  ctx.arcTo(x, y + height, x, y, r)
+  ctx.arcTo(x, y, x + width, y, r)
+  ctx.closePath()
+}
+
+function createCasaBambuMarkDataUrl (pixelSize = 768) {
+  const canvas = document.createElement('canvas')
+  canvas.width = pixelSize
+  canvas.height = pixelSize
+  const ctx = canvas.getContext('2d')
+
+  ctx.fillStyle = '#111111'
+  roundRectPath(ctx, 0, 0, pixelSize, pixelSize, pixelSize * 0.22)
+  ctx.fill()
+
+  const cx = pixelSize / 2
+  const cy = pixelSize / 2
+  const start = (52 * Math.PI) / 180
+  const end = (308 * Math.PI) / 180
+  const span = end - start
+  const dotR = pixelSize * 0.027
+  const rings = [
+    { radius: pixelSize * 0.305, count: 16 },
+    { radius: pixelSize * 0.248, count: 14 },
+    { radius: pixelSize * 0.191, count: 12 }
+  ]
+
+  ctx.fillStyle = '#ffffff'
+  for (const ring of rings) {
+    for (let i = 0; i < ring.count; i++) {
+      const t = ring.count === 1 ? 0 : i / (ring.count - 1)
+      const angle = start + span * t
+      const x = cx + Math.cos(angle) * ring.radius
+      const y = cy - Math.sin(angle) * ring.radius
+      ctx.beginPath()
+      ctx.arc(x, y, dotR, 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }
+
+  const dataUrl = canvas.toDataURL('image/png')
+  canvas.width = 0
+  canvas.height = 0
+  return dataUrl
+}
+
+let casaBambuMarkDataUrl = null
+
+function getCasaBambuMarkDataUrl () {
+  if (!casaBambuMarkDataUrl) {
+    casaBambuMarkDataUrl = createCasaBambuMarkDataUrl()
+  }
+  return casaBambuMarkDataUrl
+}
+
+function drawCasaBambuMark (doc, x, y, size) {
+  doc.addImage(getCasaBambuMarkDataUrl(), 'PNG', x, y, size, size)
+}
+
+function drawTrackedText (doc, text, x, y, tracking) {
+  let offset = 0
+  for (const ch of String(text)) {
+    doc.text(ch, x + offset, y)
+    offset += doc.getTextWidth(ch) + tracking
+  }
+  return offset
+}
+
 async function preloadReportImages (reporte) {
   const fotos = Array.isArray(reporte.fotos) ? reporte.fotos : []
   const loaded = []
@@ -168,29 +250,71 @@ async function preloadReportImages (reporte) {
 }
 
 function drawPageHeader (doc, margin, pageWidth, total) {
-  const y = margin + 4
+  const markSize = 12
+  const markX = margin
+  const markY = margin + 0.6
+  drawCasaBambuMark(doc, markX, markY, markSize)
 
-  doc.setFillColor(183, 28, 28)
-  doc.roundedRect(margin, margin, 3, 10, 1, 1, 'F')
+  const textX = markX + markSize + 3.2
+  doc.setFont('times', 'bold')
+  doc.setFontSize(13)
+  doc.setTextColor(...BRAND.ink)
+  doc.text(BRAND.name, textX, margin + 5.2)
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(6.2)
+  doc.setTextColor(...BRAND.muted)
+  drawTrackedText(doc, BRAND.place, textX, margin + 9.4, 0.55)
 
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(14)
-  doc.setTextColor(33, 33, 33)
-  doc.text('Reporte de pantallas', margin + 7, y + 2)
+  doc.setFontSize(9)
+  doc.setTextColor(45, 45, 45)
+  doc.text('Reporte de pantallas', textX, margin + 15.6)
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
-  doc.setTextColor(117, 117, 117)
+  doc.setTextColor(...BRAND.muted)
   doc.text(
     `${total} ${total === 1 ? 'casita' : 'casitas'}  ·  ${formatFechaHora(new Date(), true)}`,
     pageWidth - margin,
-    y + 2,
+    margin + 6.2,
     { align: 'right' }
   )
 
-  doc.setDrawColor(230, 230, 230)
+  doc.setDrawColor(220, 220, 220)
   doc.setLineWidth(0.3)
   doc.line(margin, margin + LAYOUT.headerHeight - 2, pageWidth - margin, margin + LAYOUT.headerHeight - 2)
+  doc.setTextColor(0, 0, 0)
+}
+
+function drawFooter (doc, pageWidth, pageHeight, page, totalPages) {
+  const y = pageHeight - LAYOUT.footerHeight + 1.2
+  const markSize = 5.2
+  drawCasaBambuMark(doc, LAYOUT.margin, y, markSize)
+
+  doc.setFont('times', 'bold')
+  doc.setFontSize(7)
+  doc.setTextColor(...BRAND.ink)
+  doc.text(BRAND.name, LAYOUT.margin + markSize + 1.8, y + 2.1)
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(5.4)
+  doc.setTextColor(...BRAND.muted)
+  drawTrackedText(doc, BRAND.place, LAYOUT.margin + markSize + 1.8, y + 4.4, 0.42)
+
+  doc.setDrawColor(220, 220, 220)
+  doc.setLineWidth(0.25)
+  doc.line(LAYOUT.margin, y - 1.6, pageWidth - LAYOUT.margin, y - 1.6)
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7.5)
+  doc.setTextColor(...BRAND.muted)
+  doc.text(
+    `${page} de ${totalPages}`,
+    pageWidth - LAYOUT.margin,
+    y + 3.2,
+    { align: 'right' }
+  )
   doc.setTextColor(0, 0, 0)
 }
 
@@ -400,7 +524,7 @@ export async function generateReportePantallasPdf (reportes) {
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
   const contentWidth = pageWidth - (LAYOUT.margin * 2)
-  const contentHeight = pageHeight - (LAYOUT.margin * 2)
+  const contentHeight = pageHeight - (LAYOUT.margin * 2) - LAYOUT.footerHeight
   const firstPageTop = LAYOUT.margin + LAYOUT.headerHeight + LAYOUT.summaryHeight
   const otherPageTop = LAYOUT.margin
   const firstPageContentHeight = contentHeight - LAYOUT.headerHeight - LAYOUT.summaryHeight
@@ -434,6 +558,12 @@ export async function generateReportePantallasPdf (reportes) {
 
     drawCasitaBlock(doc, entry.reporte, entry.images, rect)
   })
+
+  const totalPages = doc.getNumberOfPages()
+  for (let page = 1; page <= totalPages; page++) {
+    doc.setPage(page)
+    drawFooter(doc, pageWidth, pageHeight, page, totalPages)
+  }
 
   const casitas = items.map(r => r.numero_casita).filter(Boolean)
   const suffix = casitas.length === 1

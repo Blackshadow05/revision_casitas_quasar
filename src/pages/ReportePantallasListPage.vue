@@ -1125,25 +1125,37 @@ export default defineComponent({
   cursor: pointer;
   color: #424242;
   min-height: 118px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .vista-grid--compact .vista-card {
   min-height: 0;
-  flex-direction: row;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
+  text-align: center;
+  gap: 4px;
+  padding: 10px 6px 8px;
+}
+
+.vista-grid--compact .vista-card :deep(.q-icon) {
+  font-size: 22px;
 }
 
 .vista-card-text {
   flex: 1;
   min-width: 0;
+  width: 100%;
 }
 
 .vista-card-title {
   font-size: 15px;
   font-weight: 700;
   line-height: 1.2;
+}
+
+.vista-grid--compact .vista-card-title {
+  font-size: 11px;
+  line-height: 1.25;
 }
 
 .vista-card-copy {
@@ -1161,11 +1173,20 @@ export default defineComponent({
   font-size: 18px;
   font-weight: 700;
   color: #9e9e9e;
+  line-height: 1;
 }
 
 .vista-grid--compact .vista-card-count {
-  font-size: 15px;
-  margin-left: auto;
+  margin-left: 0;
+  font-size: 12px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #f3f3f3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .vista-card--active {

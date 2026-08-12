@@ -790,7 +790,7 @@ export default defineComponent({
       destinoHabitacion.value = null
       notas.value = ''
       ahoraCR.value = new Date()
-      router.push('/reporte-pantallas')
+      router.push({ path: '/reporte-pantallas', query: { vista: 'movimiento' } })
     }
 
     async function saveReport () {
@@ -852,7 +852,7 @@ export default defineComponent({
         numeroCasita.value = null
         notas.value = ''
         ahoraCR.value = new Date()
-        router.push('/reporte-pantallas')
+        router.push({ path: '/reporte-pantallas', query: { vista: 'reporte' } })
       } catch (err) {
         console.error('Error saving reporte pantallas:', err)
         notify({

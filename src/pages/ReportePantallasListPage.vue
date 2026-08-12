@@ -3,7 +3,7 @@
     <div class="page-header q-mb-md">
       <div>
         <div class="text-h5 text-weight-bold">Revisión de pantallas</div>
-        <div class="text-caption text-grey-6">Reportes, movimientos e inventario por casita</div>
+        <div class="text-caption text-grey-6">Elige qué quieres consultar</div>
       </div>
       <q-btn
         unelevated
@@ -18,336 +18,369 @@
       />
     </div>
 
-    <q-input
-      v-model="searchTerm"
-      rounded
-      outlined
-      dense
-      clearable
-      placeholder="Buscar por casita, movimiento o usuario..."
-      class="q-mb-sm"
-      bg-color="white"
-    >
-      <template #prepend>
-        <q-icon name="search" color="grey-5" />
-      </template>
-    </q-input>
+    <div class="vista-grid" :class="{ 'vista-grid--compact': !!vistaModo }">
+      <button
+        type="button"
+        class="vista-card"
+        :class="{ 'vista-card--active': vistaModo === 'reporte' }"
+        @click="selectVista('reporte')"
+      >
+        <q-icon name="photo_camera" size="26px" />
+        <div class="vista-card-text">
+          <div class="vista-card-title">Reportes</div>
+          <div class="vista-card-copy">Fotos y estado de las pantallas</div>
+        </div>
+        <div class="vista-card-count">{{ reportesCount }}</div>
+      </button>
+      <button
+        type="button"
+        class="vista-card vista-card--move"
+        :class="{ 'vista-card--active': vistaModo === 'movimiento' }"
+        @click="selectVista('movimiento')"
+      >
+        <q-icon name="swap_horiz" size="26px" />
+        <div class="vista-card-text">
+          <div class="vista-card-title">Movimientos</div>
+          <div class="vista-card-copy">De qué casita salió y a cuál llegó</div>
+        </div>
+        <div class="vista-card-count">{{ movimientosCount }}</div>
+      </button>
+    </div>
 
-    <div class="filters-toolbar q-mb-md">
-      <q-btn
-        outline
-        rounded
-        no-caps
-        color="primary"
-        icon="tune"
-        :label="filtrosActivosCount > 0 ? `Filtros (${filtrosActivosCount})` : 'Filtros'"
-        @click="filtersOpen = true"
-      />
-      <div v-if="filtrosResumen.length" class="filters-chips">
-        <q-chip
-          v-for="chip in filtrosResumen"
-          :key="chip"
-          dense
-          outline
-          color="primary"
-          size="sm"
-        >
-          {{ chip }}
-        </q-chip>
+    <div v-if="!vistaModo" class="chooser-empty">
+      <q-icon name="touch_app" size="40px" color="grey-4" />
+      <div class="chooser-title">Primero elige una opción</div>
+      <div class="chooser-copy">
+        Toca <strong>Reportes</strong> para ver fotos y estado, o <strong>Movimientos</strong> para ver traslados de pantallas.
       </div>
     </div>
 
-    <q-dialog v-model="filtersOpen" position="bottom">
-      <q-card class="filters-modal">
-        <q-toolbar>
-          <q-toolbar-title class="text-weight-bold text-body1">Filtros</q-toolbar-title>
-          <q-btn flat dense no-caps color="grey-7" label="Restablecer" @click="resetFilters" />
-          <q-btn flat round dense icon="close" v-close-popup />
-        </q-toolbar>
-        <q-separator />
-        <q-card-section>
-          <label class="field-label">Orden por fecha</label>
-          <q-option-group
-            v-model="ordenFecha"
-            :options="ordenFechaOptions"
-            color="primary"
-            dense
-            class="q-mb-md"
-          />
+    <template v-else>
+      <q-input
+        v-model="searchTerm"
+        rounded
+        outlined
+        dense
+        clearable
+        :placeholder="esVistaMovimientos ? 'Buscar casita de origen o destino...' : 'Buscar por casita o usuario...'"
+        class="q-mb-sm"
+        bg-color="white"
+      >
+        <template #prepend>
+          <q-icon name="search" color="grey-5" />
+        </template>
+      </q-input>
 
-          <q-toggle
-            v-model="ordenarPorCasita"
+      <div class="filters-toolbar q-mb-md">
+        <q-btn
+          outline
+          rounded
+          no-caps
+          color="primary"
+          icon="tune"
+          :label="filtrosActivosCount > 0 ? `Filtros (${filtrosActivosCount})` : 'Filtros'"
+          @click="filtersOpen = true"
+        />
+        <div v-if="filtrosResumen.length" class="filters-chips">
+          <q-chip
+            v-for="chip in filtrosResumen"
+            :key="chip"
             dense
+            outline
             color="primary"
-            label="Ordenar por casita (menor → mayor)"
-            class="q-mb-md"
-          />
+            size="sm"
+          >
+            {{ chip }}
+          </q-chip>
+        </div>
+      </div>
 
-          <q-toggle
-            v-model="soloDefectuosas"
-            dense
-            color="negative"
-            label="Solo pantallas defectuosas"
-            class="q-mb-md"
-          />
+      <q-dialog v-model="filtersOpen" position="bottom">
+        <q-card class="filters-modal">
+          <q-toolbar>
+            <q-toolbar-title class="text-weight-bold text-body1">Filtros</q-toolbar-title>
+            <q-btn flat dense no-caps color="grey-7" label="Restablecer" @click="resetFilters" />
+            <q-btn flat round dense icon="close" v-close-popup />
+          </q-toolbar>
+          <q-separator />
+          <q-card-section>
+            <label class="field-label">Orden por fecha</label>
+            <q-option-group
+              v-model="ordenFecha"
+              :options="ordenFechaOptions"
+              color="primary"
+              dense
+              class="q-mb-md"
+            />
 
-          <label class="field-label">Tipo de registro</label>
-          <q-option-group
-            v-model="tipoFiltro"
-            :options="tipoFiltroOptions"
-            color="primary"
+            <q-toggle
+              v-if="esVistaReportes"
+              v-model="ordenarPorCasita"
+              dense
+              color="primary"
+              label="Ordenar por casita (menor → mayor)"
+              class="q-mb-md"
+            />
+
+            <q-toggle
+              v-if="esVistaReportes"
+              v-model="soloDefectuosas"
+              dense
+              color="negative"
+              label="Solo pantallas defectuosas"
+            />
+          </q-card-section>
+          <q-card-actions class="q-pa-md">
+            <q-btn
+              unelevated
+              rounded
+              color="primary"
+              class="full-width"
+              label="Aplicar"
+              no-caps
+              v-close-popup
+            />
+          </q-card-actions>
+        </q-card>
+      </q-dialog>
+
+      <div v-if="!loading && esVistaReportes && filteredReports.length > 0" class="selection-bar q-mb-md">
+        <div class="selection-bar__info">
+          <q-checkbox
+            :model-value="allFilteredSelected"
+            :indeterminate="someFilteredSelected && !allFilteredSelected"
             dense
+            label="Seleccionar visibles"
+            @update:model-value="toggleSelectAllFiltered"
           />
-        </q-card-section>
-        <q-card-actions class="q-pa-md">
+          <span class="selection-count">{{ selectedIds.length }} seleccionados</span>
+        </div>
+        <div class="selection-bar__actions">
+          <q-btn
+            flat
+            dense
+            no-caps
+            color="grey-7"
+            label="Limpiar"
+            :disable="selectedIds.length === 0"
+            @click="clearSelection"
+          />
           <q-btn
             unelevated
             rounded
-            color="primary"
-            class="full-width"
-            label="Aplicar"
             no-caps
-            v-close-popup
+            color="negative"
+            icon="picture_as_pdf"
+            :label="selectedIds.length > 0 ? `Crear PDF (${selectedIds.length})` : 'Crear PDF'"
+            :loading="pdfBulkLoading"
+            :disable="selectedIds.length === 0"
+            @click="downloadSelectedPdf"
           />
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-
-    <div v-if="!loading && filteredReports.length > 0" class="selection-bar q-mb-md">
-      <div class="selection-bar__info">
-        <q-checkbox
-          :model-value="allFilteredSelected"
-          :indeterminate="someFilteredSelected && !allFilteredSelected"
-          dense
-          label="Seleccionar visibles"
-          @update:model-value="toggleSelectAllFiltered"
-        />
-        <span class="selection-count">{{ selectedIds.length }} seleccionados</span>
-      </div>
-      <div class="selection-bar__actions">
-        <q-btn
-          flat
-          dense
-          no-caps
-          color="grey-7"
-          label="Limpiar"
-          :disable="selectedIds.length === 0"
-          @click="clearSelection"
-        />
-        <q-btn
-          unelevated
-          rounded
-          no-caps
-          color="negative"
-          icon="picture_as_pdf"
-          :label="selectedIds.length > 0 ? `Crear PDF (${selectedIds.length})` : 'Crear PDF'"
-          :loading="pdfBulkLoading"
-          :disable="selectedIds.length === 0"
-          @click="downloadSelectedPdf"
-        />
-      </div>
-    </div>
-
-    <div v-if="loading" class="text-center q-pa-xl">
-      <q-spinner-dots color="primary" size="40px" />
-      <div class="q-mt-sm text-grey-6 text-body2">Cargando reportes…</div>
-    </div>
-
-    <div v-else-if="errorMsg" class="empty-state q-pa-xl">
-      <q-icon name="error_outline" size="48px" color="red-4" />
-      <div class="q-mt-sm text-body2 text-grey-7">{{ errorMsg }}</div>
-      <q-btn flat dense color="primary" label="Reintentar" class="q-mt-sm" @click="fetchReports" />
-    </div>
-
-    <div v-else-if="filteredReports.length === 0" class="empty-state q-pa-xl">
-      <q-icon name="tv_off" size="56px" color="grey-4" />
-      <div class="q-mt-sm text-body1 text-weight-medium text-grey-7">
-        {{ emptyTitle }}
-      </div>
-      <div class="text-caption text-grey-5">
-        {{ emptyCaption }}
-      </div>
-    </div>
-
-    <div v-else class="reports-list">
-      <div
-        v-for="report in filteredReports"
-        :key="report.id"
-        class="report-card"
-        :class="{ 'report-card--selected': isSelected(report.id) }"
-      >
-        <div class="report-card-header">
-          <q-checkbox
-            :model-value="isSelected(report.id)"
-            dense
-            class="report-checkbox"
-            @update:model-value="val => toggleSelection(report.id, val)"
-            @click.stop
-          />
-
-          <div class="report-main" @click="toggleExpand(report.id)">
-            <div class="report-title-row">
-              <div
-                class="casita-badge"
-                :class="isMovimiento(report) ? 'casita-badge--move' : ''"
-              >
-                {{ cardTitle(report) }}
-              </div>
-              <div class="report-type-chip" :class="isMovimiento(report) ? 'is-move' : 'is-report'">
-                {{ isMovimiento(report) ? 'Movimiento' : 'Reporte' }}
-              </div>
-            </div>
-            <div class="report-meta">
-              <span class="meta-item">
-                <q-icon name="person_outline" size="14px" />
-                {{ report.nombre_usuario }}
-              </span>
-              <span class="meta-item">
-                <q-icon name="schedule" size="14px" />
-                {{ formatDate(report.fecha_hora) }}
-              </span>
-            </div>
-            <div v-if="report.notas" class="report-notas">
-              {{ report.notas }}
-            </div>
-          </div>
-
-          <div class="report-actions-inline">
-            <q-icon
-              :name="expandedId === report.id ? 'expand_less' : 'expand_more'"
-              color="grey-6"
-              size="22px"
-              class="cursor-pointer"
-              @click.stop="toggleExpand(report.id)"
-            />
-          </div>
         </div>
+      </div>
 
-        <div v-if="getFotos(report).length" class="thumbs-row">
-          <div
-            v-for="(foto, idx) in getFotos(report)"
-            :key="`${report.id}_${idx}`"
-            class="thumb-wrap"
-          >
-            <div class="thumb-img-wrap" @click="openViewer(foto.url, report, foto, idx)">
-              <q-img
-                :src="getCloudinaryUrl(foto.url, 'w_200,h_200,c_fill,q_auto')"
-                :ratio="1"
-                class="thumb-img"
-                spinner-color="primary"
-              />
-              <div
-                class="thumb-estado-bar"
-                :class="estadoClass(foto.estado)"
-              />
-            </div>
-            <div class="thumb-label">{{ foto.ubicacion || 'Sin ubicación' }}</div>
-            <div
-              class="thumb-estado"
-              :class="estadoClass(foto.estado)"
-            >
-              {{ foto.estado || 'defectuosa' }}
-            </div>
-            <q-btn
-              flat
+      <div v-if="loading" class="text-center q-pa-xl">
+        <q-spinner-dots color="primary" size="40px" />
+        <div class="q-mt-sm text-grey-6 text-body2">Cargando…</div>
+      </div>
+
+      <div v-else-if="errorMsg" class="empty-state q-pa-xl">
+        <q-icon name="error_outline" size="48px" color="red-4" />
+        <div class="q-mt-sm text-body2 text-grey-7">{{ errorMsg }}</div>
+        <q-btn flat dense color="primary" label="Reintentar" class="q-mt-sm" @click="fetchReports" />
+      </div>
+
+      <div v-else-if="filteredReports.length === 0" class="empty-state q-pa-xl">
+        <q-icon :name="esVistaMovimientos ? 'swap_horiz' : 'tv_off'" size="56px" color="grey-4" />
+        <div class="q-mt-sm text-body1 text-weight-medium text-grey-7">
+          {{ emptyTitle }}
+        </div>
+        <div class="text-caption text-grey-5">
+          {{ emptyCaption }}
+        </div>
+      </div>
+
+      <div v-else class="reports-list">
+        <div
+          v-for="report in filteredReports"
+          :key="report.id"
+          class="report-card"
+          :class="{
+            'report-card--selected': esVistaReportes && isSelected(report.id),
+            'report-card--move': esVistaMovimientos
+          }"
+        >
+          <div class="report-card-header">
+            <q-checkbox
+              v-if="esVistaReportes"
+              :model-value="isSelected(report.id)"
               dense
-              no-caps
-              size="sm"
-              color="primary"
-              icon="download"
-              label="Descargar"
-              class="thumb-download-btn"
-              :loading="downloadingKey === `${report.id}_${idx}`"
-              @click.stop="downloadImage(foto, report, idx)"
+              class="report-checkbox"
+              @update:model-value="val => toggleSelection(report.id, val)"
+              @click.stop
             />
-          </div>
-        </div>
 
-        <div v-show="expandedId === report.id" class="report-expanded">
-          <div v-if="isMovimiento(report)" class="movement-panel q-mb-md">
-            <div class="expanded-title">Trayecto de la pantalla</div>
-            <div class="movement-path">
-              <div class="movement-stop">
-                <div class="movement-stop-label">Salió de</div>
-                <div class="movement-stop-value">{{ formatUbicacion(report.origen_ubicacion) }}</div>
-                <div v-if="report.origen_habitacion" class="movement-stop-room">{{ report.origen_habitacion }}</div>
+            <div class="report-main" @click="toggleExpand(report.id)">
+              <template v-if="esVistaMovimientos">
+                <div class="move-path-inline">
+                  <div class="move-stop">
+                    <div class="move-stop-kicker">Salió de</div>
+                    <div class="move-stop-name">{{ formatUbicacion(report.origen_ubicacion) }}</div>
+                    <div v-if="report.origen_habitacion" class="move-stop-room">{{ report.origen_habitacion }}</div>
+                  </div>
+                  <q-icon name="arrow_forward" color="primary" size="20px" class="move-arrow" />
+                  <div class="move-stop">
+                    <div class="move-stop-kicker">Llegó a</div>
+                    <div class="move-stop-name">{{ formatUbicacion(report.destino_ubicacion) }}</div>
+                    <div v-if="report.destino_habitacion" class="move-stop-room">{{ report.destino_habitacion }}</div>
+                  </div>
+                </div>
+              </template>
+              <template v-else>
+                <div class="casita-badge">Casita {{ report.numero_casita }}</div>
+              </template>
+              <div class="report-meta">
+                <span class="meta-item">
+                  <q-icon name="person_outline" size="14px" />
+                  {{ report.nombre_usuario }}
+                </span>
+                <span class="meta-item">
+                  <q-icon name="schedule" size="14px" />
+                  {{ formatDate(report.fecha_hora) }}
+                </span>
               </div>
-              <q-icon name="arrow_forward" color="primary" size="22px" />
-              <div class="movement-stop">
-                <div class="movement-stop-label">Llegó a</div>
-                <div class="movement-stop-value">{{ formatUbicacion(report.destino_ubicacion) }}</div>
-                <div v-if="report.destino_habitacion" class="movement-stop-room">{{ report.destino_habitacion }}</div>
+              <div v-if="report.notas" class="report-notas">
+                {{ report.notas }}
               </div>
+            </div>
+
+            <div class="report-actions-inline">
+              <q-icon
+                :name="expandedId === report.id ? 'expand_less' : 'expand_more'"
+                color="grey-6"
+                size="22px"
+                class="cursor-pointer"
+                @click.stop="toggleExpand(report.id)"
+              />
             </div>
           </div>
 
-          <div v-if="getInventarios(report).length" class="inventory-panel q-mb-md">
-            <div class="expanded-title">Inventario actual</div>
+          <div v-if="esVistaReportes && getFotos(report).length" class="thumbs-row">
             <div
-              v-for="inv in getInventarios(report)"
-              :key="`${report.id}_${inv.key}`"
-              class="inventory-card"
+              v-for="(foto, idx) in getFotos(report)"
+              :key="`${report.id}_${idx}`"
+              class="thumb-wrap"
             >
-              <div class="inventory-location">{{ inv.label }}</div>
-              <div class="inventory-rooms">
+              <div class="thumb-img-wrap" @click="openViewer(foto.url, report, foto, idx)">
+                <q-img
+                  :src="getCloudinaryUrl(foto.url, 'w_200,h_200,c_fill,q_auto')"
+                  :ratio="1"
+                  class="thumb-img"
+                  spinner-color="primary"
+                />
                 <div
-                  v-for="room in inv.rooms"
-                  :key="`${inv.key}_${room.habitacion}`"
-                  class="inventory-room"
-                  :class="{ 'has-screen': room.cantidad > 0 }"
-                >
-                  <span>{{ room.habitacion }}</span>
-                  <strong>{{ room.cantidad }} {{ room.cantidad === 1 ? 'pantalla' : 'pantallas' }}</strong>
+                  class="thumb-estado-bar"
+                  :class="estadoClass(foto.estado)"
+                />
+              </div>
+              <div class="thumb-label">{{ foto.ubicacion || 'Sin ubicación' }}</div>
+              <div
+                class="thumb-estado"
+                :class="estadoClass(foto.estado)"
+              >
+                {{ foto.estado || 'defectuosa' }}
+              </div>
+              <q-btn
+                flat
+                dense
+                no-caps
+                size="sm"
+                color="primary"
+                icon="download"
+                label="Descargar"
+                class="thumb-download-btn"
+                :loading="downloadingKey === `${report.id}_${idx}`"
+                @click.stop="downloadImage(foto, report, idx)"
+              />
+            </div>
+          </div>
+
+          <div v-show="expandedId === report.id" class="report-expanded">
+            <div v-if="esVistaMovimientos && getInventarios(report).length" class="inventory-panel q-mb-md">
+              <div class="expanded-title">Inventario actual</div>
+              <div
+                v-for="inv in getInventarios(report)"
+                :key="`${report.id}_${inv.key}`"
+                class="inventory-card"
+              >
+                <div class="inventory-location">{{ inv.label }}</div>
+                <div class="inventory-rooms">
+                  <div
+                    v-for="room in inv.rooms"
+                    :key="`${inv.key}_${room.habitacion}`"
+                    class="inventory-room"
+                    :class="{ 'has-screen': room.cantidad > 0 }"
+                  >
+                    <span>{{ room.habitacion }}</span>
+                    <strong>{{ room.cantidad }} {{ room.cantidad === 1 ? 'pantalla' : 'pantallas' }}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div
+              v-if="esVistaReportes && getRelatedMovements(report).length"
+              class="related-cta q-mb-md"
+            >
+              <div>
+                <div class="related-cta-title">Esta casita tiene movimientos</div>
+                <div class="related-cta-copy">
+                  {{ getRelatedMovements(report).length }}
+                  {{ getRelatedMovements(report).length === 1 ? 'traslado registrado' : 'traslados registrados' }}
+                </div>
+              </div>
+              <q-btn
+                unelevated
+                rounded
+                no-caps
+                color="primary"
+                label="Ver movimientos"
+                @click.stop="verMovimientosDeCasita(report.numero_casita)"
+              />
+            </div>
+
+            <div v-if="esVistaReportes && getFotos(report).length" class="expanded-grid">
+              <div
+                v-for="(foto, idx) in getFotos(report)"
+                :key="`exp_${report.id}_${idx}`"
+                class="expanded-photo"
+              >
+                <q-img
+                  :src="getCloudinaryUrl(foto.url, 'w_900,q_auto')"
+                  class="expanded-img"
+                  spinner-color="primary"
+                  @click="openViewer(foto.url, report, foto, idx)"
+                />
+                <div class="expanded-caption row items-center justify-between no-wrap">
+                  <span>{{ foto.ubicacion || 'Sin ubicación' }} · {{ foto.estado || 'defectuosa' }}</span>
+                  <q-btn
+                    flat
+                    dense
+                    round
+                    icon="download"
+                    color="primary"
+                    :loading="downloadingKey === `exp_${report.id}_${idx}`"
+                    @click="downloadImage(foto, report, idx, `exp_${report.id}_${idx}`)"
+                  >
+                    <q-tooltip>Descargar imagen</q-tooltip>
+                  </q-btn>
                 </div>
               </div>
             </div>
           </div>
-
-          <div v-if="getRelatedMovements(report).length" class="related-panel q-mb-md">
-            <div class="expanded-title">Movimientos de esta casita</div>
-            <div
-              v-for="move in getRelatedMovements(report)"
-              :key="`rel_${report.id}_${move.id}`"
-              class="related-move"
-            >
-              <div class="related-move-path">{{ formatMovimientoResumen(move) }}</div>
-              <div class="related-move-meta">
-                {{ move.nombre_usuario }} · {{ formatDate(move.fecha_hora) }}
-              </div>
-            </div>
-          </div>
-
-          <div v-if="getFotos(report).length" class="expanded-grid">
-            <div
-              v-for="(foto, idx) in getFotos(report)"
-              :key="`exp_${report.id}_${idx}`"
-              class="expanded-photo"
-            >
-              <q-img
-                :src="getCloudinaryUrl(foto.url, 'w_900,q_auto')"
-                class="expanded-img"
-                spinner-color="primary"
-                @click="openViewer(foto.url, report, foto, idx)"
-              />
-              <div class="expanded-caption row items-center justify-between no-wrap">
-                <span>{{ foto.ubicacion || 'Sin ubicación' }} · {{ foto.estado || 'defectuosa' }}</span>
-                <q-btn
-                  flat
-                  dense
-                  round
-                  icon="download"
-                  color="primary"
-                  :loading="downloadingKey === `exp_${report.id}_${idx}`"
-                  @click="downloadImage(foto, report, idx, `exp_${report.id}_${idx}`)"
-                >
-                  <q-tooltip>Descargar imagen</q-tooltip>
-                </q-btn>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
-    </div>
+    </template>
 
     <q-dialog v-model="viewerOpen" maximized transition-show="fade" transition-hide="fade">
       <q-card class="bg-black viewer-card">
@@ -386,7 +419,7 @@
 
 <script>
 import { computed, defineComponent, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { notify } from '../utils/notify'
 import { useAuthStore } from '../stores/auth'
 import { supabase } from '../supabase'
@@ -404,6 +437,7 @@ export default defineComponent({
   name: 'ReportePantallasListPage',
   setup () {
     const router = useRouter()
+    const route = useRoute()
     const authStore = useAuthStore()
 
     const loading = ref(true)
@@ -414,7 +448,7 @@ export default defineComponent({
     const ordenFecha = ref('reciente')
     const ordenarPorCasita = ref(false)
     const soloDefectuosas = ref(false)
-    const tipoFiltro = ref('todos')
+    const vistaModo = ref(null)
     const expandedId = ref(null)
     const selectedIds = ref([])
     const pdfBulkLoading = ref(false)
@@ -430,15 +464,23 @@ export default defineComponent({
       { label: 'Más antigua → más reciente', value: 'antigua' }
     ]
 
-    const tipoFiltroOptions = [
-      { label: 'Todos', value: 'todos' },
-      { label: 'Solo reportes', value: 'reporte' },
-      { label: 'Solo movimientos', value: 'movimiento' }
-    ]
+    const esVistaReportes = computed(() => vistaModo.value === 'reporte')
+    const esVistaMovimientos = computed(() => vistaModo.value === 'movimiento')
+    const reportesCount = computed(() => reports.value.filter(report => !isMovimiento(report)).length)
+    const movimientosCount = computed(() => reports.value.filter(isMovimiento).length)
 
-    function cardTitle (report) {
-      if (isMovimiento(report)) return formatMovimientoResumen(report)
-      return `Casita ${report.numero_casita}`
+    function selectVista (mode) {
+      vistaModo.value = mode
+      expandedId.value = null
+      selectedIds.value = []
+      if (route.query.vista !== mode) {
+        router.replace({ query: { ...route.query, vista: mode } })
+      }
+    }
+
+    function verMovimientosDeCasita (casita) {
+      searchTerm.value = String(casita || '')
+      selectVista('movimiento')
     }
 
     function involvedUbicaciones (report) {
@@ -530,12 +572,14 @@ export default defineComponent({
     }
 
     const filteredReports = computed(() => {
+      if (!vistaModo.value) return []
+
       const term = searchTerm.value.trim().toLowerCase()
       let list = reports.value.slice()
 
-      if (tipoFiltro.value === 'reporte') {
+      if (esVistaReportes.value) {
         list = list.filter(report => !isMovimiento(report))
-      } else if (tipoFiltro.value === 'movimiento') {
+      } else {
         list = list.filter(isMovimiento)
       }
 
@@ -557,11 +601,11 @@ export default defineComponent({
         })
       }
 
-      if (soloDefectuosas.value) {
+      if (esVistaReportes.value && soloDefectuosas.value) {
         list = list.filter(reportHasDefectuosa)
       }
 
-      if (ordenarPorCasita.value) {
+      if (esVistaReportes.value && ordenarPorCasita.value) {
         return uniqueByCasita(list)
       }
 
@@ -571,34 +615,37 @@ export default defineComponent({
     const filtrosActivosCount = computed(() => {
       let count = 0
       if (ordenFecha.value !== 'reciente') count++
-      if (ordenarPorCasita.value) count++
-      if (soloDefectuosas.value) count++
-      if (tipoFiltro.value !== 'todos') count++
+      if (esVistaReportes.value && ordenarPorCasita.value) count++
+      if (esVistaReportes.value && soloDefectuosas.value) count++
       return count
     })
 
     const filtrosResumen = computed(() => {
       const chips = []
-      if (ordenarPorCasita.value) {
+      if (esVistaReportes.value && ordenarPorCasita.value) {
         chips.push(ordenFecha.value === 'antigua' ? 'Más antigua por casita' : 'Más reciente por casita')
         chips.push('Casitas 1→50')
       } else if (ordenFecha.value === 'antigua') {
         chips.push('Antigua → reciente')
       }
-      if (soloDefectuosas.value) chips.push('Solo defectuosas')
-      if (tipoFiltro.value === 'reporte') chips.push('Solo reportes')
-      if (tipoFiltro.value === 'movimiento') chips.push('Solo movimientos')
+      if (esVistaReportes.value && soloDefectuosas.value) chips.push('Solo defectuosas')
       return chips
     })
 
     const emptyTitle = computed(() => {
-      if (reports.value.length === 0) return 'Aún no hay reportes'
-      return 'Sin resultados'
+      if (esVistaMovimientos.value) {
+        return reports.value.some(isMovimiento) ? 'Sin resultados' : 'Aún no hay movimientos'
+      }
+      return reports.value.some(report => !isMovimiento(report)) ? 'Sin resultados' : 'Aún no hay reportes'
     })
 
     const emptyCaption = computed(() => {
-      if (reports.value.length === 0) return 'Crea el primero con el botón Nuevo'
-      if (tipoFiltro.value === 'movimiento') return 'No hay movimientos de pantallas con esos filtros'
+      if (esVistaMovimientos.value) {
+        if (!reports.value.some(isMovimiento)) return 'Registra el primero con el botón Nuevo'
+        if (searchTerm.value.trim()) return 'Prueba otra casita o usuario'
+        return 'No hay movimientos con esos filtros'
+      }
+      if (!reports.value.some(report => !isMovimiento(report))) return 'Crea el primero con el botón Nuevo'
       if (soloDefectuosas.value) return 'No hay reportes con pantallas defectuosas'
       if (searchTerm.value.trim()) return 'Prueba otro término de búsqueda o cambia los filtros'
       return 'Ajusta los filtros para ver reportes'
@@ -608,7 +655,6 @@ export default defineComponent({
       ordenFecha.value = 'reciente'
       ordenarPorCasita.value = false
       soloDefectuosas.value = false
-      tipoFiltro.value = 'todos'
     }
 
     const allFilteredSelected = computed(() => {
@@ -807,7 +853,13 @@ export default defineComponent({
       router.push('/reporte-pantallas/nuevo')
     }
 
-    onMounted(fetchReports)
+    onMounted(() => {
+      const vista = route.query.vista
+      if (vista === 'reporte' || vista === 'movimiento') {
+        vistaModo.value = vista
+      }
+      fetchReports()
+    })
 
     return {
       authStore,
@@ -820,8 +872,13 @@ export default defineComponent({
       ordenFechaOptions,
       ordenarPorCasita,
       soloDefectuosas,
-      tipoFiltro,
-      tipoFiltroOptions,
+      vistaModo,
+      esVistaReportes,
+      esVistaMovimientos,
+      reportesCount,
+      movimientosCount,
+      selectVista,
+      verMovimientosDeCasita,
       filtrosActivosCount,
       filtrosResumen,
       filteredReports,
@@ -840,9 +897,7 @@ export default defineComponent({
       isDefectuosa,
       estadoClass,
       isMovimiento,
-      cardTitle,
       formatUbicacion,
-      formatMovimientoResumen,
       getInventarios,
       getRelatedMovements,
       isSelected,
@@ -907,6 +962,170 @@ export default defineComponent({
 .nuevo-btn {
   flex-shrink: 0;
   font-weight: 600;
+}
+
+.vista-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.vista-card {
+  appearance: none;
+  font-family: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  text-align: left;
+  border: 1px solid #ececec;
+  background: #fff;
+  border-radius: 16px;
+  padding: 14px 12px;
+  cursor: pointer;
+  color: #424242;
+  min-height: 118px;
+}
+
+.vista-grid--compact .vista-card {
+  min-height: 0;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+}
+
+.vista-card-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.vista-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.vista-card-copy {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #757575;
+  line-height: 1.35;
+}
+
+.vista-grid--compact .vista-card-copy {
+  display: none;
+}
+
+.vista-card-count {
+  font-size: 18px;
+  font-weight: 700;
+  color: #9e9e9e;
+}
+
+.vista-grid--compact .vista-card-count {
+  font-size: 15px;
+  margin-left: auto;
+}
+
+.vista-card--active {
+  border-color: #e57373;
+  background: #fff5f5;
+  color: #b71c1c;
+}
+
+.vista-card--move.vista-card--active {
+  border-color: #64b5f6;
+  background: #e3f2fd;
+  color: #0d47a1;
+}
+
+.chooser-empty {
+  text-align: center;
+  padding: 36px 16px 24px;
+}
+
+.chooser-title {
+  margin-top: 10px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #424242;
+}
+
+.chooser-copy {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #757575;
+  line-height: 1.45;
+  max-width: 320px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.move-path-inline {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.move-stop {
+  background: #f7f7f8;
+  border-radius: 12px;
+  padding: 8px 10px;
+  min-width: 0;
+}
+
+.move-stop-kicker {
+  font-size: 10px;
+  font-weight: 700;
+  color: #9e9e9e;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.move-stop-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #212121;
+  margin-top: 2px;
+}
+
+.move-stop-room {
+  font-size: 12px;
+  color: #616161;
+}
+
+.move-arrow {
+  flex-shrink: 0;
+}
+
+.related-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #e3f2fd;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.related-cta-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0d47a1;
+}
+
+.related-cta-copy {
+  font-size: 12px;
+  color: #1565c0;
+  margin-top: 2px;
+}
+
+.report-card--move {
+  border-color: rgba(13, 71, 161, 0.12);
 }
 
 .selection-bar {
@@ -1289,8 +1508,35 @@ export default defineComponent({
   color: #e0e0e0;
 }
 
-.body--dark .casita-badge {
-  background: rgba(183, 28, 28, 0.25);
+.body--dark .vista-card {
+  background: #1e1e1e;
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #e0e0e0;
+}
+
+.body--dark .vista-card--active {
+  background: rgba(198, 40, 40, 0.16);
+  border-color: #e57373;
+  color: #ef9a9a;
+}
+
+.body--dark .vista-card--move.vista-card--active {
+  background: rgba(13, 71, 161, 0.22);
+  border-color: #64b5f6;
+  color: #90caf9;
+}
+
+.body--dark .chooser-title,
+.body--dark .move-stop-name {
+  color: #e0e0e0;
+}
+
+.body--dark .move-stop {
+  background: #2a2a2a;
+}
+
+.body--dark .related-cta {
+  background: rgba(13, 71, 161, 0.28);
 }
 
 .body--dark .casita-badge--move {

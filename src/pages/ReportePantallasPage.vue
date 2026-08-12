@@ -356,6 +356,7 @@ import {
   HABITACIONES_PANTALLA,
   TIPO_MOVIMIENTO,
   TIPO_REPORTE,
+  aplicarInventarioDesdeReporte,
   buildCasitaOptions,
   buildUbicacionOptions,
   isCasitaUbicacion,
@@ -843,7 +844,13 @@ export default defineComponent({
 
         if (error) throw error
 
-        notify({ type: 'positive', message: 'Reporte guardado correctamente', icon: 'check_circle' })
+        try {
+          await aplicarInventarioDesdeReporte(supabase, numeroCasita.value, fotosPayload)
+        } catch (inventoryError) {
+          console.error('Reporte guardado, pero el inventario no se actualizó', inventoryError)
+        }
+
+        notify({ type: 'positive', message: 'Reporte guardado e inventario actualizado', icon: 'check_circle' })
 
         fotos.value.forEach(f => {
           if (f.preview) URL.revokeObjectURL(f.preview)

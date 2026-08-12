@@ -2,6 +2,7 @@ export const TIPO_REPORTE = 'reporte'
 export const TIPO_MOVIMIENTO = 'movimiento'
 
 export const HABITACIONES_PANTALLA = ['Living', 'Cuarto Queen', 'Cuarto King']
+export const ESTADO_NO_HAY_PANTALLA = 'no hay pantalla'
 
 export const UBICACIONES_EXTRA = [
   { label: 'Bodega', value: 'bodega' },
@@ -53,6 +54,14 @@ export function formatMovimientoResumen (report) {
 
 export function isMovimiento (report) {
   return String(report?.tipo || TIPO_REPORTE) === TIPO_MOVIMIENTO
+}
+
+export function isNoHayPantalla (estado) {
+  return String(estado || '').trim().toLowerCase() === ESTADO_NO_HAY_PANTALLA
+}
+
+function fotoHabitacion (foto) {
+  return String(foto?.ubicacion || foto?.habitacion || '').trim()
 }
 
 export function casitaKey (value) {
@@ -129,6 +138,66 @@ export async function ajustarInventarioPantalla (supabase, ubicacion, habitacion
   if (updateError) throw updateError
 }
 
+export async function setInventarioPantalla (supabase, ubicacion, habitacion, cantidad) {
+  const ubi = casitaKey(ubicacion)
+  const hab = inventoryHabitacionKey(ubi, habitacion)
+  if (!ubi) return
+  const qty = Math.max(Number(cantidad) || 0, 0)
+
+  const { error: rpcError } = await supabase.rpc('set_inventario_pantalla', {
+    p_ubicacion: ubi,
+    p_habitacion: hab,
+    p_cantidad: qty
+  })
+
+  if (!rpcError) return
+  if (!isMissingRpc(rpcError)) throw rpcError
+
+  const { data, error: selectError } = await supabase
+    .from('inventario_pantallas')
+    .select('id')
+    .eq('ubicacion', ubi)
+    .eq('habitacion', hab)
+    .maybeSingle()
+
+  if (selectError) throw selectError
+
+  if (!data) {
+    const { error: insertError } = await supabase
+      .from('inventario_pantallas')
+      .insert({
+        ubicacion: ubi,
+        habitacion: hab,
+        cantidad: qty
+      })
+    if (insertError) throw insertError
+    return
+  }
+
+  const { error: updateError } = await supabase
+    .from('inventario_pantallas')
+    .update({
+      cantidad: qty,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', data.id)
+
+  if (updateError) throw updateError
+}
+
+export async function aplicarInventarioDesdeReporte (supabase, numeroCasita, fotos) {
+  const casita = casitaKey(numeroCasita)
+  if (!casita) return
+
+  const list = Array.isArray(fotos) ? fotos : []
+  for (const foto of list) {
+    const habitacion = fotoHabitacion(foto)
+    if (!habitacion) continue
+    const cantidad = isNoHayPantalla(foto?.estado) ? 0 : 1
+    await setInventarioPantalla(supabase, casita, habitacion, cantidad)
+  }
+}
+
 export async function registrarMovimientoPantalla (supabase, payload) {
   const { error, data } = await supabase.rpc('registrar_movimiento_pantalla', {
     p_nombre_usuario: payload.nombre_usuario,
@@ -183,13 +252,95 @@ export async function registrarMovimientoPantalla (supabase, payload) {
   return record
 }
 
+function roomInventoryKey (ubicacion, habitacion) {
+  return `${casitaKey(ubicacion)}|${String(habitacion || '').trim()}`
+}
+
+function eventTime (row) {
+  const raw = String(row?.fecha_hora || row?.created_at || '').trim()
+  if (!raw) return 0
+  const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T')
+  const time = new Date(normalized).getTime()
+  return Number.isNaN(time) ? 0 : time
+}
+
+function applyReportToCounts (counts, report) {
+  const casita = casitaKey(report?.numero_casita)
+  if (!casita) return
+
+  const fotos = Array.isArray(report?.fotos) ? report.fotos : []
+  for (const foto of fotos) {
+    const habitacion = fotoHabitacion(foto)
+    if (!habitacion) continue
+    counts.set(
+      roomInventoryKey(casita, habitacion),
+      isNoHayPantalla(foto?.estado) ? 0 : 1
+    )
+  }
+}
+
+function applyMovementToCounts (counts, move) {
+  const originUbi = casitaKey(move?.origen_ubicacion)
+  const destUbi = casitaKey(move?.destino_ubicacion)
+
+  if (originUbi) {
+    const key = roomInventoryKey(originUbi, move?.origen_habitacion)
+    counts.set(key, Math.max((counts.get(key) || 0) - 1, 0))
+  }
+
+  if (destUbi) {
+    const key = roomInventoryKey(destUbi, move?.destino_habitacion)
+    counts.set(key, (counts.get(key) || 0) + 1)
+  }
+}
+
+export function inventoryCountsFromHistory (reports) {
+  const counts = new Map()
+  const ordered = [...(Array.isArray(reports) ? reports : [])].sort((a, b) => {
+    const delta = eventTime(a) - eventTime(b)
+    if (delta !== 0) return delta
+    return Number(a?.id || 0) - Number(b?.id || 0)
+  })
+
+  for (const row of ordered) {
+    if (isMovimiento(row)) applyMovementToCounts(counts, row)
+    else applyReportToCounts(counts, row)
+  }
+
+  return counts
+}
+
+function roomsFromCounts (counts, ubicacion) {
+  const key = casitaKey(ubicacion)
+
+  if (isCasitaUbicacion(key)) {
+    return HABITACIONES_PANTALLA.map((habitacion) => ({
+      habitacion,
+      cantidad: counts.get(roomInventoryKey(key, habitacion)) || 0
+    }))
+  }
+
+  return [{
+    habitacion: 'General',
+    cantidad: counts.get(roomInventoryKey(key, '')) || 0
+  }]
+}
+
+export function inventoryFromHistory (reports, ubicacion) {
+  return roomsFromCounts(inventoryCountsFromHistory(reports), ubicacion)
+}
+
 export function inventoryForUbicacion (rows, ubicacion, reports = []) {
+  if (Array.isArray(reports) && reports.length > 0) {
+    return inventoryFromHistory(reports, ubicacion)
+  }
+
   const key = casitaKey(ubicacion)
   const list = Array.isArray(rows) ? rows : []
   const matched = list.filter(row => casitaKey(row.ubicacion) === key)
 
   if (matched.length === 0) {
-    return inventoryFromMovements(reports, key)
+    return inventoryFromHistory(reports, key)
   }
 
   if (isCasitaUbicacion(key)) {
@@ -209,31 +360,7 @@ export function inventoryForUbicacion (rows, ubicacion, reports = []) {
 }
 
 export function inventoryFromMovements (reports, ubicacion) {
-  const key = casitaKey(ubicacion)
-  const counts = new Map()
-  const moves = (Array.isArray(reports) ? reports : [])
-    .filter(isMovimiento)
-    .slice()
-    .sort((a, b) => new Date(a.fecha_hora || 0) - new Date(b.fecha_hora || 0))
-
-  for (const move of moves) {
-    const originKey = `${casitaKey(move.origen_ubicacion)}|${String(move.origen_habitacion || '').trim()}`
-    const destKey = `${casitaKey(move.destino_ubicacion)}|${String(move.destino_habitacion || '').trim()}`
-    counts.set(originKey, Math.max((counts.get(originKey) || 0) - 1, 0))
-    counts.set(destKey, (counts.get(destKey) || 0) + 1)
-  }
-
-  if (isCasitaUbicacion(key)) {
-    return HABITACIONES_PANTALLA.map((habitacion) => ({
-      habitacion,
-      cantidad: counts.get(`${key}|${habitacion}`) || 0
-    }))
-  }
-
-  return [{
-    habitacion: 'General',
-    cantidad: counts.get(`${key}|`) || 0
-  }]
+  return inventoryFromHistory(reports, ubicacion)
 }
 
 export function buildInventarioCasitas (rows, reports = []) {

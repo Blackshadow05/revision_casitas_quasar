@@ -113,6 +113,35 @@ $$;
 GRANT EXECUTE ON FUNCTION public.ajustar_inventario_pantalla(text, text, integer)
   TO anon, authenticated;
 
+-- 3b. Fijar cantidad desde un reporte (1 = hay pantalla, 0 = No hay pantalla)
+CREATE OR REPLACE FUNCTION public.set_inventario_pantalla(
+  p_ubicacion text,
+  p_habitacion text,
+  p_cantidad integer
+)
+RETURNS void
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+DECLARE
+  v_hab text := COALESCE(p_habitacion, '');
+  v_qty integer := GREATEST(COALESCE(p_cantidad, 0), 0);
+BEGIN
+  IF p_ubicacion IS NULL OR btrim(p_ubicacion) = '' THEN
+    RAISE EXCEPTION 'ubicacion requerida';
+  END IF;
+
+  INSERT INTO public.inventario_pantallas (ubicacion, habitacion, cantidad, updated_at)
+  VALUES (p_ubicacion, v_hab, v_qty, now())
+  ON CONFLICT (ubicacion, habitacion) DO UPDATE
+    SET cantidad = v_qty,
+        updated_at = now();
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.set_inventario_pantalla(text, text, integer)
+  TO anon, authenticated;
+
 -- 4. Registrar movimiento y actualizar inventario de origen y destino
 CREATE OR REPLACE FUNCTION public.registrar_movimiento_pantalla(
   p_nombre_usuario text,

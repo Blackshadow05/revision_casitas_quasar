@@ -54,7 +54,7 @@
         <q-icon name="inventory_2" size="26px" />
         <div class="vista-card-text">
           <div class="vista-card-title">Inventario</div>
-          <div class="vista-card-copy">Pantallas actuales por casita 1 a 50</div>
+          <div class="vista-card-copy">Reportes y movimientos, sin «No hay pantalla»</div>
         </div>
         <div class="vista-card-count">{{ inventarioTotalPantallas }}</div>
       </button>
@@ -92,7 +92,7 @@
 
       <div v-if="esVistaInventario" class="inv-toolbar q-mb-md">
         <div class="inv-toolbar-copy">
-          Casitas 1 a 50 · {{ inventarioTotalPantallas }} pantallas en total
+          Casitas 1 a 50 · {{ inventarioTotalPantallas }} pantallas · «No hay pantalla» no suma
         </div>
         <q-btn
           unelevated
@@ -1813,6 +1813,10 @@ export default defineComponent({
   background: rgba(46, 125, 50, 0.2);
   border-color: #81c784;
   color: #a5d6a7;
+}
+
+.body--dark .vista-grid--compact .vista-card-count {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .body--dark .chooser-title,

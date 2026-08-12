@@ -12,6 +12,26 @@
           clickable
           v-ripple
           class="settings-item"
+          @click="goToReportePantallas"
+        >
+          <q-item-section avatar>
+            <div class="settings-icon-wrap bg-red">
+              <q-icon name="tv" color="white" size="20px" />
+            </div>
+          </q-item-section>
+          <q-item-section>
+            <q-item-label class="text-weight-medium">Reporte de pantallas</q-item-label>
+            <q-item-label caption>Ver reportes, fotos y generar PDF</q-item-label>
+          </q-item-section>
+          <q-item-section side>
+            <q-icon name="chevron_right" color="grey-4" size="18px" />
+          </q-item-section>
+        </q-item>
+        <q-separator inset="72px" />
+        <q-item
+          clickable
+          v-ripple
+          class="settings-item"
           @click="openForm('https://docs.google.com/forms/d/e/1FAIpQLSctsgdYAKlqLbAcbb_jkJpL8FHgMOUYnvo2YVbu7LZG_cNgAQ/viewform','Ingreso a casitas')"
         >
           <q-item-section avatar>
@@ -119,10 +139,17 @@
 
 <script>
 import { defineComponent, ref } from 'vue';
+import { useRouter } from 'vue-router';
 
 export default defineComponent({
   name: 'FormsPage',
   setup() {
+    const router = useRouter();
+
+    const goToReportePantallas = () => {
+      router.push('/reporte-pantallas');
+    };
+
     const resolvedGoogleForms = {
       'https://forms.gle/1fZvWG1wdY3QB6qz5': 'https://docs.google.com/forms/d/e/1FAIpQLSctsgdYAKlqLbAcbb_jkJpL8FHgMOUYnvo2YVbu7LZG_cNgAQ/viewform',
       'https://forms.gle/QsG9uCh7AtxXet848': 'https://docs.google.com/forms/d/e/1FAIpQLSdGtxFReFg-fgkZ0ixlSsmUVBciwkCfgb0tqNNTNE-EBniX8A/viewform',
@@ -212,6 +239,7 @@ export default defineComponent({
       closeForm,
       openExternal,
       onIFrameLoad,
+      goToReportePantallas,
     };
   },
 });

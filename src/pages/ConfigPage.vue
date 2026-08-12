@@ -78,6 +78,28 @@
         clickable
         v-ripple
         class="settings-item"
+        @click="goToReportePantallas"
+      >
+        <q-item-section avatar>
+          <div class="settings-icon-wrap bg-red">
+            <q-icon name="tv" color="white" size="20px" />
+          </div>
+        </q-item-section>
+        <q-item-section>
+          <q-item-label class="text-weight-medium">Reporte de pantallas</q-item-label>
+          <q-item-label caption>Ver reportes, fotos y generar PDF</q-item-label>
+        </q-item-section>
+        <q-item-section side>
+          <q-icon name="chevron_right" color="grey-4" size="18px" />
+        </q-item-section>
+      </q-item>
+
+      <q-separator inset="72px" />
+
+      <q-item
+        clickable
+        v-ripple
+        class="settings-item"
         @click="goToAdminUsers"
       >
         <q-item-section avatar>
@@ -152,6 +174,7 @@ const goToAdminUsers = () => router.push('/admin-users')
 const goToReportes = () => router.push('/reportes')
 const goToCajaFuerte = () => router.push('/caja-fuerte')
 const goToDanosCasitas = () => router.push('/danos-casitas')
+const goToReportePantallas = () => router.push('/reporte-pantallas')
 const goToDashboardHorario = () => router.push('/dashboard-horario')
 const goToSnippets = () => router.push('/snippets')
 </script>

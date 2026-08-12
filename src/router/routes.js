@@ -21,6 +21,16 @@ const routes = [
       { path: 'reportes', component: () => import('pages/ReportesPage.vue') },
       { path: 'danos-casitas', component: () => import('pages/DanosCasitasListPage.vue') },
       { path: 'danos-casitas/:numero', component: () => import('pages/DanosCasitasDetailPage.vue') },
+      {
+        path: 'reporte-pantallas',
+        component: () => import('pages/ReportePantallasListPage.vue'),
+        meta: { requiresAuth: true }
+      },
+      {
+        path: 'reporte-pantallas/nuevo',
+        component: () => import('pages/ReportePantallasPage.vue'),
+        meta: { requiresAuth: true }
+      },
       { path: 'dashboard-horario', component: () => import('pages/DashboardHorarioPage.vue') },
       { path: 'operacion-diaria', component: () => import('pages/OperacionDiariaPage.vue') },
       { path: 'puesto-01', component: () => import('pages/Puesto01Page.vue') },

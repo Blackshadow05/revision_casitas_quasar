@@ -11,6 +11,8 @@ const LAYOUT = {
   photoGap: 2.5,
   photoHeight: 36,
   photoMaxWidth: 54,
+  photoMinWidth: 26,
+  captionPaddingX: 1.2,
   labelGap: 1,
   labelHeight: 6.5,
   estadoBarHeight: 1.4,
@@ -123,6 +125,18 @@ function truncateText (doc, text, maxWidth) {
     truncated = truncated.slice(0, -1)
   }
   return `${truncated}…`
+}
+
+function measureCaptionWidth (doc, ubicacion, estado) {
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(6)
+  const ubicacionWidth = doc.getTextWidth(String(ubicacion || '—'))
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(5.5)
+  const estadoWidth = doc.getTextWidth(String(estado || ''))
+
+  return Math.max(ubicacionWidth, estadoWidth) + (LAYOUT.captionPaddingX * 2)
 }
 
 async function preloadReportImages (reporte) {
@@ -284,6 +298,7 @@ function drawCasitaBlock (doc, reporte, images, rect) {
   const preparedPhotos = []
   for (let i = 0; i < photoCount; i++) {
     const foto = fotos[i]
+    const estado = normalizeEstado(foto.estado)
     let drawW = LAYOUT.photoMaxWidth
     let drawH = photoHeight
 
@@ -293,42 +308,46 @@ function drawCasitaBlock (doc, reporte, images, rect) {
       drawH = Math.max(12, foto.height * ratio)
     }
 
-    preparedPhotos.push({ foto, drawW, drawH })
+    const imageW = foto.failed || !foto.dataUrl ? LAYOUT.photoMaxWidth : drawW
+    const boxW = Math.max(imageW, LAYOUT.photoMinWidth, measureCaptionWidth(doc, foto.ubicacion, estado))
+
+    preparedPhotos.push({ foto, drawW, drawH, boxW, estado })
   }
 
   let cursorX = x + paddingX + 1
 
   for (const item of preparedPhotos) {
-    const { foto, drawW, drawH } = item
-    const boxW = foto.failed || !foto.dataUrl ? LAYOUT.photoMaxWidth : drawW
-    const photoX = cursorX
+    const { foto, drawW, drawH, boxW, estado } = item
+    const colX = cursorX
+    const photoX = colX + ((boxW - drawW) / 2)
     const photoY = photosTop + ((photoHeight - drawH) / 2)
-    const estado = normalizeEstado(foto.estado)
     const barColor = estadoBarColor(estado)
+    const captionMaxWidth = boxW - (LAYOUT.captionPaddingX * 2)
 
     if (foto.failed || !foto.dataUrl) {
       doc.setFillColor(248, 248, 248)
       doc.setDrawColor(235, 235, 235)
-      doc.roundedRect(photoX, photosTop, LAYOUT.photoMaxWidth, photoHeight, 1.2, 1.2, 'FD')
+      doc.roundedRect(colX, photosTop, boxW, photoHeight, 1.2, 1.2, 'FD')
       doc.setFont('helvetica', 'normal')
       doc.setFontSize(6)
       doc.setTextColor(160, 160, 160)
-      doc.text('Sin imagen', photoX + LAYOUT.photoMaxWidth / 2, photosTop + photoHeight / 2, { align: 'center' })
+      doc.text('Sin imagen', colX + boxW / 2, photosTop + photoHeight / 2, { align: 'center' })
     } else {
       doc.addImage(foto.dataUrl, 'JPEG', photoX, photoY, drawW, drawH)
     }
 
-    // Raya de estado debajo de la foto
+    // Raya de estado debajo de la foto: usa el ancho de la columna, no el de la imagen,
+    // para que fotos verticales no recorten "no hay pantalla" / "en buen estado".
     const barY = photosTop + photoHeight + 0.8
     doc.setFillColor(...barColor)
-    doc.roundedRect(photoX, barY, boxW, LAYOUT.estadoBarHeight, 0.5, 0.5, 'F')
+    doc.roundedRect(colX, barY, boxW, LAYOUT.estadoBarHeight, 0.5, 0.5, 'F')
 
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(6)
     doc.setTextColor(66, 66, 66)
     doc.text(
-      truncateText(doc, foto.ubicacion || '—', boxW),
-      photoX + boxW / 2,
+      truncateText(doc, foto.ubicacion || '—', captionMaxWidth),
+      colX + boxW / 2,
       barY + LAYOUT.estadoBarHeight + 2.4,
       { align: 'center' }
     )
@@ -337,8 +356,8 @@ function drawCasitaBlock (doc, reporte, images, rect) {
     doc.setFontSize(5.5)
     doc.setTextColor(...barColor)
     doc.text(
-      truncateText(doc, estado, boxW),
-      photoX + boxW / 2,
+      truncateText(doc, estado, captionMaxWidth),
+      colX + boxW / 2,
       barY + LAYOUT.estadoBarHeight + 5,
       { align: 'center' }
     )

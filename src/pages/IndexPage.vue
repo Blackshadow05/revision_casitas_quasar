@@ -1,5 +1,5 @@
 <template>
-  <q-page class="q-pa-md bg-grey-1">
+  <q-page class="home-page q-pa-md bg-grey-1">
     <!-- Login Modal -->
     <q-dialog v-model="showLoginModal" persistent backdrop-filter="blur(4px)">
       <q-card style="width: 350px; border-radius: 20px;" class="q-pa-lg">
@@ -93,23 +93,15 @@
       <q-scroll-observer @scroll="onScroll" />
 
       <!-- Top Bar / Profile Section -->
-      <div class="q-mb-md">
-        <!-- Fila principal con usuario y botón logout -->
-        <div class="row items-center justify-between">
-          <div class="row items-center">
-            <q-avatar size="40px" color="grey-2" text-color="dark" icon="person" class="q-mr-sm" />
-            <div>
-              <div class="text-weight-bold text-orange-9" style="font-size: 14px;">Bienvenido, {{ currentUser?.Usuario || 'Usuario' }}</div>
-              <div class="text-weight-bold text-orange-9" style="font-size: 14px; line-height: 1;">{{ currentUser?.Rol || '' }}</div>
-            </div>
+      <div class="home-profile q-mb-md">
+        <div class="home-profile__user row items-center">
+          <q-avatar size="40px" color="grey-2" text-color="dark" icon="person" class="q-mr-sm" />
+          <div>
+            <div class="text-weight-bold text-orange-9" style="font-size: 14px;">Bienvenido, {{ currentUser?.Usuario || 'Usuario' }}</div>
+            <div class="text-weight-bold text-orange-9" style="font-size: 14px; line-height: 1;">{{ currentUser?.Rol || '' }}</div>
           </div>
-          <q-btn flat dense no-caps class="logout-btn" @click="handleLogout">
-            <q-icon name="logout" size="14px" class="q-mr-xs" />
-            <span>Cerrar sesión</span>
-          </q-btn>
         </div>
-        <!-- Fila de puntos de sesión (debajo en móvil, al lado en desktop) -->
-        <div class="row q-mt-xs items-center">
+        <div class="home-profile__session row items-center">
           <div v-if="daysRemaining > 0" class="session-dots row items-center">
             <q-icon name="history" size="14px" color="grey-7" class="q-mr-xs" />
             <span class="q-mr-xs text-caption text-grey-7">Sesión:</span>
@@ -118,11 +110,16 @@
             </div>
           </div>
         </div>
+        <q-btn flat dense no-caps class="home-profile__logout logout-btn" @click="handleLogout">
+          <q-icon name="logout" size="14px" class="q-mr-xs" />
+          <span>Cerrar sesión</span>
+        </q-btn>
       </div>
 
+      <div class="home-dashboard q-mb-md">
       <!-- Resumen de check-in, check-out y ocupación del día -->
       <section
-        class="daily-operations-mobile q-mb-md"
+        class="daily-operations-mobile"
         aria-labelledby="daily-operations-title"
       >
         <div class="daily-operations-mobile__header row items-center no-wrap q-mb-sm">
@@ -211,7 +208,7 @@
             class="daily-operation-card daily-operation-card--ocupacion"
             aria-label="Ocupación del día"
           >
-            <div class="row items-center no-wrap">
+            <div class="daily-operation-card__head row items-center no-wrap">
               <q-icon name="hotel" color="indigo-6" size="18px" class="q-mr-xs" />
               <span class="daily-operation-card__label">Ocupación</span>
               <q-space />
@@ -222,7 +219,7 @@
       </section>
 
       <!-- ==================== AVISOS DE OPERACIÓN ==================== -->
-      <div v-if="avisos.length" class="avisos-wrapper q-mb-md">
+      <div v-if="avisos.length" class="avisos-wrapper">
         <div class="avisos-header row items-center justify-between no-wrap q-mb-xs">
           <div class="row items-center no-wrap">
             <q-icon name="notifications_active" size="20px" color="orange-9" class="q-mr-xs" />
@@ -239,7 +236,7 @@
             @click="avisosOcultos = !avisosOcultos"
           />
         </div>
-        <transition-group v-show="!avisosOcultos" name="aviso-fade" tag="div">
+        <transition-group v-show="!avisosOcultos" name="aviso-fade" tag="div" class="avisos-list">
           <q-banner
             v-for="a in avisos"
             :key="a.key"
@@ -256,11 +253,12 @@
           </q-banner>
         </transition-group>
       </div>
+      </div>
 
-      <div class="text-h5 text-weight-bold q-mb-lg" style="color: #4CAF50;">Revisiones de Casitas</div>
+      <div class="home-toolbar">
+        <div class="home-title text-h5 text-weight-bold">Revisiones de Casitas</div>
 
-      <div class="row q-col-gutter-sm q-mb-lg">
-        <div class="col-6">
+        <div class="home-actions">
           <q-btn
             color="orange-8"
             icon="schedule"
@@ -268,11 +266,9 @@
             no-caps
             unelevated
             rounded
-            class="dashboard-horario-btn full-width"
+            class="dashboard-action-btn"
             @click="goToDashboardHorario"
           />
-        </div>
-        <div class="col-6">
           <q-btn
             color="teal-7"
             icon="today"
@@ -280,38 +276,37 @@
             no-caps
             unelevated
             rounded
-            class="dashboard-horario-btn full-width"
+            class="dashboard-action-btn"
             @click="goToOperacionDiaria"
           />
         </div>
-      </div>
 
-      <!-- Search Bar -->
-      <div class="row items-center q-gutter-x-md q-mb-lg">
-        <q-input
-          v-model="search"
-          placeholder="Buscar por casita, revisor o notas..."
-          outlined
-          rounded
-          dense
-          bg-color="white"
-          class="search-input col shadow-1"
-          clearable
-        >
-          <template v-slot:prepend>
-            <q-icon name="search" class="text-grey-5" />
-          </template>
-        </q-input>
-        <q-btn
-          round
-          flat
-          icon="filter_list"
-          color="primary"
-          class="filter-btn bg-white shadow-1"
-          @click="showFilterModal = true"
-        >
-          <q-tooltip>Filtros</q-tooltip>
-        </q-btn>
+        <div class="home-search row items-center no-wrap">
+          <q-input
+            v-model="search"
+            placeholder="Buscar por casita, revisor o notas..."
+            outlined
+            rounded
+            dense
+            bg-color="white"
+            class="search-input col shadow-1"
+            clearable
+          >
+            <template v-slot:prepend>
+              <q-icon name="search" class="text-grey-5" />
+            </template>
+          </q-input>
+          <q-btn
+            round
+            flat
+            icon="filter_list"
+            color="primary"
+            class="filter-btn bg-white shadow-1"
+            @click="showFilterModal = true"
+          >
+            <q-tooltip>Filtros</q-tooltip>
+          </q-btn>
+        </div>
       </div>
 
       <!-- Active Filter Badge -->
@@ -361,7 +356,7 @@
       </div>
 
       <!-- Mostrando registros badge -->
-      <div v-if="visibleRecordsCount > 0" class="flex justify-center q-mb-md">
+      <div v-if="visibleRecordsCount > 0" class="home-records-row flex justify-center q-mb-md">
         <div class="records-badge">{{ recordsBadgeText }}</div>
       </div>
 
@@ -1843,6 +1838,53 @@ export default defineComponent({
   flex-wrap: nowrap;
 }
 
+.home-profile {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "user logout"
+    "session session";
+  gap: 4px 8px;
+  align-items: center;
+}
+
+.home-profile__user {
+  grid-area: user;
+}
+
+.home-profile__session {
+  grid-area: session;
+}
+
+.home-profile__logout {
+  grid-area: logout;
+}
+
+.home-title {
+  margin: 0;
+  color: #4CAF50;
+}
+
+.home-toolbar {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.home-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.dashboard-action-btn {
+  width: 100%;
+}
+
+.home-search {
+  gap: 8px;
+}
+
 /* En pantallas grandes, ocultamos la fila inferior */
 @media (min-width: 600px) {
   .session-dots {
@@ -2013,6 +2055,158 @@ export default defineComponent({
   
   .modern-table {
     min-width: 1200px;
+  }
+}
+
+/* ===== Escritorio: layout compacto, sin estirar el diseño móvil ===== */
+@media (min-width: 1024px) {
+  .home-page {
+    padding: 20px 24px 24px !important;
+  }
+
+  .home-profile {
+    grid-template-columns: auto auto 1fr auto;
+    grid-template-areas: "user session . logout";
+    gap: 0 16px;
+  }
+
+  .home-dashboard {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .daily-operations-mobile {
+    flex: 0 1 560px;
+    max-width: 560px;
+    padding: 10px 12px;
+  }
+
+  .daily-operations-mobile__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .daily-operation-card {
+    padding: 7px 8px;
+  }
+
+  .daily-operation-card .q-mb-sm {
+    margin-bottom: 4px !important;
+  }
+
+  .daily-operation-card--ocupacion {
+    grid-column: auto;
+  }
+
+  .daily-operation-card__label {
+    font-size: 0.72rem;
+  }
+
+  .daily-operation-number {
+    min-width: 26px;
+    min-height: 22px;
+    padding: 2px 5px;
+    font-size: 0.74rem;
+  }
+
+  .daily-operation-card__empty {
+    padding: 2px 0;
+    font-size: 0.95rem;
+  }
+
+  .ocupacion-count {
+    font-size: 1.05rem;
+  }
+
+  .avisos-wrapper {
+    display: flex;
+    flex: 1 1 280px;
+    max-width: 420px;
+    max-height: 168px;
+    flex-direction: column;
+    padding: 8px 10px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 152, 0, 0.18);
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(255, 152, 0, 0.08);
+  }
+
+  .avisos-list {
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  :global(.body--dark) .avisos-wrapper {
+    border-color: rgba(255, 183, 77, 0.22);
+    background: #1e1e1e;
+  }
+
+  .aviso-banner {
+    margin-bottom: 6px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  }
+
+  .aviso-banner:last-child {
+    margin-bottom: 0;
+  }
+
+  .aviso-banner :deep(.q-banner__content) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 8px;
+    font-size: 0.78rem;
+  }
+
+  .aviso-restante {
+    font-size: 0.7rem;
+  }
+
+  .home-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 16px;
+    margin-bottom: 12px;
+  }
+
+  .home-title {
+    margin-right: auto;
+    font-size: 1.45rem;
+    line-height: 1.2;
+  }
+
+  .home-search {
+    flex: 1 1 280px;
+    max-width: 420px;
+    min-width: 240px;
+  }
+
+  .home-actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 8px;
+  }
+
+  .dashboard-action-btn {
+    width: auto;
+    min-width: 168px;
+    height: 40px;
+    padding: 0 18px;
+  }
+
+  .home-records-row {
+    justify-content: flex-start !important;
+  }
+
+  .table-container {
+    margin-top: 0;
+  }
+
+  .filter-btn {
+    flex-shrink: 0;
   }
 }
 </style>

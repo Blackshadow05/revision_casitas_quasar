@@ -92,21 +92,22 @@
     <div v-if="isLoggedIn">
       <q-scroll-observer @scroll="onScroll" />
 
+      <div class="home-top q-mb-md">
       <!-- Top Bar / Profile Section -->
-      <div class="home-profile q-mb-md">
+      <div class="home-profile">
         <div class="home-profile__user row items-center">
-          <q-avatar size="40px" color="grey-2" text-color="dark" icon="person" class="q-mr-sm" />
+          <q-avatar size="36px" color="grey-3" text-color="grey-8" icon="person" class="q-mr-sm" />
           <div>
-            <div class="text-weight-bold text-orange-9" style="font-size: 14px;">Bienvenido, {{ currentUser?.Usuario || 'Usuario' }}</div>
-            <div class="text-weight-bold text-orange-9" style="font-size: 14px; line-height: 1;">{{ currentUser?.Rol || '' }}</div>
+            <div class="home-profile__name">Bienvenido, {{ currentUser?.Usuario || 'Usuario' }}</div>
+            <div class="home-profile__role">{{ currentUser?.Rol || '' }}</div>
           </div>
         </div>
         <div class="home-profile__session row items-center">
           <div v-if="daysRemaining > 0" class="session-dots row items-center">
-            <q-icon name="history" size="14px" color="grey-7" class="q-mr-xs" />
-            <span class="q-mr-xs text-caption text-grey-7">Sesión:</span>
+            <q-icon name="history" size="14px" color="grey-6" class="q-mr-xs" />
+            <span class="q-mr-xs text-caption text-grey-6">Sesión</span>
             <div class="row q-gutter-x-xs">
-              <q-icon v-for="i in daysRemaining" :key="i" name="circle" size="10px" color="green" />
+              <q-icon v-for="i in daysRemaining" :key="i" name="circle" size="8px" color="green-6" />
             </div>
           </div>
         </div>
@@ -116,7 +117,7 @@
         </q-btn>
       </div>
 
-      <div class="home-dashboard q-mb-md">
+      <div class="home-dashboard">
       <!-- Resumen de check-in, check-out y ocupación del día -->
       <section
         class="daily-operations-mobile"
@@ -252,6 +253,7 @@
             <div class="text-caption aviso-restante">{{ a.restante }}</div>
           </q-banner>
         </transition-group>
+      </div>
       </div>
       </div>
 
@@ -1852,6 +1854,19 @@ export default defineComponent({
   grid-area: user;
 }
 
+.home-profile__name {
+  color: #37474f;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.home-profile__role {
+  color: #90a4ae;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
 .home-profile__session {
   grid-area: session;
 }
@@ -2058,79 +2073,142 @@ export default defineComponent({
   }
 }
 
-/* ===== Escritorio: layout compacto, sin estirar el diseño móvil ===== */
+/* ===== Escritorio: cabecera limpia y compacta ===== */
 @media (min-width: 1024px) {
   .home-page {
-    padding: 20px 24px 24px !important;
+    padding: 16px 24px 24px !important;
+  }
+
+  .home-top {
+    padding: 10px 14px 12px;
+    margin-bottom: 12px;
+    border: 1px solid #eceff1;
+    border-radius: 14px;
+    background: #fff;
   }
 
   .home-profile {
     grid-template-columns: auto auto 1fr auto;
     grid-template-areas: "user session . logout";
-    gap: 0 16px;
+    gap: 0 12px;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #f0f2f4;
+  }
+
+  .logout-btn {
+    background: transparent;
+    color: #78909c;
+    font-weight: 600;
   }
 
   .home-dashboard {
     display: flex;
-    align-items: flex-start;
-    gap: 12px;
+    align-items: center;
+    gap: 16px;
   }
 
   .daily-operations-mobile {
-    flex: 0 1 560px;
-    max-width: 560px;
-    padding: 10px 12px;
+    flex: 1 1 auto;
+    max-width: none;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .daily-operations-mobile__header {
+    margin-bottom: 6px !important;
   }
 
   .daily-operations-mobile__grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
-  .daily-operation-card {
-    padding: 7px 8px;
+  .daily-operation-card,
+  .daily-operation-card--checkin,
+  .daily-operation-card--checkout,
+  .daily-operation-card--ocupacion {
+    display: flex;
+    flex: 0 1 auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+    min-height: 0;
+    padding: 5px 10px;
+    border: 1px solid #eceff1;
+    border-radius: 10px;
+    background: #fafbfc;
   }
 
-  .daily-operation-card .q-mb-sm {
-    margin-bottom: 4px !important;
+  .daily-operation-card--checkin {
+    border-left: 3px solid #66bb6a;
+  }
+
+  .daily-operation-card--checkout {
+    border-left: 3px solid #ef9a9a;
   }
 
   .daily-operation-card--ocupacion {
     grid-column: auto;
+    border-left: 3px solid #90caf9;
+  }
+
+  .daily-operation-card .q-mb-sm,
+  .daily-operation-card__head {
+    margin-bottom: 0 !important;
   }
 
   .daily-operation-card__label {
     font-size: 0.72rem;
+    color: #607d8b;
+    font-weight: 600;
+  }
+
+  .daily-operation-card__numbers {
+    gap: 4px;
   }
 
   .daily-operation-number {
-    min-width: 26px;
-    min-height: 22px;
-    padding: 2px 5px;
-    font-size: 0.74rem;
+    min-width: 24px;
+    min-height: 20px;
+    padding: 1px 5px;
+    border-radius: 6px;
+    background: #fff;
+    font-size: 0.72rem;
   }
 
   .daily-operation-card__empty {
-    padding: 2px 0;
-    font-size: 0.95rem;
+    padding: 0;
+    font-size: 0.85rem;
   }
 
   .ocupacion-count {
-    font-size: 1.05rem;
+    font-size: 0.95rem;
+    color: #546e7a;
   }
 
   .avisos-wrapper {
     display: flex;
     flex: 1 1 280px;
-    max-width: 420px;
-    max-height: 168px;
+    max-width: 380px;
+    max-height: 72px;
     flex-direction: column;
-    padding: 8px 10px;
+    padding: 0;
     overflow: hidden;
-    border: 1px solid rgba(255, 152, 0, 0.18);
-    border-radius: 14px;
-    background: #fff;
-    box-shadow: 0 4px 12px rgba(255, 152, 0, 0.08);
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .avisos-header {
+    background: transparent;
+    padding: 0 0 4px;
   }
 
   .avisos-list {
@@ -2138,18 +2216,35 @@ export default defineComponent({
     overflow-y: auto;
   }
 
-  :global(.body--dark) .avisos-wrapper {
-    border-color: rgba(255, 183, 77, 0.22);
-    background: #1e1e1e;
-  }
-
-  .aviso-banner {
-    margin-bottom: 6px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-  }
-
-  .aviso-banner:last-child {
+  .aviso-banner,
+  .aviso--salida,
+  .aviso--regreso,
+  .aviso--checkin,
+  .aviso--checkout {
     margin-bottom: 0;
+    padding: 6px 8px;
+    border: 1px solid #eceff1;
+    border-radius: 8px;
+    background: #fafbfc !important;
+    color: #455a64 !important;
+    box-shadow: none;
+  }
+
+  .aviso--checkin {
+    border-left: 3px solid #66bb6a;
+  }
+
+  .aviso--checkout {
+    border-left: 3px solid #ef9a9a;
+  }
+
+  .aviso--salida,
+  .aviso--regreso {
+    border-left: 3px solid #90caf9;
+  }
+
+  .aviso-banner :deep(.q-icon) {
+    color: #78909c !important;
   }
 
   .aviso-banner :deep(.q-banner__content) {
@@ -2157,10 +2252,11 @@ export default defineComponent({
     flex-wrap: wrap;
     align-items: baseline;
     column-gap: 8px;
-    font-size: 0.78rem;
+    font-size: 0.75rem;
   }
 
   .aviso-restante {
+    color: #90a4ae;
     font-size: 0.7rem;
   }
 
@@ -2168,33 +2264,48 @@ export default defineComponent({
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 12px 16px;
-    margin-bottom: 12px;
+    gap: 8px 12px;
+    margin-bottom: 10px;
   }
 
   .home-title {
     margin-right: auto;
-    font-size: 1.45rem;
+    color: #455a64;
+    font-size: 1.15rem;
     line-height: 1.2;
   }
 
   .home-search {
-    flex: 1 1 280px;
-    max-width: 420px;
-    min-width: 240px;
+    flex: 1 1 240px;
+    max-width: 360px;
+    min-width: 200px;
+  }
+
+  .home-search .search-input {
+    box-shadow: none;
   }
 
   .home-actions {
     display: flex;
     flex: 0 0 auto;
-    gap: 8px;
+    gap: 6px;
   }
 
   .dashboard-action-btn {
     width: auto;
-    min-width: 168px;
-    height: 40px;
-    padding: 0 18px;
+    min-width: 0;
+    height: 34px;
+    padding: 0 12px;
+    background: #fff !important;
+    color: #546e7a !important;
+    border: 1px solid #cfd8dc;
+    box-shadow: none;
+  }
+
+  .records-badge {
+    background: #eceff1;
+    color: #607d8b;
+    box-shadow: none;
   }
 
   .home-records-row {
@@ -2207,6 +2318,23 @@ export default defineComponent({
 
   .filter-btn {
     flex-shrink: 0;
+    box-shadow: none;
+  }
+
+  :global(.body--dark) .home-top {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: #1e1e1e;
+  }
+
+  :global(.body--dark) .home-profile {
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+  }
+
+  :global(.body--dark) .daily-operation-card,
+  :global(.body--dark) .aviso-banner {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04) !important;
+    color: #eceff1 !important;
   }
 }
 </style>

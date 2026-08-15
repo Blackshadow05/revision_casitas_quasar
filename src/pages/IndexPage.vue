@@ -154,6 +154,11 @@
             :key="grupo.key"
             class="daily-operation-card"
             :class="`daily-operation-card--${grupo.key}`"
+            role="button"
+            tabindex="0"
+            :aria-label="`Ver detalle de ${grupo.label}`"
+            @click="openOperationModal(grupo.key)"
+            @keyup.enter="openOperationModal(grupo.key)"
           >
             <div class="row items-center no-wrap q-mb-sm">
               <q-icon :name="grupo.icon" :color="grupo.color" size="18px" class="q-mr-xs" />
@@ -201,13 +206,17 @@
                 ? 'Ver menos'
                 : `+${grupo.casitas.length - 8} más`"
               :aria-expanded="operationExpanded[grupo.key] ? 'true' : 'false'"
-              @click="operationExpanded[grupo.key] = !operationExpanded[grupo.key]"
+              @click.stop="operationExpanded[grupo.key] = !operationExpanded[grupo.key]"
             />
           </article>
 
           <article
             class="daily-operation-card daily-operation-card--ocupacion"
-            aria-label="Ocupación del día"
+            aria-label="Ver detalle de ocupación del día"
+            role="button"
+            tabindex="0"
+            @click="openOperationModal('ocupacion')"
+            @keyup.enter="openOperationModal('ocupacion')"
           >
             <div class="daily-operation-card__head row items-center no-wrap">
               <q-icon name="hotel" color="indigo-6" size="18px" class="q-mr-xs" />
@@ -561,6 +570,70 @@
       </div>
     </div>
 
+    <q-dialog v-model="showOperationModal" backdrop-filter="blur(4px)">
+      <q-card class="operation-modal">
+        <q-card-section class="row items-center no-wrap q-pb-sm">
+          <q-icon :name="operationModalMeta.icon" :color="operationModalMeta.color" size="22px" class="q-mr-sm" />
+          <div>
+            <div class="text-subtitle1 text-weight-bold">{{ operationModalMeta.title }}</div>
+            <div class="text-caption text-grey-6">{{ operationModalDayLabel }} · {{ operationModalCount }} {{ operationModalCount === 1 ? 'casita' : 'casitas' }}</div>
+          </div>
+          <q-space />
+          <q-btn icon="close" flat round dense v-close-popup aria-label="Cerrar" />
+        </q-card-section>
+
+        <q-separator />
+
+        <q-card-section class="operation-modal__body q-pt-sm">
+          <div v-if="operationModalKey === 'ocupacion'">
+            <div v-if="!operationModalZonas.length" class="text-grey-6 text-center q-pa-md">
+              {{ operationModalMeta.empty }}
+            </div>
+            <div v-else>
+              <div
+                v-for="zona in operationModalZonas"
+                :key="zona.nombre"
+                class="operation-modal__zona"
+              >
+                <div class="row items-center justify-between q-mb-xs">
+                  <span class="text-weight-medium text-grey-8">{{ zona.nombre }}</span>
+                  <span class="text-caption text-grey-6">{{ zona.numeros.length }}</span>
+                </div>
+                <div class="daily-operation-card__numbers">
+                  <span
+                    v-for="n in zona.numeros"
+                    :key="zona.nombre + '-' + n"
+                    class="daily-operation-number"
+                  >
+                    {{ n }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-else>
+            <div v-if="!operationModalItems.length" class="text-grey-6 text-center q-pa-md">
+              {{ operationModalMeta.empty }}
+            </div>
+            <div v-else>
+              <div
+                v-for="(item, idx) in operationModalItems"
+                :key="item.casita + '-' + item.hora + '-' + idx"
+                class="operation-modal__item"
+              >
+                <div class="operation-modal__casita">{{ item.casita }}</div>
+                <div class="operation-modal__meta">
+                  <span>{{ operationModalKey === 'checkin' ? 'ETA' : 'ETD' }} {{ item.hora }}</span>
+                  <span v-if="item.method !== '—'"> · {{ item.method }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
+
     <!-- Filter Modal -->
     <q-dialog v-model="showFilterModal" persistent backdrop-filter="blur(4px)">
       <q-card style="width: 90%; max-width: 400px; border-radius: 20px;">
@@ -692,6 +765,15 @@ const MEMO_MONTHS = {
   january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
   july: 7, august: 8, september: 9, october: 10, november: 11, december: 12
 }
+
+const OCUPACION_ZONAS = [
+  { nombre: 'Zona A', min: 1, max: 6 },
+  { nombre: 'Zona B', min: 7, max: 14 },
+  { nombre: 'Zona C', min: 15, max: 22 },
+  { nombre: 'Zona D', min: 23, max: 31 },
+  { nombre: 'Zona E', min: 32, max: 40 },
+  { nombre: 'Zona F', min: 41, max: 50 }
+]
 
 // Normaliza texto: minúsculas, sin apóstrofes, espacios colapsados.
 function memoNorm (v) {
@@ -952,6 +1034,94 @@ export default defineComponent({
         casitas: casitasDeOperacionSeleccionada('departure')
       }
     ])
+
+    const operationModalKey = ref(null)
+    const showOperationModal = computed({
+      get: () => operationModalKey.value != null,
+      set: (open) => {
+        if (!open) operationModalKey.value = null
+      }
+    })
+
+    const filasDeOperacionSeleccionada = (tipoOperacion) => {
+      const fechaSeleccionada = new Date(now.value)
+      if (operationDay.value === 'tomorrow') {
+        fechaSeleccionada.setDate(fechaSeleccionada.getDate() + 1)
+      }
+      const month = fechaSeleccionada.getMonth() + 1
+      const day = fechaSeleccionada.getDate()
+      return memoRows.value
+        .filter((row) => {
+          const fecha = memoParseFecha(row.fecha)
+          return fecha.month === month && fecha.day === day && coincideTipoOperacion(row, tipoOperacion)
+        })
+        .slice()
+        .sort((a, b) => {
+          const na = Number(String(a.casita ?? '').match(/\d+/)?.[0] || 0)
+          const nb = Number(String(b.casita ?? '').match(/\d+/)?.[0] || 0)
+          return na - nb
+        })
+    }
+
+    const openOperationModal = (key) => {
+      operationModalKey.value = key
+    }
+
+    const operationModalMeta = computed(() => {
+      const map = {
+        checkin: { title: 'Check-in', icon: 'login', color: 'green-7', empty: 'No hay check-in para este día' },
+        checkout: { title: 'Check-out', icon: 'logout', color: 'red-6', empty: 'No hay check-out para este día' },
+        ocupacion: { title: 'Ocupación', icon: 'hotel', color: 'indigo-6', empty: 'No hay ocupación para este día' }
+      }
+      return map[operationModalKey.value] || map.checkin
+    })
+
+    const operationModalDayLabel = computed(() => (
+      operationDay.value === 'tomorrow' ? 'Mañana' : 'Hoy'
+    ))
+
+    const operationModalItems = computed(() => {
+      if (operationModalKey.value === 'checkin') {
+        return filasDeOperacionSeleccionada('arrival').map((row) => ({
+          casita: memoTxt(row.casita),
+          method: memoTxt(row.method),
+          hora: memoTxt(row.eta || row.hora_llegada_real)
+        }))
+      }
+      if (operationModalKey.value === 'checkout') {
+        return filasDeOperacionSeleccionada('departure').map((row) => ({
+          casita: memoTxt(row.casita),
+          method: memoTxt(row.method),
+          hora: memoTxt(row.etd || row.hora_salida_real)
+        }))
+      }
+      return []
+    })
+
+    const operationModalZonas = computed(() => {
+      if (operationModalKey.value !== 'ocupacion') return []
+      const numeros = casitasDeOperacionSeleccionada('in house')
+        .map((n) => Number(n))
+        .filter((n) => !Number.isNaN(n))
+      const unique = [...new Set(numeros)].sort((a, b) => a - b)
+      const zonas = OCUPACION_ZONAS
+        .map((zona) => ({
+          nombre: zona.nombre,
+          numeros: unique.filter((n) => n >= zona.min && n <= zona.max)
+        }))
+        .filter((zona) => zona.numeros.length)
+      const cubiertos = new Set(zonas.flatMap((zona) => zona.numeros))
+      const otras = unique.filter((n) => !cubiertos.has(n))
+      if (otras.length) zonas.push({ nombre: 'Otras', numeros: otras })
+      return zonas
+    })
+
+    const operationModalCount = computed(() => {
+      if (operationModalKey.value === 'ocupacion') {
+        return casitasDeOperacionSeleccionada('in house').length
+      }
+      return operationModalItems.value.length
+    })
 
     watch(operationDay, () => {
       operationExpanded.checkin = false
@@ -1349,6 +1519,14 @@ export default defineComponent({
       ocupacionCount,
       operationDay,
       operationExpanded,
+      showOperationModal,
+      operationModalKey,
+      operationModalMeta,
+      operationModalDayLabel,
+      operationModalItems,
+      operationModalZonas,
+      operationModalCount,
+      openOperationModal,
       casas,
       desktopCasas,
       canAdd,
@@ -1458,6 +1636,12 @@ export default defineComponent({
   border: 1px solid #eceff1;
   border-radius: 10px;
   background: #fafbfc;
+  cursor: pointer;
+}
+
+.daily-operation-card:focus-visible {
+  outline: 2px solid #90caf9;
+  outline-offset: 2px;
 }
 
 .daily-operation-card--checkin {
@@ -1529,6 +1713,46 @@ export default defineComponent({
 .daily-operation-card__expand {
   min-height: 26px;
   font-size: 0.7rem;
+}
+
+.operation-modal {
+  width: min(92vw, 480px);
+  border-radius: 16px;
+}
+
+.operation-modal__body {
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
+}
+
+.operation-modal__item {
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f2f4;
+}
+
+.operation-modal__item:last-child {
+  border-bottom: none;
+}
+
+.operation-modal__casita {
+  color: #37474f;
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.operation-modal__meta {
+  margin-top: 2px;
+  color: #78909c;
+  font-size: 0.78rem;
+}
+
+.operation-modal__zona {
+  padding: 8px 0 12px;
+}
+
+.operation-modal__zona + .operation-modal__zona {
+  border-top: 1px solid #f0f2f4;
 }
 
 :global(.body--dark) .home-top,

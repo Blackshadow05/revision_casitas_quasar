@@ -243,11 +243,11 @@
             :key="a.key"
             rounded
             dense
-            class="aviso-banner q-mb-sm text-white"
+            class="aviso-banner q-mb-sm"
             :class="a.cssClass"
           >
             <template v-slot:avatar>
-              <q-icon :name="a.icon" color="white" />
+              <q-icon :name="a.icon" />
             </template>
             <div class="text-weight-bold">{{ a.text }}</div>
             <div class="text-caption aviso-restante">{{ a.restante }}</div>
@@ -392,7 +392,7 @@
           ref="infiniteScroll"
           :disable="!!store.activeFilter || loading || casas.length === 0"
         >
-          <div class="row q-col-gutter-md mobile-cards-grid">
+          <div class="row q-col-gutter-sm mobile-cards-grid">
             <div v-for="casa in casas" :key="casa.id" class="col-6 col-md-4">
               <q-card 
                 class="modern-card" 
@@ -1409,65 +1409,84 @@ export default defineComponent({
 </script>
 
 <style scoped>
-/* ===== Resumen móvil de check-in / check-out ===== */
-.daily-operations-mobile {
-  padding: 12px;
-  border: 1px solid rgba(25, 118, 210, 0.12);
-  border-radius: 16px;
+/* ===== Resumen de check-in / check-out ===== */
+.home-page {
+  padding: 12px !important;
+}
+
+.home-top {
+  padding: 10px 12px 12px;
+  border: 1px solid #eceff1;
+  border-radius: 14px;
   background: #fff;
-  box-shadow: 0 6px 18px rgba(25, 118, 210, 0.08);
+}
+
+.home-profile {
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #f0f2f4;
+}
+
+.daily-operations-mobile {
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .daily-operations-mobile__title {
-  color: #263238;
+  color: #546e7a;
 }
 
 .daily-operations-mobile__day-toggle {
   flex: 0 0 auto;
-  border: 1px solid rgba(25, 118, 210, 0.13);
+  border: 1px solid #eceff1;
   font-size: 0.72rem;
 }
 
 .daily-operations-mobile__grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .daily-operation-card {
   min-width: 0;
-  padding: 10px;
-  border: 1px solid transparent;
-  border-radius: 13px;
+  padding: 8px;
+  border: 1px solid #eceff1;
+  border-radius: 10px;
+  background: #fafbfc;
 }
 
 .daily-operation-card--checkin {
-  border-color: rgba(46, 125, 50, 0.17);
-  background: rgba(76, 175, 80, 0.07);
+  border-left: 3px solid #66bb6a;
+  background: #fafbfc;
 }
 
 .daily-operation-card--checkout {
-  border-color: rgba(198, 40, 40, 0.15);
-  background: rgba(244, 67, 54, 0.06);
+  border-left: 3px solid #ef9a9a;
+  background: #fafbfc;
 }
 
 .daily-operation-card--ocupacion {
-  grid-column: 1 / -1;
-  border-color: rgba(63, 81, 181, 0.18);
-  background: rgba(63, 81, 181, 0.07);
+  grid-column: auto;
+  border-left: 3px solid #90caf9;
+  background: #fafbfc;
 }
 
 .ocupacion-count {
-  color: #3949ab;
-  font-size: 1.35rem;
+  color: #546e7a;
+  font-size: 1.05rem;
   font-weight: 800;
   line-height: 1;
 }
 
 .daily-operation-card__label {
   overflow: hidden;
-  font-size: 0.78rem;
-  font-weight: 700;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #607d8b;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1475,34 +1494,34 @@ export default defineComponent({
 .daily-operation-card__numbers {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 4px;
 }
 
 .daily-operation-card__numbers--extra {
   width: 100%;
-  padding-top: 5px;
+  padding-top: 4px;
 }
 
 .daily-operation-number {
   display: inline-flex;
-  min-width: 32px;
-  min-height: 28px;
+  min-width: 26px;
+  min-height: 22px;
   align-items: center;
   justify-content: center;
-  padding: 3px 7px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.9);
-  color: #263238;
-  font-size: 0.82rem;
-  font-weight: 800;
+  padding: 2px 5px;
+  border: 1px solid #eceff1;
+  border-radius: 7px;
+  background: #fff;
+  color: #37474f;
+  font-size: 0.74rem;
+  font-weight: 700;
   line-height: 1;
 }
 
 .daily-operation-card__empty {
-  padding: 5px 0;
-  color: #9e9e9e;
-  font-size: 1.1rem;
+  padding: 2px 0;
+  color: #b0bec5;
+  font-size: 0.95rem;
   text-align: center;
 }
 
@@ -1511,31 +1530,26 @@ export default defineComponent({
   font-size: 0.7rem;
 }
 
+:global(.body--dark) .home-top,
 :global(.body--dark) .daily-operations-mobile {
-  border-color: rgba(100, 181, 246, 0.18);
+  border-color: rgba(255, 255, 255, 0.08);
   background: #1e1e1e;
 }
 
 :global(.body--dark) .daily-operations-mobile__title,
 :global(.body--dark) .daily-operation-card__label,
 :global(.body--dark) .daily-operation-number {
-  color: #f5f5f5;
+  color: #eceff1;
 }
 
-:global(.body--dark) .daily-operation-card--checkin {
-  background: rgba(76, 175, 80, 0.12);
-}
-
-:global(.body--dark) .daily-operation-card--checkout {
-  background: rgba(244, 67, 54, 0.11);
-}
-
+:global(.body--dark) .daily-operation-card--checkin,
+:global(.body--dark) .daily-operation-card--checkout,
 :global(.body--dark) .daily-operation-card--ocupacion {
-  background: rgba(92, 107, 192, 0.16);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 :global(.body--dark) .ocupacion-count {
-  color: #c5cae9;
+  color: #cfd8dc;
 }
 
 :global(.body--dark) .daily-operation-number {
@@ -1544,32 +1558,54 @@ export default defineComponent({
 }
 
 /* ===== Avisos de operación ===== */
+.avisos-wrapper {
+  margin-top: 8px;
+}
+
 .avisos-header {
-  background: #fff8e1;
-  border-radius: 10px;
-  padding: 2px 4px 2px 10px;
+  background: transparent;
+  border-radius: 0;
+  padding: 0 0 4px;
+}
+
+.avisos-header :deep(.text-orange-9),
+.avisos-header :deep(.q-icon) {
+  color: #607d8b !important;
 }
 
 .aviso-banner {
-  border-radius: 14px;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+  border-radius: 10px;
+  box-shadow: none;
 }
 
 .aviso-restante {
-  opacity: 0.9;
+  opacity: 0.85;
 }
 
-.aviso--salida {
-  background: linear-gradient(135deg, #1e88e5 0%, #1565c0 100%);
-}
-.aviso--regreso {
-  background: linear-gradient(135deg, #00897b 0%, #00695c 100%);
-}
-.aviso--checkin {
-  background: linear-gradient(135deg, #43a047 0%, #2e7d32 100%);
-}
+.aviso--salida,
+.aviso--regreso,
+.aviso--checkin,
 .aviso--checkout {
-  background: linear-gradient(135deg, #e53935 0%, #c62828 100%);
+  border: 1px solid #eceff1;
+  background: #fafbfc !important;
+  color: #455a64 !important;
+}
+
+.aviso--salida,
+.aviso--regreso {
+  border-left: 3px solid #90caf9;
+}
+
+.aviso--checkin {
+  border-left: 3px solid #66bb6a;
+}
+
+.aviso--checkout {
+  border-left: 3px solid #ef9a9a;
+}
+
+.aviso-banner :deep(.q-icon) {
+  color: #78909c !important;
 }
 
 .aviso-fade-enter-active,
@@ -1583,13 +1619,13 @@ export default defineComponent({
 }
 
 .records-badge {
-  background: #31a8ff;
-  color: white;
-  padding: 6px 20px;
+  background: #eceff1;
+  color: #607d8b;
+  padding: 4px 12px;
   border-radius: 20px;
   font-size: 11px;
   font-weight: 500;
-  box-shadow: 0 4px 10px rgba(49, 168, 255, 0.3);
+  box-shadow: none;
 }
 
 .sync-status-card {
@@ -1824,12 +1860,12 @@ export default defineComponent({
 }
 
 .logout-btn {
-  background: #ffebee;
-  color: #c62828;
+  background: transparent;
+  color: #78909c;
   padding: 4px 8px;
   border-radius: 8px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   min-width: auto;
 }
 
@@ -1876,17 +1912,23 @@ export default defineComponent({
 }
 
 .home-title {
+  display: none;
   margin: 0;
-  color: #4CAF50;
+  color: #546e7a;
+  font-size: 0.95rem;
 }
 
 .home-toolbar {
   display: grid;
-  gap: 12px;
-  margin-bottom: 16px;
+  grid-template-areas:
+    "search"
+    "actions";
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .home-actions {
+  grid-area: actions;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
@@ -1894,16 +1936,73 @@ export default defineComponent({
 
 .dashboard-action-btn {
   width: 100%;
+  min-height: 36px;
+  background: #fff !important;
+  color: #546e7a !important;
+  border: 1px solid #cfd8dc;
+  box-shadow: none;
 }
 
 .home-search {
+  grid-area: search;
   gap: 8px;
+}
+
+.search-input {
+  box-shadow: none;
 }
 
 /* En pantallas grandes, ocultamos la fila inferior */
 @media (min-width: 600px) {
   .session-dots {
     max-width: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  .daily-operation-card .q-mb-sm {
+    margin-bottom: 4px !important;
+  }
+
+  .theme-green {
+    background: linear-gradient(145deg, #e8f6ee 0%, #ffffff 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+  .theme-red {
+    background: linear-gradient(145deg, #fbecee 0%, #ffffff 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+  .theme-purple {
+    background: linear-gradient(145deg, #f4eef8 0%, #ffffff 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+  .theme-orange {
+    background: linear-gradient(145deg, #f8f0e6 0%, #ffffff 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+  .theme-gold {
+    background: linear-gradient(145deg, #f8f3e4 0%, #ffffff 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+  .theme-blue {
+    background: linear-gradient(145deg, #eaf4fb 0%, #ffffff 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+  .theme-brown {
+    background: linear-gradient(145deg, #f3eeec 0%, #ffffff 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+
+  .modern-card::before {
+    height: 22%;
+  }
+
+  .filter-btn {
+    box-shadow: none;
+  }
+
+  .home-records-row {
+    margin-bottom: 8px;
   }
 }
 
@@ -2269,6 +2368,7 @@ export default defineComponent({
   }
 
   .home-title {
+    display: block;
     margin-right: auto;
     color: #455a64;
     font-size: 1.15rem;

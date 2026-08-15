@@ -6,6 +6,7 @@
         <div class="text-caption text-grey-6">Elige qué quieres consultar</div>
       </div>
       <q-btn
+        v-if="vistaModo"
         unelevated
         rounded
         color="primary"
@@ -73,6 +74,24 @@
         Toca <strong>Reportes</strong>, <strong>Movimientos</strong> o <strong>Inventario</strong> para ver la información.
       </div>
     </div>
+
+    <q-page-sticky
+      v-if="!vistaModo"
+      position="bottom-right"
+      :offset="[18, 18]"
+    >
+      <q-btn
+        unelevated
+        rounded
+        color="primary"
+        icon="add"
+        label="Nuevo"
+        no-caps
+        class="nuevo-btn nuevo-btn--fab"
+        :disable="!authStore.canAdd"
+        @click="goToNuevo"
+      />
+    </q-page-sticky>
 
     <template v-else>
       <q-input
@@ -1106,6 +1125,10 @@ export default defineComponent({
 .nuevo-btn {
   flex-shrink: 0;
   font-weight: 600;
+}
+
+.nuevo-btn--fab {
+  box-shadow: 0 6px 18px rgba(25, 118, 210, 0.35);
 }
 
 .vista-grid {

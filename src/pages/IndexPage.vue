@@ -164,14 +164,45 @@
 
             <div v-if="grupo.casitas.length" class="daily-operation-card__numbers">
               <span
-                v-for="casita in grupo.casitas"
+                v-for="casita in grupo.casitas.slice(0, 8)"
                 :key="casita"
                 class="daily-operation-number"
               >
                 {{ casita }}
               </span>
+
+              <q-slide-transition v-if="grupo.casitas.length > 8">
+                <div
+                  v-show="operationExpanded[grupo.key]"
+                  class="daily-operation-card__numbers daily-operation-card__numbers--extra"
+                >
+                  <span
+                    v-for="casita in grupo.casitas.slice(8)"
+                    :key="casita"
+                    class="daily-operation-number"
+                  >
+                    {{ casita }}
+                  </span>
+                </div>
+              </q-slide-transition>
             </div>
             <div v-else class="daily-operation-card__empty">—</div>
+
+            <q-btn
+              v-if="grupo.casitas.length > 8"
+              flat
+              dense
+              no-caps
+              size="sm"
+              color="grey-7"
+              class="daily-operation-card__expand full-width q-mt-xs"
+              :icon-right="operationExpanded[grupo.key] ? 'expand_less' : 'expand_more'"
+              :label="operationExpanded[grupo.key]
+                ? 'Ver menos'
+                : `+${grupo.casitas.length - 8} más`"
+              :aria-expanded="operationExpanded[grupo.key] ? 'true' : 'false'"
+              @click="operationExpanded[grupo.key] = !operationExpanded[grupo.key]"
+            />
           </article>
 
           <article
@@ -875,6 +906,7 @@ export default defineComponent({
     })
 
     const operationDay = ref('today')
+    const operationExpanded = reactive({ checkin: false, checkout: false })
 
     const coincideTipoOperacion = (row, tipoOperacion) => {
       const tipo = memoNorm(row.tipo)
@@ -920,6 +952,11 @@ export default defineComponent({
         casitas: casitasDeOperacionSeleccionada('departure')
       }
     ])
+
+    watch(operationDay, () => {
+      operationExpanded.checkin = false
+      operationExpanded.checkout = false
+    })
 
     // Desktop table columns
     const tableColumns = [
@@ -1311,6 +1348,7 @@ export default defineComponent({
       operacionesHoy,
       ocupacionCount,
       operationDay,
+      operationExpanded,
       casas,
       desktopCasas,
       canAdd,
@@ -1411,6 +1449,7 @@ export default defineComponent({
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
+  align-items: start;
 }
 
 .daily-operation-card {
@@ -1459,6 +1498,11 @@ export default defineComponent({
   gap: 4px;
 }
 
+.daily-operation-card__numbers--extra {
+  width: 100%;
+  padding-top: 4px;
+}
+
 .daily-operation-number {
   display: inline-flex;
   min-width: 26px;
@@ -1480,6 +1524,11 @@ export default defineComponent({
   color: #b0bec5;
   font-size: 0.95rem;
   text-align: center;
+}
+
+.daily-operation-card__expand {
+  min-height: 26px;
+  font-size: 0.7rem;
 }
 
 :global(.body--dark) .home-top,

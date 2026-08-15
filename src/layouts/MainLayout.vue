@@ -9,14 +9,65 @@
     </q-page-container>
 
     <q-header class="app-header bg-primary text-white">
-      <q-toolbar>
+      <q-toolbar class="app-header__toolbar">
         <q-toolbar-title class="text-weight-bold">
           Revisiones Casitas
         </q-toolbar-title>
 
+        <div v-if="authStore.isLoggedIn && $q.screen.gt.md" class="desktop-shortcuts row no-wrap items-center">
+          <q-btn
+            flat
+            no-caps
+            dense
+            icon="home"
+            label="Inicio"
+            class="appbar-nav-btn text-white"
+            @click="goToHome"
+          />
+          <q-btn
+            flat
+            no-caps
+            dense
+            icon="restaurant"
+            label="Menús"
+            class="appbar-nav-btn text-white"
+            @click="goToMenus"
+          />
+          <q-btn
+            flat
+            no-caps
+            dense
+            icon="schedule"
+            label="Horarios"
+            class="appbar-nav-btn text-white"
+            @click="goTo('/dashboard-horario')"
+          />
+          <q-btn
+            v-if="isEstebanB"
+            flat
+            no-caps
+            dense
+            icon="local_police"
+            label="Puesto 01"
+            class="appbar-nav-btn text-white"
+            @click="goTo('/puesto-01')"
+          />
+          <q-btn
+            v-for="item in desktopSecurityLinks"
+            :key="item.path"
+            flat
+            no-caps
+            dense
+            :icon="item.icon"
+            :label="item.label"
+            class="appbar-nav-btn text-white"
+            @click="goTo(item.path)"
+          />
+        </div>
+
         <q-space />
 
-        <q-btn v-if="authStore.isLoggedIn" flat round dense icon="menu" class="menu-button text-white gt-xs" aria-label="Abrir navegación">
+        <q-btn v-if="authStore.isLoggedIn" flat round dense icon="menu" class="menu-button text-white" aria-label="Abrir navegación">
           <q-menu anchor="bottom right" self="top right" class="menu-dropdown">
             <q-list style="min-width: 220px">
               <q-item clickable v-close-popup @click="goToHome">
@@ -77,62 +128,6 @@
             </q-list>
           </q-menu>
         </q-btn>
-      </q-toolbar>
-
-      <q-toolbar v-if="$q.screen.gt.md" class="desktop-shortcuts-toolbar">
-        <div class="desktop-shortcuts row no-wrap items-center">
-          <q-btn
-            flat
-            no-caps
-            dense
-            icon="home"
-            label="Inicio"
-            class="appbar-nav-btn text-white q-mr-md"
-            @click="goToHome"
-          />
-          <q-btn
-            flat
-            no-caps
-            dense
-            icon="restaurant"
-            label="Menús"
-            class="appbar-nav-btn text-white q-mr-md"
-            @click="goToMenus"
-          />
-          <q-btn
-            v-if="authStore.isLoggedIn"
-            flat
-            no-caps
-            dense
-            icon="schedule"
-            label="Horarios"
-            class="appbar-nav-btn text-white q-mr-md"
-            @click="goTo('/dashboard-horario')"
-          />
-          <q-btn
-            v-if="isEstebanB"
-            flat
-            no-caps
-            dense
-            icon="local_police"
-            label="Puesto 01"
-            class="appbar-nav-btn text-white q-mr-md"
-            @click="goTo('/puesto-01')"
-          />
-          <template v-if="authStore.isLoggedIn">
-            <q-btn
-              v-for="item in desktopSecurityLinks"
-              :key="item.path"
-              flat
-              no-caps
-              dense
-              :icon="item.icon"
-              :label="item.label"
-              class="appbar-nav-btn text-white"
-              @click="goTo(item.path)"
-            />
-          </template>
-        </div>
       </q-toolbar>
     </q-header>
 
@@ -293,20 +288,19 @@ export default defineComponent({
   border-bottom: none;
 }
 
-.appbar-nav-btn {
-  border-radius: 999px;
-  padding: 0 14px;
+.app-header__toolbar {
+  min-height: 52px;
 }
 
-.desktop-shortcuts-toolbar {
-  min-height: 52px;
-  padding: 0 16px 12px;
+.appbar-nav-btn {
+  border-radius: 999px;
+  padding: 0 12px;
 }
 
 .desktop-shortcuts {
-  gap: 8px;
+  gap: 4px;
+  margin-left: 16px;
   overflow-x: auto;
-  width: 100%;
   scrollbar-width: none;
 }
 

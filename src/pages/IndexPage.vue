@@ -1,5 +1,5 @@
 <template>
-  <q-page class="q-pa-md bg-grey-1">
+  <q-page class="home-page q-pa-md bg-grey-1">
     <!-- Login Modal -->
     <q-dialog v-model="showLoginModal" persistent backdrop-filter="blur(4px)">
       <q-card style="width: 350px; border-radius: 20px;" class="q-pa-lg">
@@ -92,37 +92,35 @@
     <div v-if="isLoggedIn">
       <q-scroll-observer @scroll="onScroll" />
 
+      <div class="home-top q-mb-md">
       <!-- Top Bar / Profile Section -->
-      <div class="q-mb-md">
-        <!-- Fila principal con usuario y botón logout -->
-        <div class="row items-center justify-between">
-          <div class="row items-center">
-            <q-avatar size="40px" color="grey-2" text-color="dark" icon="person" class="q-mr-sm" />
-            <div>
-              <div class="text-weight-bold text-orange-9" style="font-size: 14px;">Bienvenido, {{ currentUser?.Usuario || 'Usuario' }}</div>
-              <div class="text-weight-bold text-orange-9" style="font-size: 14px; line-height: 1;">{{ currentUser?.Rol || '' }}</div>
-            </div>
+      <div class="home-profile">
+        <div class="home-profile__user row items-center">
+          <q-avatar size="36px" color="grey-3" text-color="grey-8" icon="person" class="q-mr-sm" />
+          <div>
+            <div class="home-profile__name">Bienvenido, {{ currentUser?.Usuario || 'Usuario' }}</div>
+            <div class="home-profile__role">{{ currentUser?.Rol || '' }}</div>
           </div>
-          <q-btn flat dense no-caps class="logout-btn" @click="handleLogout">
-            <q-icon name="logout" size="14px" class="q-mr-xs" />
-            <span>Cerrar sesión</span>
-          </q-btn>
         </div>
-        <!-- Fila de puntos de sesión (debajo en móvil, al lado en desktop) -->
-        <div class="row q-mt-xs items-center">
+        <div class="home-profile__session row items-center">
           <div v-if="daysRemaining > 0" class="session-dots row items-center">
-            <q-icon name="history" size="14px" color="grey-7" class="q-mr-xs" />
-            <span class="q-mr-xs text-caption text-grey-7">Sesión:</span>
+            <q-icon name="history" size="14px" color="grey-6" class="q-mr-xs" />
+            <span class="q-mr-xs text-caption text-grey-6">Sesión</span>
             <div class="row q-gutter-x-xs">
-              <q-icon v-for="i in daysRemaining" :key="i" name="circle" size="10px" color="green" />
+              <q-icon v-for="i in daysRemaining" :key="i" name="circle" size="8px" color="green-6" />
             </div>
           </div>
         </div>
+        <q-btn flat dense no-caps class="home-profile__logout logout-btn" @click="handleLogout">
+          <q-icon name="logout" size="14px" class="q-mr-xs" />
+          <span>Cerrar sesión</span>
+        </q-btn>
       </div>
 
+      <div class="home-dashboard">
       <!-- Resumen de check-in, check-out y ocupación del día -->
       <section
-        class="daily-operations-mobile q-mb-md"
+        class="daily-operations-mobile"
         aria-labelledby="daily-operations-title"
       >
         <div class="daily-operations-mobile__header row items-center no-wrap q-mb-sm">
@@ -156,6 +154,11 @@
             :key="grupo.key"
             class="daily-operation-card"
             :class="`daily-operation-card--${grupo.key}`"
+            role="button"
+            tabindex="0"
+            :aria-label="`Ver detalle de ${grupo.label}`"
+            @click="openOperationModal(grupo.key)"
+            @keyup.enter="openOperationModal(grupo.key)"
           >
             <div class="row items-center no-wrap q-mb-sm">
               <q-icon :name="grupo.icon" :color="grupo.color" size="18px" class="q-mr-xs" />
@@ -196,22 +199,26 @@
               dense
               no-caps
               size="sm"
-              :color="grupo.color"
+              color="grey-7"
               class="daily-operation-card__expand full-width q-mt-xs"
               :icon-right="operationExpanded[grupo.key] ? 'expand_less' : 'expand_more'"
               :label="operationExpanded[grupo.key]
                 ? 'Ver menos'
                 : `+${grupo.casitas.length - 8} más`"
-              :aria-expanded="operationExpanded[grupo.key]"
-              @click="operationExpanded[grupo.key] = !operationExpanded[grupo.key]"
+              :aria-expanded="operationExpanded[grupo.key] ? 'true' : 'false'"
+              @click.stop="operationExpanded[grupo.key] = !operationExpanded[grupo.key]"
             />
           </article>
 
           <article
             class="daily-operation-card daily-operation-card--ocupacion"
-            aria-label="Ocupación del día"
+            aria-label="Ver detalle de ocupación del día"
+            role="button"
+            tabindex="0"
+            @click="openOperationModal('ocupacion')"
+            @keyup.enter="openOperationModal('ocupacion')"
           >
-            <div class="row items-center no-wrap">
+            <div class="daily-operation-card__head row items-center no-wrap">
               <q-icon name="hotel" color="indigo-6" size="18px" class="q-mr-xs" />
               <span class="daily-operation-card__label">Ocupación</span>
               <q-space />
@@ -222,7 +229,7 @@
       </section>
 
       <!-- ==================== AVISOS DE OPERACIÓN ==================== -->
-      <div v-if="avisos.length" class="avisos-wrapper q-mb-md">
+      <div v-if="avisos.length" class="avisos-wrapper">
         <div class="avisos-header row items-center justify-between no-wrap q-mb-xs">
           <div class="row items-center no-wrap">
             <q-icon name="notifications_active" size="20px" color="orange-9" class="q-mr-xs" />
@@ -239,28 +246,30 @@
             @click="avisosOcultos = !avisosOcultos"
           />
         </div>
-        <transition-group v-show="!avisosOcultos" name="aviso-fade" tag="div">
+        <transition-group v-show="!avisosOcultos" name="aviso-fade" tag="div" class="avisos-list">
           <q-banner
             v-for="a in avisos"
             :key="a.key"
             rounded
             dense
-            class="aviso-banner q-mb-sm text-white"
+            class="aviso-banner q-mb-sm"
             :class="a.cssClass"
           >
             <template v-slot:avatar>
-              <q-icon :name="a.icon" color="white" />
+              <q-icon :name="a.icon" />
             </template>
             <div class="text-weight-bold">{{ a.text }}</div>
             <div class="text-caption aviso-restante">{{ a.restante }}</div>
           </q-banner>
         </transition-group>
       </div>
+      </div>
+      </div>
 
-      <div class="text-h5 text-weight-bold q-mb-lg" style="color: #4CAF50;">Revisiones de Casitas</div>
+      <div class="home-toolbar">
+        <div class="home-title text-h5 text-weight-bold">Revisiones de Casitas</div>
 
-      <div class="row q-col-gutter-sm q-mb-lg">
-        <div class="col-6">
+        <div class="home-actions">
           <q-btn
             color="orange-8"
             icon="schedule"
@@ -268,11 +277,9 @@
             no-caps
             unelevated
             rounded
-            class="dashboard-horario-btn full-width"
+            class="dashboard-action-btn"
             @click="goToDashboardHorario"
           />
-        </div>
-        <div class="col-6">
           <q-btn
             color="teal-7"
             icon="today"
@@ -280,38 +287,37 @@
             no-caps
             unelevated
             rounded
-            class="dashboard-horario-btn full-width"
+            class="dashboard-action-btn"
             @click="goToOperacionDiaria"
           />
         </div>
-      </div>
 
-      <!-- Search Bar -->
-      <div class="row items-center q-gutter-x-md q-mb-lg">
-        <q-input
-          v-model="search"
-          placeholder="Buscar por casita, revisor o notas..."
-          outlined
-          rounded
-          dense
-          bg-color="white"
-          class="search-input col shadow-1"
-          clearable
-        >
-          <template v-slot:prepend>
-            <q-icon name="search" class="text-grey-5" />
-          </template>
-        </q-input>
-        <q-btn
-          round
-          flat
-          icon="filter_list"
-          color="primary"
-          class="filter-btn bg-white shadow-1"
-          @click="showFilterModal = true"
-        >
-          <q-tooltip>Filtros</q-tooltip>
-        </q-btn>
+        <div class="home-search row items-center no-wrap">
+          <q-input
+            v-model="search"
+            placeholder="Buscar por casita, revisor o notas..."
+            outlined
+            rounded
+            dense
+            bg-color="white"
+            class="search-input col shadow-1"
+            clearable
+          >
+            <template v-slot:prepend>
+              <q-icon name="search" class="text-grey-5" />
+            </template>
+          </q-input>
+          <q-btn
+            round
+            flat
+            icon="filter_list"
+            color="primary"
+            class="filter-btn bg-white shadow-1"
+            @click="showFilterModal = true"
+          >
+            <q-tooltip>Filtros</q-tooltip>
+          </q-btn>
+        </div>
       </div>
 
       <!-- Active Filter Badge -->
@@ -361,7 +367,7 @@
       </div>
 
       <!-- Mostrando registros badge -->
-      <div v-if="visibleRecordsCount > 0" class="flex justify-center q-mb-md">
+      <div v-if="visibleRecordsCount > 0" class="home-records-row flex justify-center q-mb-md">
         <div class="records-badge">{{ recordsBadgeText }}</div>
       </div>
 
@@ -395,7 +401,7 @@
           ref="infiniteScroll"
           :disable="!!store.activeFilter || loading || casas.length === 0"
         >
-          <div class="row q-col-gutter-md mobile-cards-grid">
+          <div class="row q-col-gutter-sm mobile-cards-grid">
             <div v-for="casa in casas" :key="casa.id" class="col-6 col-md-4">
               <q-card 
                 class="modern-card" 
@@ -564,6 +570,70 @@
       </div>
     </div>
 
+    <q-dialog v-model="showOperationModal" backdrop-filter="blur(4px)">
+      <q-card class="operation-modal">
+        <q-card-section class="row items-center no-wrap q-pb-sm">
+          <q-icon :name="operationModalMeta.icon" :color="operationModalMeta.color" size="22px" class="q-mr-sm" />
+          <div>
+            <div class="text-subtitle1 text-weight-bold">{{ operationModalMeta.title }}</div>
+            <div class="text-caption text-grey-6">{{ operationModalDayLabel }} · {{ operationModalCount }} {{ operationModalCount === 1 ? 'casita' : 'casitas' }}</div>
+          </div>
+          <q-space />
+          <q-btn icon="close" flat round dense v-close-popup aria-label="Cerrar" />
+        </q-card-section>
+
+        <q-separator />
+
+        <q-card-section class="operation-modal__body q-pt-sm">
+          <div v-if="operationModalKey === 'ocupacion'">
+            <div v-if="!operationModalZonas.length" class="text-grey-6 text-center q-pa-md">
+              {{ operationModalMeta.empty }}
+            </div>
+            <div v-else>
+              <div
+                v-for="zona in operationModalZonas"
+                :key="zona.nombre"
+                class="operation-modal__zona"
+              >
+                <div class="row items-center justify-between q-mb-xs">
+                  <span class="text-weight-medium text-grey-8">{{ zona.nombre }}</span>
+                  <span class="text-caption text-grey-6">{{ zona.numeros.length }}</span>
+                </div>
+                <div class="daily-operation-card__numbers">
+                  <span
+                    v-for="n in zona.numeros"
+                    :key="zona.nombre + '-' + n"
+                    class="daily-operation-number"
+                  >
+                    {{ n }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-else>
+            <div v-if="!operationModalItems.length" class="text-grey-6 text-center q-pa-md">
+              {{ operationModalMeta.empty }}
+            </div>
+            <div v-else>
+              <div
+                v-for="(item, idx) in operationModalItems"
+                :key="item.casita + '-' + item.hora + '-' + idx"
+                class="operation-modal__item"
+              >
+                <div class="operation-modal__casita">{{ item.casita }}</div>
+                <div class="operation-modal__meta">
+                  <span>{{ operationModalKey === 'checkin' ? 'ETA' : 'ETD' }} {{ item.hora }}</span>
+                  <span v-if="item.method !== '—'"> · {{ item.method }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
+
     <!-- Filter Modal -->
     <q-dialog v-model="showFilterModal" persistent backdrop-filter="blur(4px)">
       <q-card style="width: 90%; max-width: 400px; border-radius: 20px;">
@@ -695,6 +765,15 @@ const MEMO_MONTHS = {
   january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
   july: 7, august: 8, september: 9, october: 10, november: 11, december: 12
 }
+
+const OCUPACION_ZONAS = [
+  { nombre: 'Zona A', min: 1, max: 6 },
+  { nombre: 'Zona B', min: 7, max: 14 },
+  { nombre: 'Zona C', min: 15, max: 22 },
+  { nombre: 'Zona D', min: 23, max: 31 },
+  { nombre: 'Zona E', min: 32, max: 40 },
+  { nombre: 'Zona F', min: 41, max: 50 }
+]
 
 // Normaliza texto: minúsculas, sin apóstrofes, espacios colapsados.
 function memoNorm (v) {
@@ -955,6 +1034,94 @@ export default defineComponent({
         casitas: casitasDeOperacionSeleccionada('departure')
       }
     ])
+
+    const operationModalKey = ref(null)
+    const showOperationModal = computed({
+      get: () => operationModalKey.value != null,
+      set: (open) => {
+        if (!open) operationModalKey.value = null
+      }
+    })
+
+    const filasDeOperacionSeleccionada = (tipoOperacion) => {
+      const fechaSeleccionada = new Date(now.value)
+      if (operationDay.value === 'tomorrow') {
+        fechaSeleccionada.setDate(fechaSeleccionada.getDate() + 1)
+      }
+      const month = fechaSeleccionada.getMonth() + 1
+      const day = fechaSeleccionada.getDate()
+      return memoRows.value
+        .filter((row) => {
+          const fecha = memoParseFecha(row.fecha)
+          return fecha.month === month && fecha.day === day && coincideTipoOperacion(row, tipoOperacion)
+        })
+        .slice()
+        .sort((a, b) => {
+          const na = Number(String(a.casita ?? '').match(/\d+/)?.[0] || 0)
+          const nb = Number(String(b.casita ?? '').match(/\d+/)?.[0] || 0)
+          return na - nb
+        })
+    }
+
+    const openOperationModal = (key) => {
+      operationModalKey.value = key
+    }
+
+    const operationModalMeta = computed(() => {
+      const map = {
+        checkin: { title: 'Check-in', icon: 'login', color: 'green-7', empty: 'No hay check-in para este día' },
+        checkout: { title: 'Check-out', icon: 'logout', color: 'red-6', empty: 'No hay check-out para este día' },
+        ocupacion: { title: 'Ocupación', icon: 'hotel', color: 'indigo-6', empty: 'No hay ocupación para este día' }
+      }
+      return map[operationModalKey.value] || map.checkin
+    })
+
+    const operationModalDayLabel = computed(() => (
+      operationDay.value === 'tomorrow' ? 'Mañana' : 'Hoy'
+    ))
+
+    const operationModalItems = computed(() => {
+      if (operationModalKey.value === 'checkin') {
+        return filasDeOperacionSeleccionada('arrival').map((row) => ({
+          casita: memoTxt(row.casita),
+          method: memoTxt(row.method),
+          hora: memoTxt(row.eta || row.hora_llegada_real)
+        }))
+      }
+      if (operationModalKey.value === 'checkout') {
+        return filasDeOperacionSeleccionada('departure').map((row) => ({
+          casita: memoTxt(row.casita),
+          method: memoTxt(row.method),
+          hora: memoTxt(row.etd || row.hora_salida_real)
+        }))
+      }
+      return []
+    })
+
+    const operationModalZonas = computed(() => {
+      if (operationModalKey.value !== 'ocupacion') return []
+      const numeros = casitasDeOperacionSeleccionada('in house')
+        .map((n) => Number(n))
+        .filter((n) => !Number.isNaN(n))
+      const unique = [...new Set(numeros)].sort((a, b) => a - b)
+      const zonas = OCUPACION_ZONAS
+        .map((zona) => ({
+          nombre: zona.nombre,
+          numeros: unique.filter((n) => n >= zona.min && n <= zona.max)
+        }))
+        .filter((zona) => zona.numeros.length)
+      const cubiertos = new Set(zonas.flatMap((zona) => zona.numeros))
+      const otras = unique.filter((n) => !cubiertos.has(n))
+      if (otras.length) zonas.push({ nombre: 'Otras', numeros: otras })
+      return zonas
+    })
+
+    const operationModalCount = computed(() => {
+      if (operationModalKey.value === 'ocupacion') {
+        return casitasDeOperacionSeleccionada('in house').length
+      }
+      return operationModalItems.value.length
+    })
 
     watch(operationDay, () => {
       operationExpanded.checkin = false
@@ -1352,6 +1519,14 @@ export default defineComponent({
       ocupacionCount,
       operationDay,
       operationExpanded,
+      showOperationModal,
+      operationModalKey,
+      operationModalMeta,
+      operationModalDayLabel,
+      operationModalItems,
+      operationModalZonas,
+      operationModalCount,
+      openOperationModal,
       casas,
       desktopCasas,
       canAdd,
@@ -1412,65 +1587,91 @@ export default defineComponent({
 </script>
 
 <style scoped>
-/* ===== Resumen móvil de check-in / check-out ===== */
-.daily-operations-mobile {
-  padding: 12px;
-  border: 1px solid rgba(25, 118, 210, 0.12);
-  border-radius: 16px;
+/* ===== Resumen de check-in / check-out ===== */
+.home-page {
+  padding: 12px !important;
+}
+
+.home-top {
+  padding: 10px 12px 12px;
+  border: 1px solid #eceff1;
+  border-radius: 14px;
   background: #fff;
-  box-shadow: 0 6px 18px rgba(25, 118, 210, 0.08);
+}
+
+.home-profile {
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #f0f2f4;
+}
+
+.daily-operations-mobile {
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .daily-operations-mobile__title {
-  color: #263238;
+  color: #546e7a;
 }
 
 .daily-operations-mobile__day-toggle {
   flex: 0 0 auto;
-  border: 1px solid rgba(25, 118, 210, 0.13);
+  border: 1px solid #eceff1;
   font-size: 0.72rem;
 }
 
 .daily-operations-mobile__grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  align-items: start;
 }
 
 .daily-operation-card {
   min-width: 0;
-  padding: 10px;
-  border: 1px solid transparent;
-  border-radius: 13px;
+  padding: 8px;
+  border: 1px solid #eceff1;
+  border-radius: 10px;
+  background: #fafbfc;
+  cursor: pointer;
+}
+
+.daily-operation-card:focus-visible {
+  outline: 2px solid #90caf9;
+  outline-offset: 2px;
 }
 
 .daily-operation-card--checkin {
-  border-color: rgba(46, 125, 50, 0.17);
-  background: rgba(76, 175, 80, 0.07);
+  border-left: 3px solid #66bb6a;
+  background: #fafbfc;
 }
 
 .daily-operation-card--checkout {
-  border-color: rgba(198, 40, 40, 0.15);
-  background: rgba(244, 67, 54, 0.06);
+  border-left: 3px solid #ef9a9a;
+  background: #fafbfc;
 }
 
 .daily-operation-card--ocupacion {
-  grid-column: 1 / -1;
-  border-color: rgba(63, 81, 181, 0.18);
-  background: rgba(63, 81, 181, 0.07);
+  grid-column: auto;
+  border-left: 3px solid #90caf9;
+  background: #fafbfc;
 }
 
 .ocupacion-count {
-  color: #3949ab;
-  font-size: 1.35rem;
+  color: #546e7a;
+  font-size: 1.05rem;
   font-weight: 800;
   line-height: 1;
 }
 
 .daily-operation-card__label {
   overflow: hidden;
-  font-size: 0.78rem;
-  font-weight: 700;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #607d8b;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1478,34 +1679,34 @@ export default defineComponent({
 .daily-operation-card__numbers {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 4px;
 }
 
 .daily-operation-card__numbers--extra {
   width: 100%;
-  padding-top: 5px;
+  padding-top: 4px;
 }
 
 .daily-operation-number {
   display: inline-flex;
-  min-width: 32px;
-  min-height: 28px;
+  min-width: 26px;
+  min-height: 22px;
   align-items: center;
   justify-content: center;
-  padding: 3px 7px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.9);
-  color: #263238;
-  font-size: 0.82rem;
-  font-weight: 800;
+  padding: 2px 5px;
+  border: 1px solid #eceff1;
+  border-radius: 7px;
+  background: #fff;
+  color: #37474f;
+  font-size: 0.74rem;
+  font-weight: 700;
   line-height: 1;
 }
 
 .daily-operation-card__empty {
-  padding: 5px 0;
-  color: #9e9e9e;
-  font-size: 1.1rem;
+  padding: 2px 0;
+  color: #b0bec5;
+  font-size: 0.95rem;
   text-align: center;
 }
 
@@ -1514,31 +1715,66 @@ export default defineComponent({
   font-size: 0.7rem;
 }
 
+.operation-modal {
+  width: min(92vw, 480px);
+  border-radius: 16px;
+}
+
+.operation-modal__body {
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
+}
+
+.operation-modal__item {
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f2f4;
+}
+
+.operation-modal__item:last-child {
+  border-bottom: none;
+}
+
+.operation-modal__casita {
+  color: #37474f;
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.operation-modal__meta {
+  margin-top: 2px;
+  color: #78909c;
+  font-size: 0.78rem;
+}
+
+.operation-modal__zona {
+  padding: 8px 0 12px;
+}
+
+.operation-modal__zona + .operation-modal__zona {
+  border-top: 1px solid #f0f2f4;
+}
+
+:global(.body--dark) .home-top,
 :global(.body--dark) .daily-operations-mobile {
-  border-color: rgba(100, 181, 246, 0.18);
+  border-color: rgba(255, 255, 255, 0.08);
   background: #1e1e1e;
 }
 
 :global(.body--dark) .daily-operations-mobile__title,
 :global(.body--dark) .daily-operation-card__label,
 :global(.body--dark) .daily-operation-number {
-  color: #f5f5f5;
+  color: #eceff1;
 }
 
-:global(.body--dark) .daily-operation-card--checkin {
-  background: rgba(76, 175, 80, 0.12);
-}
-
-:global(.body--dark) .daily-operation-card--checkout {
-  background: rgba(244, 67, 54, 0.11);
-}
-
+:global(.body--dark) .daily-operation-card--checkin,
+:global(.body--dark) .daily-operation-card--checkout,
 :global(.body--dark) .daily-operation-card--ocupacion {
-  background: rgba(92, 107, 192, 0.16);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 :global(.body--dark) .ocupacion-count {
-  color: #c5cae9;
+  color: #cfd8dc;
 }
 
 :global(.body--dark) .daily-operation-number {
@@ -1547,32 +1783,54 @@ export default defineComponent({
 }
 
 /* ===== Avisos de operación ===== */
+.avisos-wrapper {
+  margin-top: 8px;
+}
+
 .avisos-header {
-  background: #fff8e1;
-  border-radius: 10px;
-  padding: 2px 4px 2px 10px;
+  background: transparent;
+  border-radius: 0;
+  padding: 0 0 4px;
+}
+
+.avisos-header :deep(.text-orange-9),
+.avisos-header :deep(.q-icon) {
+  color: #607d8b !important;
 }
 
 .aviso-banner {
-  border-radius: 14px;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+  border-radius: 10px;
+  box-shadow: none;
 }
 
 .aviso-restante {
-  opacity: 0.9;
+  opacity: 0.85;
 }
 
-.aviso--salida {
-  background: linear-gradient(135deg, #1e88e5 0%, #1565c0 100%);
-}
-.aviso--regreso {
-  background: linear-gradient(135deg, #00897b 0%, #00695c 100%);
-}
-.aviso--checkin {
-  background: linear-gradient(135deg, #43a047 0%, #2e7d32 100%);
-}
+.aviso--salida,
+.aviso--regreso,
+.aviso--checkin,
 .aviso--checkout {
-  background: linear-gradient(135deg, #e53935 0%, #c62828 100%);
+  border: 1px solid #eceff1;
+  background: #fafbfc !important;
+  color: #455a64 !important;
+}
+
+.aviso--salida,
+.aviso--regreso {
+  border-left: 3px solid #90caf9;
+}
+
+.aviso--checkin {
+  border-left: 3px solid #66bb6a;
+}
+
+.aviso--checkout {
+  border-left: 3px solid #ef9a9a;
+}
+
+.aviso-banner :deep(.q-icon) {
+  color: #78909c !important;
 }
 
 .aviso-fade-enter-active,
@@ -1586,13 +1844,13 @@ export default defineComponent({
 }
 
 .records-badge {
-  background: #31a8ff;
-  color: white;
-  padding: 6px 20px;
+  background: #eceff1;
+  color: #607d8b;
+  padding: 4px 12px;
   border-radius: 20px;
   font-size: 11px;
   font-weight: 500;
-  box-shadow: 0 4px 10px rgba(49, 168, 255, 0.3);
+  box-shadow: none;
 }
 
 .sync-status-card {
@@ -1827,12 +2085,12 @@ export default defineComponent({
 }
 
 .logout-btn {
-  background: #ffebee;
-  color: #c62828;
+  background: transparent;
+  color: #78909c;
   padding: 4px 8px;
   border-radius: 8px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   min-width: auto;
 }
 
@@ -1843,10 +2101,133 @@ export default defineComponent({
   flex-wrap: nowrap;
 }
 
+.home-profile {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "user logout"
+    "session session";
+  gap: 4px 8px;
+  align-items: center;
+}
+
+.home-profile__user {
+  grid-area: user;
+}
+
+.home-profile__name {
+  color: #37474f;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.home-profile__role {
+  color: #90a4ae;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.home-profile__session {
+  grid-area: session;
+}
+
+.home-profile__logout {
+  grid-area: logout;
+}
+
+.home-title {
+  display: none;
+  margin: 0;
+  color: #546e7a;
+  font-size: 0.95rem;
+}
+
+.home-toolbar {
+  display: grid;
+  grid-template-areas:
+    "search"
+    "actions";
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.home-actions {
+  grid-area: actions;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.dashboard-action-btn {
+  width: 100%;
+  min-height: 36px;
+  background: #fff !important;
+  color: #546e7a !important;
+  border: 1px solid #cfd8dc;
+  box-shadow: none;
+}
+
+.home-search {
+  grid-area: search;
+  gap: 8px;
+}
+
+.search-input {
+  box-shadow: none;
+}
+
 /* En pantallas grandes, ocultamos la fila inferior */
 @media (min-width: 600px) {
   .session-dots {
     max-width: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  .daily-operation-card .q-mb-sm {
+    margin-bottom: 4px !important;
+  }
+
+  .theme-green {
+    background: linear-gradient(145deg, #e8f6ee 0%, #ffffff 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+  .theme-red {
+    background: linear-gradient(145deg, #fbecee 0%, #ffffff 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+  .theme-purple {
+    background: linear-gradient(145deg, #f4eef8 0%, #ffffff 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+  .theme-orange {
+    background: linear-gradient(145deg, #f8f0e6 0%, #ffffff 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+  .theme-gold {
+    background: linear-gradient(145deg, #f8f3e4 0%, #ffffff 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+  .theme-blue {
+    background: linear-gradient(145deg, #eaf4fb 0%, #ffffff 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+  .theme-brown {
+    background: linear-gradient(145deg, #f3eeec 0%, #ffffff 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+
+  .modern-card::before {
+    height: 22%;
+  }
+
+  .filter-btn {
+    box-shadow: none;
+  }
+
+  .home-records-row {
+    margin-bottom: 8px;
   }
 }
 
@@ -2013,6 +2394,272 @@ export default defineComponent({
   
   .modern-table {
     min-width: 1200px;
+  }
+}
+
+/* ===== Escritorio: cabecera limpia y compacta ===== */
+@media (min-width: 1024px) {
+  .home-page {
+    padding: 16px 24px 24px !important;
+  }
+
+  .home-top {
+    padding: 10px 14px 12px;
+    margin-bottom: 12px;
+    border: 1px solid #eceff1;
+    border-radius: 14px;
+    background: #fff;
+  }
+
+  .home-profile {
+    grid-template-columns: auto auto 1fr auto;
+    grid-template-areas: "user session . logout";
+    gap: 0 12px;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #f0f2f4;
+  }
+
+  .logout-btn {
+    background: transparent;
+    color: #78909c;
+    font-weight: 600;
+  }
+
+  .home-dashboard {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .daily-operations-mobile {
+    flex: 1 1 auto;
+    max-width: none;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .daily-operations-mobile__header {
+    margin-bottom: 6px !important;
+  }
+
+  .daily-operations-mobile__grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .daily-operation-card,
+  .daily-operation-card--checkin,
+  .daily-operation-card--checkout,
+  .daily-operation-card--ocupacion {
+    display: flex;
+    flex: 0 1 auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+    min-height: 0;
+    padding: 5px 10px;
+    border: 1px solid #eceff1;
+    border-radius: 10px;
+    background: #fafbfc;
+  }
+
+  .daily-operation-card--checkin {
+    border-left: 3px solid #66bb6a;
+  }
+
+  .daily-operation-card--checkout {
+    border-left: 3px solid #ef9a9a;
+  }
+
+  .daily-operation-card--ocupacion {
+    grid-column: auto;
+    border-left: 3px solid #90caf9;
+  }
+
+  .daily-operation-card .q-mb-sm,
+  .daily-operation-card__head {
+    margin-bottom: 0 !important;
+  }
+
+  .daily-operation-card__label {
+    font-size: 0.72rem;
+    color: #607d8b;
+    font-weight: 600;
+  }
+
+  .daily-operation-card__numbers {
+    gap: 4px;
+  }
+
+  .daily-operation-number {
+    min-width: 24px;
+    min-height: 20px;
+    padding: 1px 5px;
+    border-radius: 6px;
+    background: #fff;
+    font-size: 0.72rem;
+  }
+
+  .daily-operation-card__empty {
+    padding: 0;
+    font-size: 0.85rem;
+  }
+
+  .ocupacion-count {
+    font-size: 0.95rem;
+    color: #546e7a;
+  }
+
+  .avisos-wrapper {
+    display: flex;
+    flex: 1 1 280px;
+    max-width: 380px;
+    max-height: 72px;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .avisos-header {
+    background: transparent;
+    padding: 0 0 4px;
+  }
+
+  .avisos-list {
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .aviso-banner,
+  .aviso--salida,
+  .aviso--regreso,
+  .aviso--checkin,
+  .aviso--checkout {
+    margin-bottom: 0;
+    padding: 6px 8px;
+    border: 1px solid #eceff1;
+    border-radius: 8px;
+    background: #fafbfc !important;
+    color: #455a64 !important;
+    box-shadow: none;
+  }
+
+  .aviso--checkin {
+    border-left: 3px solid #66bb6a;
+  }
+
+  .aviso--checkout {
+    border-left: 3px solid #ef9a9a;
+  }
+
+  .aviso--salida,
+  .aviso--regreso {
+    border-left: 3px solid #90caf9;
+  }
+
+  .aviso-banner :deep(.q-icon) {
+    color: #78909c !important;
+  }
+
+  .aviso-banner :deep(.q-banner__content) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 8px;
+    font-size: 0.75rem;
+  }
+
+  .aviso-restante {
+    color: #90a4ae;
+    font-size: 0.7rem;
+  }
+
+  .home-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    margin-bottom: 10px;
+  }
+
+  .home-title {
+    display: block;
+    margin-right: auto;
+    color: #455a64;
+    font-size: 1.15rem;
+    line-height: 1.2;
+  }
+
+  .home-search {
+    flex: 1 1 240px;
+    max-width: 360px;
+    min-width: 200px;
+  }
+
+  .home-search .search-input {
+    box-shadow: none;
+  }
+
+  .home-actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 6px;
+  }
+
+  .dashboard-action-btn {
+    width: auto;
+    min-width: 0;
+    height: 34px;
+    padding: 0 12px;
+    background: #fff !important;
+    color: #546e7a !important;
+    border: 1px solid #cfd8dc;
+    box-shadow: none;
+  }
+
+  .records-badge {
+    background: #eceff1;
+    color: #607d8b;
+    box-shadow: none;
+  }
+
+  .home-records-row {
+    justify-content: flex-start !important;
+  }
+
+  .table-container {
+    margin-top: 0;
+  }
+
+  .filter-btn {
+    flex-shrink: 0;
+    box-shadow: none;
+  }
+
+  :global(.body--dark) .home-top {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: #1e1e1e;
+  }
+
+  :global(.body--dark) .home-profile {
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+  }
+
+  :global(.body--dark) .daily-operation-card,
+  :global(.body--dark) .aviso-banner {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04) !important;
+    color: #eceff1 !important;
   }
 }
 </style>

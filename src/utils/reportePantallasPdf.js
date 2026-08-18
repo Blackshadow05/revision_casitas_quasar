@@ -139,7 +139,40 @@ function measureCaptionWidth (doc, ubicacion, estado) {
   return Math.max(ubicacionWidth, estadoWidth) + (LAYOUT.captionPaddingX * 2)
 }
 
-async function preloadReportImages (reporte) {
+function countFotosConUrl (items) {
+  let total = 0
+  for (const reporte of items) {
+    const fotos = Array.isArray(reporte.fotos) ? reporte.fotos : []
+    for (const foto of fotos) {
+      if (foto?.url) total++
+    }
+  }
+  return total
+}
+
+function yieldToUi () {
+  return new Promise((resolve) => {
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => resolve())
+      return
+    }
+    setTimeout(resolve, 0)
+  })
+}
+
+function emitProgress (onProgress, payload) {
+  if (typeof onProgress !== 'function') return
+  onProgress({
+    percent: Math.max(0, Math.min(100, Math.round(payload.percent))),
+    message: payload.message || 'Creando reporte',
+    detail: payload.detail || 'Esto podría tardar un rato',
+    stage: payload.stage || 'start',
+    current: payload.current || 0,
+    total: payload.total || 0
+  })
+}
+
+async function preloadReportImages (reporte, onFoto) {
   const fotos = Array.isArray(reporte.fotos) ? reporte.fotos : []
   const loaded = []
 
@@ -160,6 +193,12 @@ async function preloadReportImages (reporte) {
         ubicacion: foto.ubicacion || '—',
         estado,
         failed: true
+      })
+    }
+    if (typeof onFoto === 'function') {
+      await onFoto({
+        casita: reporte.numero_casita,
+        ubicacion: foto.ubicacion
       })
     }
   }
@@ -372,8 +411,9 @@ function drawCasitaBlock (doc, reporte, images, rect) {
  * 1 columna × 5 filas por página, ordenado por número de casita.
  * Barra roja lateral solo si hay alguna pantalla defectuosa.
  * @param {object|object[]} reportes
+ * @param {(progress: { percent: number, message: string, detail: string, stage: string, current: number, total: number }) => void} [onProgress]
  */
-export async function generateReportePantallasPdf (reportes) {
+export async function generateReportePantallasPdf (reportes, onProgress) {
   const items = (Array.isArray(reportes) ? reportes : [reportes])
     .filter(Boolean)
     .filter((reporte) => String(reporte.tipo || 'reporte') !== 'movimiento')
@@ -384,12 +424,41 @@ export async function generateReportePantallasPdf (reportes) {
     throw new Error('No hay reportes seleccionados')
   }
 
+  const totalFotos = countFotosConUrl(items)
+  const imageWeight = totalFotos > 0 ? 82 : 8
+  const drawWeight = totalFotos > 0 ? 13 : 87
+  let loadedFotos = 0
+
+  emitProgress(onProgress, {
+    percent: 1,
+    stage: 'start',
+    message: 'Creando reporte',
+    detail: `Preparando ${items.length} ${items.length === 1 ? 'casita' : 'casitas'}. Esto podría tardar un rato.`,
+    current: 0,
+    total: items.length
+  })
+  await yieldToUi()
+
   const prepared = []
   for (const reporte of items) {
-    prepared.push({
-      reporte,
-      images: await preloadReportImages(reporte)
+    const images = await preloadReportImages(reporte, async ({ casita }) => {
+      loadedFotos++
+      const photoPercent = totalFotos > 0
+        ? (loadedFotos / totalFotos) * imageWeight
+        : imageWeight
+      emitProgress(onProgress, {
+        percent: Math.max(2, photoPercent),
+        stage: 'images',
+        message: 'Creando reporte',
+        detail: totalFotos > 0
+          ? `Cargando fotos ${loadedFotos} de ${totalFotos}${casita ? ` · casita ${casita}` : ''}. Esto podría tardar un rato.`
+          : 'Esto podría tardar un rato.',
+        current: loadedFotos,
+        total: totalFotos
+      })
+      await yieldToUi()
     })
+    prepared.push({ reporte, images })
   }
 
   const doc = new jsPDF({
@@ -409,7 +478,18 @@ export async function generateReportePantallasPdf (reportes) {
   const rowHeightOther = (contentHeight - (LAYOUT.cellGapY * (LAYOUT.casitasPerPage - 1))) / LAYOUT.casitasPerPage
   const resumen = getPantallasResumen(prepared)
 
-  prepared.forEach((entry, index) => {
+  emitProgress(onProgress, {
+    percent: imageWeight,
+    stage: 'draw',
+    message: 'Creando reporte',
+    detail: 'Armando el PDF. Esto podría tardar un rato.',
+    current: 0,
+    total: prepared.length
+  })
+  await yieldToUi()
+
+  for (let index = 0; index < prepared.length; index++) {
+    const entry = prepared[index]
     const pageIndex = Math.floor(index / LAYOUT.casitasPerPage)
     const slotOnPage = index % LAYOUT.casitasPerPage
 
@@ -434,11 +514,40 @@ export async function generateReportePantallasPdf (reportes) {
     }
 
     drawCasitaBlock(doc, entry.reporte, entry.images, rect)
+
+    emitProgress(onProgress, {
+      percent: imageWeight + (((index + 1) / prepared.length) * drawWeight),
+      stage: 'draw',
+      message: 'Creando reporte',
+      detail: `Armando el PDF · casita ${entry.reporte.numero_casita || index + 1} (${index + 1} de ${prepared.length})`,
+      current: index + 1,
+      total: prepared.length
+    })
+    await yieldToUi()
+  }
+
+  emitProgress(onProgress, {
+    percent: imageWeight + drawWeight,
+    stage: 'save',
+    message: 'Creando reporte',
+    detail: 'Guardando el archivo PDF…',
+    current: prepared.length,
+    total: prepared.length
   })
+  await yieldToUi()
 
   const casitas = items.map(r => r.numero_casita).filter(Boolean)
   const suffix = casitas.length === 1
     ? `casita_${casitas[0]}`
     : `${casitas.length}_casitas`
   doc.save(`reporte_pantallas_${suffix}_${Date.now()}.pdf`)
+
+  emitProgress(onProgress, {
+    percent: 100,
+    stage: 'done',
+    message: 'Creando reporte',
+    detail: 'Listo',
+    current: prepared.length,
+    total: prepared.length
+  })
 }

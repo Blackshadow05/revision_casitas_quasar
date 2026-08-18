@@ -754,6 +754,7 @@
 <script>
 import { computed, defineComponent, onMounted, onUnmounted, ref, watch, reactive, nextTick } from 'vue'
 import { notify } from '../utils/notify'
+import { scrollAppToTop } from '../utils/appScroll'
 import { useCasasStore } from '../stores/casas'
 import { useAuthStore } from '../stores/auth'
 import { date, useQuasar } from 'quasar'
@@ -844,7 +845,7 @@ export default defineComponent({
     }
 
     const scrollToTop = () => {
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      scrollAppToTop({ smooth: true })
     }
 
     // ===== Avisos de operación (tabla operaciones_memo) =====
@@ -1199,7 +1200,7 @@ export default defineComponent({
         showFilterModal.value = false
         filterDate.value = null
         selectedFilter.value = null
-        window.scrollTo({ top: 0 })
+        scrollAppToTop()
         notify({
           type: 'positive',
           message: `Filtro aplicado: ${store.activeFilter?.label}`,
@@ -1220,7 +1221,7 @@ export default defineComponent({
       })
       
       showFilterModal.value = false
-      window.scrollTo({ top: 0 })
+      scrollAppToTop()
       notify({
         type: 'positive',
         message: `Filtro aplicado: ${filterData.label}`,
@@ -1233,7 +1234,7 @@ export default defineComponent({
       filterDate.value = null
       await store.clearAdvancedFilter()
       showFilterModal.value = false
-      window.scrollTo({ top: 0 })
+      scrollAppToTop()
       notify({
         type: 'info',
         message: 'Filtros limpiados',
@@ -1245,7 +1246,7 @@ export default defineComponent({
       selectedFilter.value = null
       filterDate.value = null
       await store.clearAdvancedFilter()
-      window.scrollTo({ top: 0 })
+      scrollAppToTop()
       notify({
         type: 'info',
         message: 'Filtro limpiado',
@@ -1258,7 +1259,7 @@ export default defineComponent({
       filterDate.value = null
       store.setSearch('')
       await store.clearAdvancedFilter()
-      window.scrollTo({ top: 0 })
+      scrollAppToTop()
     }
     const loginLoading = computed(() => authStore.loading)
     const loginError = computed(() => authStore.error)
@@ -1379,7 +1380,7 @@ export default defineComponent({
     watch(() => store.search, () => {
       infiniteScroll.value?.reset()
       nextTick(() => {
-        window.scrollTo({ top: 0 })
+        scrollAppToTop()
       })
     })
 

@@ -1,13 +1,5 @@
 <template>
-  <q-layout view="lHh Lpr lFf">
-    <q-page-container>
-      <router-view v-slot="{ Component, route }">
-        <transition mode="out-in">
-          <component :is="Component" :key="route.fullPath" />
-        </transition>
-      </router-view>
-    </q-page-container>
-
+  <q-layout view="lHh Lpr lFf" :class="{ 'app-shell': isMobileNav }">
     <q-header class="app-header bg-primary text-white">
       <q-toolbar class="app-header__toolbar">
         <q-toolbar-title class="text-weight-bold">
@@ -131,8 +123,16 @@
       </q-toolbar>
     </q-header>
 
-    <!-- Mobile/Tablet: Bottom tabs -->
-    <q-footer class="custom-footer" v-if="!$q.screen.gt.md">
+    <q-page-container :id="appPageScrollId" class="app-page-container">
+      <router-view v-slot="{ Component, route }">
+        <transition mode="out-in">
+          <component :is="Component" :key="route.fullPath" />
+        </transition>
+      </router-view>
+    </q-page-container>
+
+    <!-- Mobile/Tablet: Bottom tabs (in-flow, no position:fixed) -->
+    <q-footer class="custom-footer" v-if="isMobileNav" unelevated>
       <q-tabs
         v-model="tab"
         dense
@@ -156,7 +156,7 @@
 </template>
 
 <script>
-import { ref, computed, defineComponent, watch, onUnmounted } from "vue";
+import { ref, computed, defineComponent, watch, onMounted, onUnmounted } from "vue";
 import { notify } from '../utils/notify'
 import { useRouter, useRoute } from "vue-router";
 import { useQuasar } from "quasar";
@@ -165,6 +165,7 @@ import { useCasasStore } from "../stores/casas";
 import { useAuthStore } from "../stores/auth";
 import { desktopSecurityLinks } from "../services/securityNavigation";
 import { playSound } from "../utils/sounds";
+import { APP_PAGE_SCROLL_ID } from "../utils/appScroll";
 
 export default defineComponent({
   name: "MainLayout",
@@ -178,8 +179,40 @@ export default defineComponent({
     const route = useRoute();
     const casasStore = useCasasStore();
     const authStore = useAuthStore();
+    const isMobileNav = computed(() => !q.screen.gt.md);
     // Puesto 01 solo visible para el usuario Esteban B
     const isEstebanB = computed(() => authStore.user?.Usuario === "Esteban B");
+
+    const isEditableFocused = () => {
+      const el = document.activeElement;
+      if (!el || el === document.body) return false;
+      const tag = el.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || el.isContentEditable;
+    };
+
+    const syncMobileShell = () => {
+      const mobile = !q.screen.gt.md;
+      document.documentElement.classList.toggle("mobile-app-shell", mobile);
+      document.body.classList.toggle("mobile-app-shell", mobile);
+
+      if (!mobile) {
+        document.documentElement.style.removeProperty("--app-shell-height");
+        return;
+      }
+
+      let height = window.innerHeight;
+      const vv = window.visualViewport;
+      // Solo encoger al visualViewport con un input activo (teclado).
+      // Si usáramos visualViewport siempre, bugs de iOS dejarían el menú a media pantalla.
+      if (vv && isEditableFocused()) {
+        height = vv.height;
+      }
+      document.documentElement.style.setProperty("--app-shell-height", `${Math.round(height)}px`);
+
+      if (document.scrollingElement && document.scrollingElement.scrollTop !== 0) {
+        document.scrollingElement.scrollTop = 0;
+      }
+    };
     let stopHomeUpdates = null;
     const detachHomeUpdates = () => {
       if (typeof stopHomeUpdates === 'function') {
@@ -238,8 +271,35 @@ export default defineComponent({
       }
     }, { immediate: true });
 
+    watch(isMobileNav, () => {
+      syncMobileShell();
+    }, { immediate: true });
+
+    onMounted(() => {
+      syncMobileShell();
+      window.addEventListener("resize", syncMobileShell);
+      window.addEventListener("orientationchange", syncMobileShell);
+      window.addEventListener("focusin", syncMobileShell);
+      window.addEventListener("focusout", syncMobileShell);
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", syncMobileShell);
+        window.visualViewport.addEventListener("scroll", syncMobileShell);
+      }
+    });
+
     onUnmounted(() => {
-      detachHomeUpdates()
+      detachHomeUpdates();
+      window.removeEventListener("resize", syncMobileShell);
+      window.removeEventListener("orientationchange", syncMobileShell);
+      window.removeEventListener("focusin", syncMobileShell);
+      window.removeEventListener("focusout", syncMobileShell);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener("resize", syncMobileShell);
+        window.visualViewport.removeEventListener("scroll", syncMobileShell);
+      }
+      document.documentElement.classList.remove("mobile-app-shell");
+      document.body.classList.remove("mobile-app-shell");
+      document.documentElement.style.removeProperty("--app-shell-height");
     });
 
     const goToHome = () => {
@@ -271,6 +331,8 @@ export default defineComponent({
       tab,
       authStore,
       isEstebanB,
+      isMobileNav,
+      appPageScrollId: APP_PAGE_SCROLL_ID,
       desktopSecurityLinks,
       goTo,
       goToHome,
@@ -286,6 +348,9 @@ export default defineComponent({
 <style>
 .app-header {
   border-bottom: none;
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 .app-header__toolbar {
@@ -311,7 +376,9 @@ export default defineComponent({
 .custom-footer {
   background: white;
   border-top: 1px solid #eee;
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
 }
 
 .custom-footer :deep(.q-tab--active .q-tab__icon) {
@@ -329,7 +396,7 @@ export default defineComponent({
   margin-left: 8px;
 }
 
-.q-page-container {
+.app-page-container {
   position: relative;
 }
 </style>

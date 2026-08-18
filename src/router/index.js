@@ -6,6 +6,9 @@ import {
 } from "vue-router";
 import routes from "./routes";
 import { useAuthStore } from "../stores/auth";
+import { getAppScrollTarget } from "../utils/appScroll";
+
+const pageScrollByPath = new Map();
 
 export default function (/* { store, ssrContext } */) {
   const createHistory = process.env.SERVER
@@ -16,6 +19,19 @@ export default function (/* { store, ssrContext } */) {
 
   const Router = createRouter({
     scrollBehavior: (to, from, savedPosition) => {
+      const page = typeof document !== "undefined" ? getAppScrollTarget() : null;
+      if (from?.fullPath && page) {
+        pageScrollByPath.set(from.fullPath, page.scrollTop);
+      }
+
+      if (page && document.body.classList.contains("mobile-app-shell")) {
+        const top = savedPosition
+          ? (pageScrollByPath.get(to.fullPath) || 0)
+          : 0;
+        page.scrollTo(0, top);
+        return { left: 0, top: 0 };
+      }
+
       if (savedPosition) {
         return new Promise((resolve) => {
           let attempts = 0

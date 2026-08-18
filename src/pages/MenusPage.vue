@@ -321,7 +321,7 @@ export default defineComponent({
 .menus-shell {
   width: min(1180px, 100%);
   margin: 0 auto;
-  padding: clamp(18px, 3vw, 30px) clamp(14px, 3vw, 28px) calc(96px + env(safe-area-inset-bottom));
+  padding: clamp(18px, 3vw, 30px);
   display: grid;
   gap: clamp(22px, 3vw, 34px);
   align-content: start;

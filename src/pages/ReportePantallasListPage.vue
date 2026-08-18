@@ -199,6 +199,33 @@
         </q-card>
       </q-dialog>
 
+      <q-dialog v-model="pdfProgress.open" persistent>
+        <q-card class="pdf-progress-card">
+          <q-card-section>
+            <div class="pdf-progress-head row items-center no-wrap q-mb-md">
+              <q-spinner-dots color="negative" size="28px" class="q-mr-sm" />
+              <div class="min-width-0">
+                <div class="text-subtitle1 text-weight-bold">{{ pdfProgress.message }}</div>
+                <div class="text-caption text-grey-7">{{ pdfProgress.detail }}</div>
+              </div>
+            </div>
+            <q-linear-progress
+              rounded
+              size="12px"
+              color="negative"
+              track-color="red-1"
+              :value="pdfProgress.percent / 100"
+              instant-feedback
+              aria-label="Progreso del PDF"
+            />
+            <div class="row items-center justify-between q-mt-sm text-caption text-grey-6">
+              <span>{{ pdfProgress.percent }}%</span>
+              <span v-if="pdfProgress.total">{{ pdfProgress.current }} / {{ pdfProgress.total }}</span>
+            </div>
+          </q-card-section>
+        </q-card>
+      </q-dialog>
+
       <div v-if="!loading && esVistaReportes && filteredReports.length > 0" class="selection-bar q-mb-md">
         <div class="selection-bar__info">
           <q-checkbox
@@ -510,7 +537,7 @@
 </template>
 
 <script>
-import { computed, defineComponent, onMounted, ref } from 'vue'
+import { computed, defineComponent, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { notify } from '../utils/notify'
 import { useAuthStore } from '../stores/auth'
@@ -547,6 +574,14 @@ export default defineComponent({
     const expandedId = ref(null)
     const selectedIds = ref([])
     const pdfBulkLoading = ref(false)
+    const pdfProgress = ref({
+      open: false,
+      percent: 0,
+      message: 'Creando reporte',
+      detail: 'Esto podría tardar un rato',
+      current: 0,
+      total: 0
+    })
     const downloadingKey = ref(null)
     const viewerOpen = ref(false)
     const viewerUrl = ref('')
@@ -952,8 +987,34 @@ export default defineComponent({
       }
 
       pdfBulkLoading.value = true
+      pdfProgress.value = {
+        open: true,
+        percent: 1,
+        message: 'Creando reporte',
+        detail: `Esto podría tardar un rato. Se incluirán ${selectedReports.length} ${selectedReports.length === 1 ? 'casita' : 'casitas'}.`,
+        current: 0,
+        total: selectedReports.length
+      }
+      await nextTick()
+      await new Promise((resolve) => setTimeout(resolve, 40))
       try {
-        await generateReportePantallasPdf(selectedReports)
+        await generateReportePantallasPdf(selectedReports, (progress) => {
+          pdfProgress.value = {
+            open: true,
+            percent: progress.percent,
+            message: progress.message,
+            detail: progress.detail,
+            current: progress.current,
+            total: progress.total
+          }
+        })
+        pdfProgress.value = {
+          ...pdfProgress.value,
+          percent: 100,
+          message: 'Creando reporte',
+          detail: 'Listo'
+        }
+        await new Promise((resolve) => setTimeout(resolve, 400))
         notify({
           type: 'positive',
           message: `PDF generado (${selectedReports.length} casitas)`,
@@ -969,6 +1030,11 @@ export default defineComponent({
         })
       } finally {
         pdfBulkLoading.value = false
+        pdfProgress.value = {
+          ...pdfProgress.value,
+          open: false,
+          percent: 0
+        }
       }
     }
 
@@ -1052,6 +1118,7 @@ export default defineComponent({
       allFilteredSelected,
       someFilteredSelected,
       pdfBulkLoading,
+      pdfProgress,
       downloadingKey,
       viewerOpen,
       viewerUrl,
@@ -1471,6 +1538,19 @@ export default defineComponent({
   gap: 8px;
 }
 
+.pdf-progress-card {
+  width: min(92vw, 420px);
+  border-radius: 16px;
+}
+
+.pdf-progress-head {
+  min-width: 0;
+}
+
+.min-width-0 {
+  min-width: 0;
+}
+
 .empty-state {
   text-align: center;
 }
@@ -1820,6 +1900,10 @@ export default defineComponent({
 .body--dark .selection-bar {
   background: #1e1e1e;
   border-color: rgba(255, 255, 255, 0.06);
+}
+
+.body--dark .pdf-progress-card {
+  background: #1e1e1e;
 }
 
 .body--dark .field-label {

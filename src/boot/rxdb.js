@@ -1,4 +1,4 @@
-import { boot } from 'quasar/wrappers'
+import { boot } from '#q-app/wrappers'
 import { ensureHomeDatabase } from '../services/homeSync'
 
 export default boot(async () => {

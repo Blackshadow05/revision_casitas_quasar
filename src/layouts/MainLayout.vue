@@ -61,7 +61,7 @@
 
         <q-btn v-if="authStore.isLoggedIn" flat round dense icon="menu" class="menu-button text-white" aria-label="Abrir navegación">
           <q-menu anchor="bottom right" self="top right" class="menu-dropdown">
-            <q-list style="min-width: 220px">
+            <q-list role="menu" style="min-width: 220px">
               <q-item clickable v-close-popup @click="goToHome">
                 <q-item-section avatar>
                   <q-icon name="home" color="primary" />

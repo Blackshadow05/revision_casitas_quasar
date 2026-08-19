@@ -115,7 +115,7 @@
               </q-btn>
               <q-btn flat round dense icon="more_vert" size="sm" color="grey-5">
                 <q-menu>
-                  <q-list dense>
+                  <q-list dense role="menu">
                     <q-item clickable v-close-popup @click="openEdit(snippet)">
                       <q-item-section avatar><q-icon name="edit" size="xs"/></q-item-section>
                       <q-item-section>Editar</q-item-section>

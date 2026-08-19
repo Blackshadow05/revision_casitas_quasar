@@ -381,7 +381,7 @@ export default defineComponent({
   padding-right: env(safe-area-inset-right, 0px);
 }
 
-.custom-footer :deep(.q-tab--active .q-tab__icon) {
+.custom-footer .q-tab--active .q-tab__icon {
   background: #e1f5fe;
   padding: 8px 16px;
   border-radius: 15px;

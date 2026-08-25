@@ -188,7 +188,7 @@
 
 <script>
 import { computed, defineComponent, ref, watch } from 'vue'
-import { useAuthStore } from '../stores/auth'
+import { useAuthStore } from '../../stores/auth'
 
 export default defineComponent({
   name: 'AuthenticatorLoginDialog',

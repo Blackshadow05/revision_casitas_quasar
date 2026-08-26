@@ -3,7 +3,7 @@ import { configure } from 'quasar/wrappers'
 export default configure((ctx) => {
   return {
     boot: [
-      'google-auth',
+      'auth',
       'rxdb',
       'sw-update'
     ],
@@ -89,6 +89,10 @@ export default configure((ctx) => {
         skipWaiting: true,
         clientsClaim: true,
         runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/.*\.supabase\.co\/auth\/.*/i,
+            handler: 'NetworkOnly'
+          },
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
             handler: 'NetworkFirst',

@@ -26,7 +26,7 @@
           <span>Continuar con Google</span>
         </q-btn>
         <div v-if="googleLoginPending" class="text-caption text-grey-7 text-center q-mt-sm">
-          Se abrió Google en el navegador. Cuando termines, vuelve a esta app.
+          Se abrió Google en el navegador. Después te pedirá el código de Authenticator.
         </div>
 
         <div class="login-divider row items-center q-my-md">
@@ -161,7 +161,7 @@
           </div>
         </div>
         <div class="home-profile__session row items-center">
-          <div v-if="usesAuthenticator && sessionRemainingLabel" class="session-dots row items-center">
+          <div v-if="usesHourlySession && sessionRemainingLabel" class="session-dots row items-center">
             <q-icon name="schedule" size="14px" color="grey-6" class="q-mr-xs" />
             <span class="q-mr-xs text-caption text-grey-6">Sesión {{ sessionRemainingLabel }}</span>
           </div>
@@ -774,7 +774,7 @@ export default defineComponent({
       username: '',
       password: ''
     })
-    const usesAuthenticator = computed(() => authStore.usesAuthenticator)
+    const usesHourlySession = computed(() => authStore.usesHourlySession)
     const sessionRemainingLabel = computed(() => authStore.sessionRemainingLabel)
 
     const handleLogin = async () => {
@@ -816,6 +816,9 @@ export default defineComponent({
       showLoginModal.value = false
       loginData.username = ''
       loginData.password = ''
+      if (authStore.usesGoogle && !isStandaloneDisplay()) {
+        showGoogleReturnHint.value = true
+      }
       await loadData()
     }
 
@@ -896,10 +899,18 @@ export default defineComponent({
       await store.fetchCasas()
     }
 
+    watch(() => authStore.mfa.step, (step) => {
+      if (step && !authStore.isLoggedIn) {
+        showLoginModal.value = false
+        showAuthenticatorModal.value = true
+      }
+    })
+
     watch(isLoggedIn, async (logged) => {
       if (!logged) return
       if (!authStore.googleLoginPending && route.query.google_return !== '1') return
       showLoginModal.value = false
+      showAuthenticatorModal.value = false
       authStore.googleLoginPending = false
       await loadData()
     })
@@ -1090,7 +1101,7 @@ export default defineComponent({
       isLoggedIn,
       currentUser,
       daysRemaining,
-      usesAuthenticator,
+      usesHourlySession,
       sessionRemainingLabel,
       handleLogin,
       handleGoogleLogin,

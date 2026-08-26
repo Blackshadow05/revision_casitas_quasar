@@ -113,7 +113,7 @@ export const useAuthStore = defineStore('auth', {
     },
     userId: (state) => state.user?.id || null,
     daysRemaining: (state) => {
-      if (!state.sessionExpiry || state.authMode === 'supabase') return 0
+      if (!state.sessionExpiry || usesSupabaseSession(state.authMode)) return 0
       const diffTime = new Date(state.sessionExpiry) - new Date()
       return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))
     },
@@ -122,7 +122,7 @@ export const useAuthStore = defineStore('auth', {
       const diffMs = new Date(state.sessionExpiry) - Date.now()
       if (diffMs <= 0) return 'Expirada'
 
-      if (state.authMode === 'supabase') {
+      if (usesSupabaseSession(state.authMode)) {
         const hours = Math.floor(diffMs / (1000 * 60 * 60))
         const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
         return hours > 0 ? `${hours} h ${minutes} min` : `${minutes} min`
@@ -137,7 +137,8 @@ export const useAuthStore = defineStore('auth', {
     isSuperAdmin: (state) => state.user?.Rol === 'SuperAdmin',
     canManageUsers: (state) => USER_MANAGERS.includes(state.user?.Usuario),
     usesAuthenticator: (state) => state.authMode === 'supabase',
-    usesGoogle: (state) => state.authMode === 'google'
+    usesGoogle: (state) => state.authMode === 'google',
+    usesHourlySession: (state) => usesSupabaseSession(state.authMode)
   },
 
   actions: {
@@ -183,12 +184,47 @@ export const useAuthStore = defineStore('auth', {
 
     buildExpiry(mode) {
       const expiryDate = new Date()
-      if (mode === 'supabase') {
+      if (usesSupabaseSession(mode)) {
         expiryDate.setHours(expiryDate.getHours() + SUPABASE_SESSION_HOURS)
       } else {
         expiryDate.setDate(expiryDate.getDate() + LEGACY_SESSION_DAYS)
       }
       return expiryDate
+    },
+
+    sessionModeForAuthUser(authUser) {
+      return isGoogleProvider(authUser) ? 'google' : 'supabase'
+    },
+
+    unauthorizedMessageForAuthUser(authUser) {
+      if (isGoogleProvider(authUser)) {
+        return 'Este correo de Google no está autorizado. Pide al administrador que lo asigne.'
+      }
+      return 'Tu correo no está autorizado. Contacte al administrador.'
+    },
+
+    async fetchAuthorizedProfile(authUser) {
+      if (isGoogleProvider(authUser)) {
+        return this.fetchGoogleProfile(authUser)
+      }
+      return this.fetchProfileForAuthUser(authUser)
+    },
+
+    async linkAuthUserToProfile(profile, authUser) {
+      const nextProfile = toProfile(profile)
+      if (!nextProfile || !authUser?.id) return nextProfile
+
+      const email = normalizeEmail(authUser.email || nextProfile.email)
+      if (nextProfile.auth_user_id === authUser.id && (!email || nextProfile.email === email)) {
+        return nextProfile
+      }
+
+      await supabase
+        .from('Usuarios')
+        .update({ auth_user_id: authUser.id, email })
+        .eq('id', nextProfile.id)
+
+      return { ...nextProfile, auth_user_id: authUser.id, email }
     },
 
     isSupabaseSessionExpired() {
@@ -261,29 +297,32 @@ export const useAuthStore = defineStore('auth', {
       return toProfile(data) || { ...toProfile(profile), totp_enrolled: true }
     },
 
-    async completeAuthenticatorSession(profile) {
+    async completeHourlySession(profile, mode) {
       const enrolledProfile = await this.markTotpEnrolled(profile)
-      this.persistLocalSession(enrolledProfile, this.buildExpiry('supabase'), 'supabase')
+      this.persistLocalSession(enrolledProfile, this.buildExpiry(mode), mode)
+      this.googleLoginPending = false
       this.clearMfaState()
       return { success: true, userId: enrolledProfile.id }
     },
 
-    async completeGoogleSession(profile, authUser) {
-      const email = normalizeEmail(authUser?.email || profile.email)
-      let nextProfile = toProfile(profile)
+    async tryRestoreHourlySession(profile, authUser, mode) {
+      const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+      if (aalData?.currentLevel !== 'aal2') return null
 
-      if (authUser?.id && nextProfile.auth_user_id !== authUser.id) {
-        await supabase
-          .from('Usuarios')
-          .update({ auth_user_id: authUser.id, email })
-          .eq('id', nextProfile.id)
-        nextProfile = { ...nextProfile, auth_user_id: authUser.id, email }
+      const linked = await this.linkAuthUserToProfile(profile, authUser)
+      const startedAt = readDate(localStorage.getItem(SESSION_STARTED_KEY)) || new Date()
+      const expiryDate = new Date(startedAt.getTime() + SUPABASE_SESSION_HOURS * 60 * 60 * 1000)
+
+      if (Date.now() > expiryDate.getTime()) {
+        await supabase.auth.signOut({ scope: 'global' }).catch(() => null)
+        this.clearLocalSession()
+        return false
       }
 
-      this.persistLocalSession(nextProfile, this.buildExpiry('google'), 'google')
+      this.persistLocalSession(linked, expiryDate, mode, startedAt)
       this.googleLoginPending = false
       this.clearMfaState()
-      return { success: true, userId: nextProfile.id }
+      return true
     },
 
     async rejectUnauthorizedAuthSession(message) {
@@ -301,18 +340,26 @@ export const useAuthStore = defineStore('auth', {
         return { success: false, message: this.error }
       }
 
+      const { data: sessionData } = await supabase.auth.getUser()
+      const authUser = sessionData?.user
+      const mode = this.sessionModeForAuthUser(authUser)
+
       if (aalData?.currentLevel === 'aal2') {
-        const { data: sessionData } = await supabase.auth.getUser()
-        const { profile, error } = await this.fetchProfileForAuthUser(sessionData?.user)
+        const { profile, error } = await this.fetchAuthorizedProfile(authUser)
         if (error || !profile) {
-          return this.rejectUnauthorizedAuthSession('Tu correo no está autorizado. Contacte al administrador.')
+          return this.rejectUnauthorizedAuthSession(this.unauthorizedMessageForAuthUser(authUser))
         }
         if (profile.Rol === 'inactivo') {
           return this.rejectUnauthorizedAuthSession('Usuario inactivo. Contacte al administrador.')
         }
-        return this.completeAuthenticatorSession(profile)
+        const linked = await this.linkAuthUserToProfile(profile, authUser)
+        return this.completeHourlySession(linked, mode)
       }
 
+      return this.prepareMfaChallengeOrEnroll()
+    },
+
+    async prepareMfaChallengeOrEnroll() {
       const { data: factorsData, error: factorsError } = await supabase.auth.mfa.listFactors()
       if (factorsError) {
         this.error = factorsError.message || 'No se pudieron leer los factores MFA'
@@ -366,39 +413,28 @@ export const useAuthStore = defineStore('auth', {
         const session = sessionData?.session
 
         if (session?.user) {
-          if (isGoogleProvider(session.user)) {
-            const { profile, error } = await this.fetchGoogleProfile(session.user)
-            if (error || !profile) {
-              return this.rejectUnauthorizedAuthSession(
-                'Este correo de Google no está autorizado. Pide al administrador que lo asigne.'
-              )
-            }
-            if (profile.Rol === 'inactivo') {
-              return this.rejectUnauthorizedAuthSession('Usuario inactivo. Contacte al administrador.')
-            }
-            await this.completeGoogleSession(profile, session.user)
-            return true
+          if (this.mfa.step) {
+            return false
           }
 
-          const { profile, error } = await this.fetchProfileForAuthUser(session.user)
-          if (error || !profile || profile.Rol === 'inactivo') {
-            await supabase.auth.signOut({ scope: 'local' }).catch(() => null)
-          } else {
-            const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-            if (aalData?.currentLevel === 'aal2') {
-              const startedAt = readDate(localStorage.getItem(SESSION_STARTED_KEY)) || new Date()
-              const expiryDate = new Date(startedAt.getTime() + SUPABASE_SESSION_HOURS * 60 * 60 * 1000)
-              if (Date.now() > expiryDate.getTime()) {
-                await supabase.auth.signOut({ scope: 'global' }).catch(() => null)
-                this.clearLocalSession()
-                return false
-              }
-              this.persistLocalSession(profile, expiryDate, 'supabase', startedAt)
-              return true
-            }
+          const { profile, error } = await this.fetchAuthorizedProfile(session.user)
+          const mode = this.sessionModeForAuthUser(session.user)
 
-            this.authMode = 'supabase'
-            await this.prepareMfaStep()
+          if (error || !profile) {
+            if (isGoogleProvider(session.user) || usesSupabaseSession(this.authMode)) {
+              return this.rejectUnauthorizedAuthSession(this.unauthorizedMessageForAuthUser(session.user))
+            }
+            await supabase.auth.signOut({ scope: 'local' }).catch(() => null)
+          } else if (profile.Rol === 'inactivo') {
+            return this.rejectUnauthorizedAuthSession('Usuario inactivo. Contacte al administrador.')
+          } else {
+            const restored = await this.tryRestoreHourlySession(profile, session.user, mode)
+            if (restored === true) return true
+            if (restored === false) return false
+
+            await this.linkAuthUserToProfile(profile, session.user)
+            this.authMode = mode
+            await this.prepareMfaChallengeOrEnroll()
             return false
           }
         }
@@ -415,7 +451,7 @@ export const useAuthStore = defineStore('auth', {
     },
 
     async checkSessionExpiry() {
-      if (this.authMode === 'supabase' && this.isSupabaseSessionExpired()) {
+      if (usesSupabaseSession(this.authMode) && this.isSupabaseSessionExpired()) {
         await this.logout()
         return false
       }
@@ -506,9 +542,14 @@ export const useAuthStore = defineStore('auth', {
     },
 
     async resumeAfterExternalGoogleLogin () {
-      if (this.restoring || this.isLoggedIn || !this.googleLoginPending) {
+      if (this.restoring || this.isLoggedIn || this.mfa.step) {
         return this.isLoggedIn
       }
+
+      const { data } = await supabase.auth.getSession()
+      const user = data?.session?.user
+      if (!user) return false
+      if (!this.googleLoginPending && !isGoogleProvider(user)) return false
 
       return this.restoreSession()
     },
@@ -596,15 +637,17 @@ export const useAuthStore = defineStore('auth', {
         }
 
         const { data: userData } = await supabase.auth.getUser()
-        const { profile, error } = await this.fetchProfileForAuthUser(userData?.user)
+        const authUser = userData?.user
+        const { profile, error } = await this.fetchAuthorizedProfile(authUser)
         if (error || !profile) {
-          return this.rejectUnauthorizedAuthSession('Tu correo no está autorizado. Contacte al administrador.')
+          return this.rejectUnauthorizedAuthSession(this.unauthorizedMessageForAuthUser(authUser))
         }
         if (profile.Rol === 'inactivo') {
           return this.rejectUnauthorizedAuthSession('Usuario inactivo. Contacte al administrador.')
         }
 
-        return this.completeAuthenticatorSession(profile)
+        const linked = await this.linkAuthUserToProfile(profile, authUser)
+        return this.completeHourlySession(linked, this.sessionModeForAuthUser(authUser))
       } catch (err) {
         this.error = 'Ocurrió un error inesperado'
         console.error('MFA verify error:', err)
@@ -617,9 +660,10 @@ export const useAuthStore = defineStore('auth', {
     async cancelAuthenticatorLogin() {
       this.clearMfaState()
       this.error = null
-      if (!this.user || this.authMode === 'supabase') {
+      this.googleLoginPending = false
+      if (!this.user || usesSupabaseSession(this.authMode)) {
         await supabase.auth.signOut({ scope: 'local' }).catch(() => null)
-        if (this.authMode === 'supabase' && !this.user) {
+        if (usesSupabaseSession(this.authMode) && !this.user) {
           this.clearLocalSession()
         }
       }

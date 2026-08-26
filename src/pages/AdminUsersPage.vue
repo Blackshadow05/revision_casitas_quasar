@@ -34,7 +34,21 @@
               {{ user.Rol || 'Sin rol' }}
             </q-chip>
           </q-item-label>
-          <q-item-label caption class="q-mt-sm row items-center no-wrap">
+          <q-item-label caption class="q-mt-xs">
+            <q-chip
+              dense
+              size="sm"
+              :color="isGoogleLogin(user) ? 'blue-1' : 'grey-2'"
+              :text-color="isGoogleLogin(user) ? 'blue-9' : 'grey-8'"
+              :icon="isGoogleLogin(user) ? 'login' : 'lock'"
+            >
+              {{ loginMethodLabel(user) }}
+            </q-chip>
+          </q-item-label>
+          <q-item-label v-if="isGoogleLogin(user)" caption class="q-mt-xs">
+            {{ user.email || 'Sin correo de Google' }}
+          </q-item-label>
+          <q-item-label v-else caption class="q-mt-sm row items-center no-wrap">
             <q-icon name="lock" size="14px" class="q-mr-xs" />
             <span class="password-text">
               {{ isPasswordVisible(user.id) ? (user.password_hash || 'Sin contraseña') : '••••••••' }}
@@ -61,7 +75,7 @@
               color="primary"
               @click="openEditDialog(user)"
             >
-              <q-tooltip>Editar contraseña y rol</q-tooltip>
+              <q-tooltip>Editar acceso y rol</q-tooltip>
             </q-btn>
             <q-btn
               v-if="canDeleteUsers"
@@ -110,13 +124,34 @@
           </q-td>
         </template>
 
+        <template v-slot:body-cell-acceso="props">
+          <q-td :props="props">
+            <div>
+              <q-chip
+                dense
+                size="sm"
+                :color="isGoogleLogin(props.row) ? 'blue-1' : 'grey-2'"
+                :text-color="isGoogleLogin(props.row) ? 'blue-9' : 'grey-8'"
+              >
+                {{ loginMethodLabel(props.row) }}
+              </q-chip>
+              <div v-if="isGoogleLogin(props.row)" class="text-caption text-grey-7">
+                {{ props.row.email || 'Sin correo' }}
+              </div>
+            </div>
+          </q-td>
+        </template>
+
         <template v-slot:body-cell-password="props">
           <q-td :props="props">
             <div class="row items-center no-wrap">
               <span class="password-text">
-                {{ isPasswordVisible(props.row.id) ? (props.row.password_hash || 'Sin contraseña') : '••••••••' }}
+                {{ isGoogleLogin(props.row)
+                  ? '—'
+                  : (isPasswordVisible(props.row.id) ? (props.row.password_hash || 'Sin contraseña') : '••••••••') }}
               </span>
               <q-btn
+                v-if="!isGoogleLogin(props.row)"
                 flat
                 round
                 dense
@@ -141,7 +176,7 @@
                 color="primary"
                 @click="openEditDialog(props.row)"
               >
-                <q-tooltip>Editar contraseña y rol</q-tooltip>
+                <q-tooltip>Editar acceso y rol</q-tooltip>
               </q-btn>
               <q-btn
                 v-if="canDeleteUsers"
@@ -174,7 +209,26 @@
             filled
             class="q-mb-md"
           />
+          <q-select
+            v-model="newUser.metodo_login"
+            :options="loginMethodOptions"
+            label="Cómo inicia sesión"
+            emit-value
+            map-options
+            filled
+            class="q-mb-md"
+          />
           <q-input
+            v-if="newUser.metodo_login === 'google'"
+            v-model="newUser.email"
+            label="Correo de Google"
+            type="email"
+            filled
+            class="q-mb-md"
+            hint="El Gmail con el que va a entrar"
+          />
+          <q-input
+            v-else
             v-model="newUser.password_hash"
             label="Contraseña"
             :type="showPassword ? 'text' : 'password'"
@@ -217,8 +271,27 @@
           <div class="text-caption">Usuario: {{ editingUser?.Usuario }}</div>
         </q-card-section>
 
-        <q-card-section>
+        <q-card-section v-if="editingUser">
+          <q-select
+            v-model="editingUser.metodo_login"
+            :options="loginMethodOptions"
+            label="Cómo inicia sesión"
+            emit-value
+            map-options
+            filled
+            class="q-mb-md"
+          />
           <q-input
+            v-if="editingUser.metodo_login === 'google'"
+            v-model="editingUser.email"
+            label="Correo de Google"
+            type="email"
+            filled
+            class="q-mb-md"
+            hint="El Gmail con el que va a entrar"
+          />
+          <q-input
+            v-else
             v-model="editingUser.password_hash"
             label="Contraseña"
             :type="showPassword ? 'text' : 'password'"
@@ -282,7 +355,7 @@ import { defineComponent, ref, onMounted, computed } from "vue";
 import { notify } from '../utils/notify'
 import { useRouter } from "vue-router";
 import { supabase } from "../supabase";
-import { useAuthStore } from "../stores/auth";
+import { useAuthStore, LOGIN_METHODS, normalizeEmail } from "../stores/auth";
 
 export default defineComponent({
   name: "AdminUsersPage",
@@ -302,10 +375,17 @@ export default defineComponent({
       Usuario: "",
       password_hash: "",
       Rol: "user",
+      metodo_login: LOGIN_METHODS.password,
+      email: "",
     });
 
     const editingUser = ref(null);
     const userToDelete = ref(null);
+
+    const loginMethodOptions = [
+      { label: "Usuario y contraseña", value: LOGIN_METHODS.password },
+      { label: "Iniciar sesión con Google", value: LOGIN_METHODS.google },
+    ];
 
     const rolOptions = ["SuperAdmin", "admin", "user", "inactivo"];
 
@@ -330,6 +410,12 @@ export default defineComponent({
         field: "Rol",
         align: "center",
         sortable: true,
+      },
+      {
+        name: "acceso",
+        label: "Inicio de sesión",
+        field: "metodo_login",
+        align: "left",
       },
       {
         name: "password",
@@ -359,12 +445,28 @@ export default defineComponent({
       };
     };
 
+    const isGoogleLogin = (user) => user?.metodo_login === LOGIN_METHODS.google
+
+    const loginMethodLabel = (user) => {
+      return isGoogleLogin(user) ? 'Google' : 'Usuario y contraseña'
+    }
+
+    const emptyUserForm = () => ({
+      Usuario: "",
+      password_hash: "",
+      Rol: "user",
+      metodo_login: LOGIN_METHODS.password,
+      email: "",
+    })
+
+    const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(value))
+
     const loadUsers = async () => {
       loading.value = true;
       try {
         const { data, error } = await supabase
           .from("Usuarios")
-          .select("id, Usuario, Rol, password_hash")
+          .select("id, Usuario, Rol, password_hash, metodo_login, email")
           .order("Usuario", { ascending: true });
 
         if (error) throw error;
@@ -382,12 +484,28 @@ export default defineComponent({
 
     const openAddDialog = () => {
       showPassword.value = false;
-      newUser.value = { Usuario: "", password_hash: "", Rol: "user" };
+      newUser.value = emptyUserForm();
       showAddDialog.value = true;
     };
 
     const addUser = async () => {
-      if (!newUser.value.Usuario || !newUser.value.password_hash || !newUser.value.Rol) {
+      if (!newUser.value.Usuario || !newUser.value.Rol) {
+        notify({
+          color: "warning",
+          message: "El nombre de usuario y el rol son obligatorios",
+        });
+        return;
+      }
+
+      if (newUser.value.metodo_login === LOGIN_METHODS.google) {
+        if (!isValidEmail(newUser.value.email)) {
+          notify({
+            color: "warning",
+            message: "Indica el correo de Google de este usuario",
+          });
+          return;
+        }
+      } else if (!newUser.value.password_hash) {
         notify({
           color: "warning",
           message: "El nombre de usuario, contraseña y rol son obligatorios",
@@ -397,11 +515,20 @@ export default defineComponent({
 
       loading.value = true;
       try {
-        const { error } = await supabase.from("Usuarios").insert({
+        const payload = {
           Usuario: newUser.value.Usuario.trim(),
-          password_hash: newUser.value.password_hash,
           Rol: newUser.value.Rol,
-        });
+          metodo_login: newUser.value.metodo_login || LOGIN_METHODS.password,
+          email: newUser.value.metodo_login === LOGIN_METHODS.google
+            ? normalizeEmail(newUser.value.email)
+            : null,
+        }
+
+        if (newUser.value.metodo_login === LOGIN_METHODS.password) {
+          payload.password_hash = newUser.value.password_hash
+        }
+
+        const { error } = await supabase.from("Usuarios").insert(payload);
 
         if (error) throw error;
 
@@ -411,7 +538,7 @@ export default defineComponent({
         });
 
         showAddDialog.value = false;
-        newUser.value = { Usuario: "", password_hash: "", Rol: "user" };
+        newUser.value = emptyUserForm();
         loadUsers();
       } catch (error) {
         console.error("Error adding user:", error);
@@ -425,20 +552,16 @@ export default defineComponent({
     };
 
     const openEditDialog = (user) => {
-      editingUser.value = { ...user };
+      editingUser.value = {
+        ...user,
+        metodo_login: user.metodo_login || LOGIN_METHODS.password,
+        email: user.email || "",
+      };
       showPassword.value = true;
       showEditDialog.value = true;
     };
 
     const updateUser = async () => {
-      if (!editingUser.value.password_hash) {
-        notify({
-          color: "warning",
-          message: "La contraseña no puede estar vacía",
-        });
-        return;
-      }
-
       if (!editingUser.value.Rol) {
         notify({
           color: "warning",
@@ -447,14 +570,39 @@ export default defineComponent({
         return;
       }
 
+      if (editingUser.value.metodo_login === LOGIN_METHODS.google) {
+        if (!isValidEmail(editingUser.value.email)) {
+          notify({
+            color: "warning",
+            message: "Indica el correo de Google de este usuario",
+          });
+          return;
+        }
+      } else if (!editingUser.value.password_hash) {
+        notify({
+          color: "warning",
+          message: "La contraseña no puede estar vacía",
+        });
+        return;
+      }
+
       loading.value = true;
       try {
+        const payload = {
+          Rol: editingUser.value.Rol,
+          metodo_login: editingUser.value.metodo_login || LOGIN_METHODS.password,
+          email: editingUser.value.metodo_login === LOGIN_METHODS.google
+            ? normalizeEmail(editingUser.value.email)
+            : null,
+        }
+
+        if (editingUser.value.metodo_login === LOGIN_METHODS.password) {
+          payload.password_hash = editingUser.value.password_hash
+        }
+
         const { error } = await supabase
           .from("Usuarios")
-          .update({
-            password_hash: editingUser.value.password_hash,
-            Rol: editingUser.value.Rol,
-          })
+          .update(payload)
           .eq("id", editingUser.value.id);
 
         if (error) throw error;
@@ -550,8 +698,11 @@ export default defineComponent({
       editingUser,
       userToDelete,
       rolOptions,
+      loginMethodOptions,
       columns,
       canDeleteUsers,
+      isGoogleLogin,
+      loginMethodLabel,
       isPasswordVisible,
       togglePassword,
       addUser,

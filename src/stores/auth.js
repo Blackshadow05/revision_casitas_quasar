@@ -4,6 +4,13 @@ import { useCasasStore } from './casas'
 
 export const USER_MANAGERS = ['Esteban B', 'JosephR', 'Ramiro Q']
 
+export const LOGIN_METHODS = {
+  password: 'password',
+  google: 'google'
+}
+
+const PROFILE_FIELDS = 'id, Usuario, Rol, metodo_login, email, auth_user_id'
+
 const loadStoredUser = () => {
   try {
     const stored = JSON.parse(localStorage.getItem('user'))
@@ -21,6 +28,21 @@ const loadStoredUser = () => {
   } catch (_error) {
     localStorage.removeItem('user')
     return null
+  }
+}
+
+export function normalizeEmail (value) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function toProfile (row) {
+  if (!row) return null
+  return {
+    id: row.id,
+    Usuario: row.Usuario,
+    Rol: row.Rol,
+    metodo_login: row.metodo_login || LOGIN_METHODS.password,
+    email: row.email || null
   }
 }
 
@@ -76,6 +98,16 @@ export const useAuthStore = defineStore('auth', {
   },
   
   actions: {
+    persistSession (profile) {
+      const user = toProfile(profile)
+      this.user = user
+      const expiryDate = new Date()
+      expiryDate.setDate(expiryDate.getDate() + 6)
+      this.sessionExpiry = expiryDate
+      localStorage.setItem('user', JSON.stringify(user))
+      localStorage.setItem('sessionExpiry', expiryDate.toISOString())
+    },
+
     async checkSessionExpiry() {
       if (this.sessionExpiry && new Date() > this.sessionExpiry) {
         await this.logout()
@@ -89,7 +121,7 @@ export const useAuthStore = defineStore('auth', {
       try {
         const { data, error } = await supabase
           .from('Usuarios')
-          .select('id, Usuario, Rol')
+          .select(PROFILE_FIELDS)
           .eq('Usuario', username)
           .eq('password_hash', password)
           .single()
@@ -99,18 +131,18 @@ export const useAuthStore = defineStore('auth', {
           return { success: false, message: this.error }
         }
 
+        if (data.metodo_login === LOGIN_METHODS.google) {
+          this.error = 'Este usuario entra con Google. Usa el botón de Google.'
+          return { success: false, message: this.error }
+        }
+
         // Check if user is inactive
         if (data.Rol === 'inactivo') {
           this.error = 'Usuario inactivo. Contacte al administrador.'
           return { success: false, message: this.error }
         }
 
-        this.user = data
-        const expiryDate = new Date()
-        expiryDate.setDate(expiryDate.getDate() + 6)
-        this.sessionExpiry = expiryDate
-        localStorage.setItem('user', JSON.stringify(data))
-        localStorage.setItem('sessionExpiry', expiryDate.toISOString())
+        this.persistSession(data)
         return { success: true, userId: data.id }
       } catch (err) {
         this.error = 'Ocurrió un error inesperado'
@@ -121,6 +153,93 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
+    async loginWithGoogle () {
+      this.loading = true
+      this.error = null
+      try {
+        const redirectTo = `${window.location.origin}/`
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo,
+            queryParams: {
+              prompt: 'select_account'
+            }
+          }
+        })
+
+        if (error) {
+          this.error = error.message || 'No se pudo abrir Google'
+          return { success: false, message: this.error }
+        }
+
+        return { success: true, redirected: true }
+      } catch (err) {
+        this.error = 'Ocurrió un error inesperado'
+        console.error('Google login error:', err)
+        return { success: false, message: this.error }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async consumeGoogleRedirect () {
+      try {
+        const href = typeof window === 'undefined' ? '' : `${window.location.search}${window.location.hash}`
+        const oauthReturn = /access_token|refresh_token|code=|error=/.test(href)
+
+        if (this.isLoggedIn && !oauthReturn) {
+          return { success: true, skipped: true }
+        }
+
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+        if (sessionError) {
+          console.error('Google session error:', sessionError)
+          return { success: false }
+        }
+
+        const session = sessionData?.session
+        const email = normalizeEmail(session?.user?.email)
+        if (!session || !email) {
+          return { success: false, skipped: true }
+        }
+
+        const { data: rows, error } = await supabase
+          .from('Usuarios')
+          .select(PROFILE_FIELDS)
+          .eq('metodo_login', LOGIN_METHODS.google)
+
+        const data = (rows || []).find((row) => normalizeEmail(row.email) === email)
+
+        if (error || !data) {
+          await supabase.auth.signOut()
+          this.error = 'Este correo de Google no está autorizado. Pide al administrador que lo asigne.'
+          return { success: false, message: this.error }
+        }
+
+        if (data.Rol === 'inactivo') {
+          await supabase.auth.signOut()
+          this.error = 'Usuario inactivo. Contacte al administrador.'
+          return { success: false, message: this.error }
+        }
+
+        if (session.user?.id && data.auth_user_id !== session.user.id) {
+          await supabase
+            .from('Usuarios')
+            .update({ auth_user_id: session.user.id, email })
+            .eq('id', data.id)
+        }
+
+        this.persistSession({ ...data, email })
+        this.error = null
+        return { success: true, userId: data.id }
+      } catch (err) {
+        console.error('Google redirect error:', err)
+        this.error = 'No se pudo completar el inicio con Google'
+        return { success: false, message: this.error }
+      }
+    },
+
     async logout() {
       const casasStore = useCasasStore()
 
@@ -128,6 +247,12 @@ export const useAuthStore = defineStore('auth', {
       this.sessionExpiry = null
       localStorage.removeItem('user')
       localStorage.removeItem('sessionExpiry')
+
+      try {
+        await supabase.auth.signOut()
+      } catch (error) {
+        console.error('Supabase signOut error:', error)
+      }
 
       try {
         await casasStore.clearHomeSessionState()

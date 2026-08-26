@@ -3,6 +3,7 @@ import { configure } from 'quasar/wrappers'
 export default configure((ctx) => {
   return {
     boot: [
+      'google-auth',
       'rxdb',
       'sw-update'
     ],

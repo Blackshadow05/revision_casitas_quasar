@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { supabase } from '../supabase'
 import { useCasasStore } from './casas'
+import { recordLogin } from '../services/recordLogin'
 
 export const USER_MANAGERS = ['Esteban B', 'JosephR', 'Ramiro Q']
 
@@ -302,7 +303,20 @@ export const useAuthStore = defineStore('auth', {
       this.persistLocalSession(enrolledProfile, this.buildExpiry(mode), mode)
       this.googleLoginPending = false
       this.clearMfaState()
+      this.recordSuccessfulLogin(enrolledProfile, mode === 'google' ? 'google' : 'authenticator')
       return { success: true, userId: enrolledProfile.id }
+    },
+
+    recordSuccessfulLogin(profile, metodo) {
+      if (!profile?.id || !profile?.Usuario) return
+
+      void recordLogin({
+        userId: profile.id,
+        usuario: profile.Usuario,
+        metodo
+      }).catch((error) => {
+        console.error('No se pudo registrar IP y hora del acceso:', error)
+      })
     },
 
     async tryRestoreHourlySession(profile, authUser, mode) {
@@ -497,6 +511,7 @@ export const useAuthStore = defineStore('auth', {
 
         this.persistLocalSession(data, this.buildExpiry('legacy'), 'legacy')
         await supabase.auth.signOut({ scope: 'local' }).catch(() => null)
+        this.recordSuccessfulLogin(data, 'password')
         return { success: true, userId: data.id }
       } catch (err) {
         this.error = 'Ocurrió un error inesperado'

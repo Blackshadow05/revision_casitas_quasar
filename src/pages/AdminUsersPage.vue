@@ -32,7 +32,7 @@
         dense
         clearable
         debounce="80"
-        placeholder="Buscar por nombre, correo o rol"
+        placeholder="Buscar por nombre, correo, rol o IP"
         class="users-search"
         hide-bottom-space
       >
@@ -143,6 +143,19 @@
             </q-btn>
           </template>
         </div>
+
+        <button
+          type="button"
+          class="user-card__login"
+          @click="openLoginHistory(user)"
+        >
+          <q-icon name="schedule" size="14px" />
+          <span class="user-card__login-copy">
+            <strong>{{ formatLastLoginAt(user.ultimo_login_at) }}</strong>
+            <span>{{ user.ultimo_login_ip || 'Sin IP registrada' }}</span>
+          </span>
+          <q-icon name="history" size="16px" class="user-card__login-more" />
+        </button>
       </article>
     </div>
 
@@ -217,6 +230,19 @@
             >
               {{ getAuthStatus(props.row).label }}
             </span>
+          </q-td>
+        </template>
+
+        <template v-slot:body-cell-login="props">
+          <q-td :props="props">
+            <button
+              type="button"
+              class="table-login"
+              @click="openLoginHistory(props.row)"
+            >
+              <span class="table-login__time">{{ formatLastLoginAt(props.row.ultimo_login_at) }}</span>
+              <span class="table-login__ip">{{ props.row.ultimo_login_ip || 'Sin IP' }}</span>
+            </button>
           </q-td>
         </template>
 
@@ -674,6 +700,52 @@
         </footer>
       </q-card>
     </q-dialog>
+
+    <q-dialog v-model="showLoginHistory" backdrop-filter="blur(12px)">
+      <q-card class="auth-access-card">
+        <header class="auth-access-head">
+          <div class="auth-access-head__mark" aria-hidden="true">
+            <q-icon name="history" size="22px" />
+          </div>
+          <div class="auth-access-head__copy">
+            <div class="auth-access-title">Accesos recientes</div>
+            <div class="auth-access-user">{{ loginHistoryUser?.Usuario || 'Usuario' }}</div>
+          </div>
+          <q-btn flat round dense icon="close" class="auth-access-close" v-close-popup aria-label="Cerrar" />
+        </header>
+
+        <div class="auth-access-body">
+          <div v-if="loginHistoryLoading" class="users-empty users-empty--table">
+            <q-spinner color="primary" size="24px" />
+            <p class="users-empty__title q-mt-md">Cargando accesos</p>
+          </div>
+          <div v-else-if="!loginHistory.length" class="users-empty users-empty--table">
+            <p class="users-empty__title">Sin registros todavía</p>
+            <p class="users-empty__copy">Se guardarán la IP y la hora en el próximo inicio de sesión.</p>
+          </div>
+          <ol v-else class="login-history">
+            <li v-for="entry in loginHistory" :key="entry.id" class="login-history__item">
+              <div class="login-history__when">{{ formatLastLoginAt(entry.logged_at) }}</div>
+              <div class="login-history__meta">
+                <span>{{ entry.ip_address || 'IP no disponible' }}</span>
+                <span>{{ loginMethodHistoryLabel(entry.metodo) }}</span>
+              </div>
+            </li>
+          </ol>
+        </div>
+
+        <footer class="auth-access-footer">
+          <q-btn
+            flat
+            no-caps
+            unelevated
+            label="Cerrar"
+            class="auth-btn-ghost"
+            v-close-popup
+          />
+        </footer>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -702,13 +774,17 @@ export default defineComponent({
     const showPassword = ref(false);
     const showAuthPassword = ref(false);
     const showManagerPassword = ref(false);
+    const showLoginHistory = ref(false);
     const authLoading = ref(false);
+    const loginHistoryLoading = ref(false);
     const searchQuery = ref("");
     const tablePagination = ref({
       page: 1,
       rowsPerPage: 12,
     });
     const visiblePasswords = ref({});
+    const loginHistoryUser = ref(null);
+    const loginHistory = ref([]);
 
     const newUser = ref({
       Usuario: "",
@@ -767,6 +843,13 @@ export default defineComponent({
         align: "left",
       },
       {
+        name: "login",
+        label: "Último acceso",
+        field: "ultimo_login_at",
+        align: "left",
+        sortable: true,
+      },
+      {
         name: "actions",
         label: "",
         field: "actions",
@@ -802,7 +885,7 @@ export default defineComponent({
       const query = searchQuery.value.trim().toLowerCase();
       if (!query) return users.value;
       return users.value.filter((user) => {
-        const haystack = [user.Usuario, user.Rol, user.email, user.metodo_login]
+        const haystack = [user.Usuario, user.Rol, user.email, user.metodo_login, user.ultimo_login_ip]
           .filter(Boolean)
           .join(" ")
           .toLowerCase();
@@ -869,7 +952,7 @@ export default defineComponent({
       try {
         const { data, error } = await supabase
           .from("Usuarios")
-          .select("id, Usuario, Rol, password_hash, metodo_login, email, auth_user_id, totp_enrolled")
+          .select("id, Usuario, Rol, password_hash, metodo_login, email, auth_user_id, totp_enrolled, ultimo_login_at, ultimo_login_ip")
           .order("Usuario", { ascending: true });
 
         if (error) throw error;
@@ -1030,6 +1113,52 @@ export default defineComponent({
         });
       } finally {
         loading.value = false;
+      }
+    };
+
+    const formatLastLoginAt = (value) => {
+      if (!value) return "Sin accesos";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "Sin accesos";
+      return date.toLocaleString("es-CR", {
+        timeZone: "America/Costa_Rica",
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    };
+
+    const loginMethodHistoryLabel = (metodo) => {
+      if (metodo === LOGIN_METHODS.google) return "Google";
+      if (metodo === "authenticator") return "Authenticator";
+      return "Contraseña";
+    };
+
+    const openLoginHistory = async (user) => {
+      loginHistoryUser.value = user;
+      loginHistory.value = [];
+      showLoginHistory.value = true;
+      loginHistoryLoading.value = true;
+      try {
+        const { data, error } = await supabase
+          .from("login_logs")
+          .select("id, logged_at, ip_address, metodo")
+          .eq("usuario", user.Usuario)
+          .order("logged_at", { ascending: false })
+          .limit(40);
+
+        if (error) throw error;
+        loginHistory.value = data || [];
+      } catch (error) {
+        console.error("Error loading login history:", error);
+        notify({
+          color: "negative",
+          message: "No se pudo cargar el historial de accesos",
+        });
+      } finally {
+        loginHistoryLoading.value = false;
       }
     };
 
@@ -1241,7 +1370,11 @@ export default defineComponent({
       showPassword,
       showAuthPassword,
       showManagerPassword,
+      showLoginHistory,
       authLoading,
+      loginHistoryLoading,
+      loginHistoryUser,
+      loginHistory,
       newUser,
       editingUser,
       userToDelete,
@@ -1276,6 +1409,9 @@ export default defineComponent({
       getRolTone,
       getAvatarColor,
       getAuthStatus,
+      formatLastLoginAt,
+      loginMethodHistoryLabel,
+      openLoginHistory,
     };
   },
 });
@@ -1919,6 +2055,112 @@ export default defineComponent({
 .table-secret {
   display: flex;
   align-items: center;
+}
+
+.user-card__login,
+.table-login {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: #f8fafc;
+  border: 1px solid transparent;
+}
+
+.user-card__login {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  color: #3f3f46;
+}
+
+.user-card__login:hover,
+.table-login:hover {
+  background: #eef6ff;
+  border-color: rgba(0, 113, 227, 0.12);
+}
+
+.user-card__login-copy {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+
+.user-card__login-copy strong {
+  font-weight: 650;
+  color: var(--apple-text-primary);
+}
+
+.user-card__login-more {
+  color: #86868b;
+}
+
+.table-login {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 4px 6px;
+  border-radius: 10px;
+}
+
+.table-login__time {
+  font-size: 0.82rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--apple-text-primary);
+}
+
+.table-login__ip {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.72rem;
+  color: #6e6e73;
+}
+
+.login-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.login-history__item {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f8fafc;
+  border: 1px solid var(--apple-separator);
+}
+
+.login-history__when {
+  font-weight: 700;
+  font-size: 0.88rem;
+  letter-spacing: -0.01em;
+  color: var(--apple-text-primary);
+}
+
+.login-history__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: #6e6e73;
+}
+
+.login-history__meta span:first-child {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 .users-desktop :deep(.q-table__container) {

@@ -2,14 +2,25 @@
   <q-page style="background: #f5f5f7;">
     <!-- Image Slider at the top (Optional, but useful) -->
     <div v-if="images.length > 0" class="image-header">
+      <q-btn
+        flat
+        round
+        dense
+        icon="arrow_back"
+        class="image-header__back bg-white-glass shadow-5"
+        aria-label="Volver"
+        @click.stop.prevent="goBack"
+      />
+
       <q-carousel
+        v-if="!isDesktop"
         animated
         v-model="slide"
         infinite
         arrows
         navigation
         height="250px"
-        class="bg-transparent"
+        class="bg-transparent image-header__carousel"
       >
         <q-carousel-slide 
           v-for="(img, index) in images" 
@@ -20,13 +31,19 @@
           class="rounded-header-img"
         />
       </q-carousel>
-      <!-- Back Button Floating -->
-      <q-btn 
-        flat round dense 
-        icon="arrow_back" 
-        class="absolute-top-left q-ma-md bg-white-glass shadow-5" 
-        @click="$router.back()" 
-      />
+
+      <div v-else class="evidence-thumbs">
+        <button
+          v-for="(img, index) in gridImages"
+          :key="index"
+          type="button"
+          class="evidence-thumb"
+          :aria-label="`Ver evidencia ${index + 1}`"
+          @click="onOpenImage(index)"
+        >
+          <img :src="img" alt="" decoding="async" />
+        </button>
+      </div>
     </div>
 
     <!-- Main Content following the Image Design -->
@@ -500,7 +517,7 @@
         <!-- Top Title Section -->
         <div class="q-px-lg q-pt-lg q-pb-md header-gradient" :class="{ 'rounded-top': images.length > 0 }">
           <div v-if="images.length === 0" class="row items-center q-mb-md">
-             <q-btn flat round dense icon="arrow_back" style="color: #1d1d1f; background: rgba(0,0,0,0.06); border-radius: 50%;" @click="$router.back()" />
+             <q-btn flat round dense icon="arrow_back" style="color: #1d1d1f; background: rgba(0,0,0,0.06); border-radius: 50%;" @click.stop.prevent="goBack" />
           </div>
           <div class="row items-center justify-between">
             <div style="font-size: 28px; font-weight: 700; color: #1d1d1f; letter-spacing: -0.5px;">Casita {{ casa.casita || '--' }}</div>
@@ -874,7 +891,7 @@
       <div class="text-center">
         <q-icon name="error_outline" size="64px" color="grey-4" />
         <div class="text-h6 text-grey-5 q-mt-md">No se encontró la información</div>
-        <q-btn flat color="primary" label="Volver" class="q-mt-md" @click="$router.back()" />
+        <q-btn flat color="primary" label="Volver" class="q-mt-md" @click.stop.prevent="goBack" />
       </div>
     </div>
 
@@ -933,17 +950,20 @@ import { notify } from '../utils/notify'
 import { useCasasStore } from '../stores/casas'
 import { useAuthStore } from '../stores/auth'
 import { date, useQuasar } from 'quasar'
-import { useRoute } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { supabase } from '../supabase'
 import { CLOUDINARY_CONFIG } from '../cloudinary'
 import PhotoSwipeLightbox from 'photoswipe/lightbox'
+import PhotoSwipe from 'photoswipe'
 import 'photoswipe/style.css'
 
 export default defineComponent({
   name: 'DetailsPage',
   setup () {
     const $q = useQuasar()
+    const isDesktop = computed(() => $q.screen.gt.md)
     const store = useCasasStore()
+    const router = useRouter()
     const route = useRoute()
     const slide = ref(0)
 
@@ -953,9 +973,9 @@ export default defineComponent({
     const CLOUDINARY_BASE = 'https://res.cloudinary.com/dhd61lan4/image/upload'
     const CAROUSEL_TRANSFORM = 'f_auto,q_auto,w_900'
     const THUMB_TRANSFORM = 'f_auto,q_auto,w_600'
-    const FULL_TRANSFORM = 'f_auto,q_auto,w_1600'
-    const PROBE_TRANSFORM = 'f_auto,q_auto,w_64'
-    const FULL_WIDTH = 1600
+    const GRID_TRANSFORM = 'f_auto,q_auto,w_360'
+    const FULL_TRANSFORM = 'f_auto,q_auto,c_limit,w_1200'
+    const FULL_WIDTH = 1200
 
     const buildCloudinaryUrl = (path, transform) => {
       if (!path) return ''
@@ -971,6 +991,18 @@ export default defineComponent({
 
     const aspectCache = new Map()
 
+    const buildLightboxItem = (path, naturalWidth = 0, naturalHeight = 0) => {
+      const width = naturalWidth || 4
+      const height = naturalHeight || 3
+      const scale = FULL_WIDTH / width
+      return {
+        src: buildCloudinaryUrl(path, FULL_TRANSFORM),
+        msrc: buildCloudinaryUrl(path, isDesktop.value ? GRID_TRANSFORM : CAROUSEL_TRANSFORM),
+        width: FULL_WIDTH,
+        height: Math.round(height * scale)
+      }
+    }
+
     const loadImageSize = (path) => {
       if (aspectCache.has(path)) {
         return Promise.resolve(aspectCache.get(path))
@@ -979,20 +1011,14 @@ export default defineComponent({
       return new Promise((resolve) => {
         const probe = new Image()
         const finish = (naturalWidth, naturalHeight) => {
-          const width = naturalWidth || 4
-          const height = naturalHeight || 3
-          const scale = FULL_WIDTH / width
-          const item = {
-            src: buildCloudinaryUrl(path, FULL_TRANSFORM),
-            width: FULL_WIDTH,
-            height: Math.round(height * scale)
-          }
+          const item = buildLightboxItem(path, naturalWidth, naturalHeight)
           aspectCache.set(path, item)
           resolve(item)
         }
         probe.onload = () => finish(probe.naturalWidth, probe.naturalHeight)
         probe.onerror = () => finish(0, 0)
-        probe.src = buildCloudinaryUrl(path, PROBE_TRANSFORM)
+        probe.decoding = 'async'
+        probe.src = buildCloudinaryUrl(path, FULL_TRANSFORM)
       })
     }
 
@@ -1004,12 +1030,14 @@ export default defineComponent({
     }
 
     const initLightbox = () => {
+      if (lightbox) return
       lightbox = new PhotoSwipeLightbox({
-        pswpModule: () => import('photoswipe'),
+        pswpModule: PhotoSwipe,
         bgOpacity: 1,
         showHideAnimationType: 'fade',
         wheelToZoom: true,
         zoom: true,
+        preload: [1, 2],
         padding: { top: 60, bottom: 60, left: 0, right: 0 }
       })
 
@@ -1753,12 +1781,29 @@ export default defineComponent({
       return `${Number(day)} De ${months[Number(month) - 1] || month} ${year} ${hour}:${minute}`
     }
 
+    const goBack = () => {
+      if (isEditing.value) {
+        cancelEditing()
+        return
+      }
+
+      const previous = window.history.state?.back
+      if (typeof previous === 'string' && previous !== route.fullPath) {
+        router.replace(previous)
+        return
+      }
+
+      router.replace('/')
+    }
+
     const getThumbUrl = (path) => buildCloudinaryUrl(path, THUMB_TRANSFORM)
 
-    const onOpenImage = async (index) => {
+    const onOpenImage = (index) => {
       if (!imagePaths.value.length) return
-      const dataSource = await Promise.all(imagePaths.value.map(loadImageSize))
       if (!lightbox) initLightbox()
+      const dataSource = imagePaths.value.map((path) =>
+        aspectCache.get(path) || buildLightboxItem(path)
+      )
       lightbox.loadAndOpen(index, dataSource)
     }
 
@@ -1955,6 +2000,22 @@ export default defineComponent({
     })
 
     const images = computed(() => imagePaths.value.map(path => buildCloudinaryUrl(path, CAROUSEL_TRANSFORM)))
+    const gridImages = computed(() => imagePaths.value.map(path => buildCloudinaryUrl(path, GRID_TRANSFORM)))
+
+    watch(imagePaths, (paths) => {
+      if (!paths.length) return
+      if (!lightbox) initLightbox()
+      const prefetch = () => {
+        paths.forEach((path) => {
+          loadImageSize(path)
+        })
+      }
+      if (typeof requestIdleCallback === 'function') {
+        requestIdleCallback(prefetch, { timeout: 600 })
+      } else {
+        setTimeout(prefetch, 150)
+      }
+    }, { immediate: true })
 
     const electronicItems = computed(() => {
       if (!casa.value) return []
@@ -2019,6 +2080,8 @@ export default defineComponent({
     return {
       casa,
       images,
+      gridImages,
+      isDesktop,
       slide,
       bootstrapping,
       puertasVentanasOk,
@@ -2029,6 +2092,7 @@ export default defineComponent({
       themeClass,
       onOpenImage,
       openNoteImage,
+      goBack,
       // Share
       canShare,
       shareImage,
@@ -2093,20 +2157,37 @@ export default defineComponent({
 
 .image-header {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
   height: auto;
   background-color: transparent;
   z-index: 2;
-  margin: 16px 16px 0 16px;
+  margin: 12px 16px 0 16px;
+}
+
+.image-header__back {
+  flex-shrink: 0;
+  z-index: 3;
+  pointer-events: auto;
+}
+
+.image-header__carousel {
+  width: 100%;
 }
 
 @media (min-width: 768px) {
   .image-header {
-    margin: 20px 20px 0 20px;
+    margin: 16px 20px 0 20px;
   }
 }
 
 @media (min-width: 1024px) {
   .image-header {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 10px;
     margin: 24px 24px 0 24px;
   }
 }
@@ -2118,6 +2199,39 @@ export default defineComponent({
 
 .rounded-header-img:hover {
   transform: translateY(-3px);
+}
+
+.evidence-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0;
+  min-height: 88px;
+}
+
+.evidence-thumb {
+  width: 148px;
+  height: 110px;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #ececec;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.evidence-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.evidence-thumb:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.16);
 }
 
 .bg-white-glass {

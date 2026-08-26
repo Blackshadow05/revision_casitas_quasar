@@ -55,6 +55,10 @@ export default function (/* { store, ssrContext } */) {
     history: createHistory(process.env.VUE_ROUTER_BASE),
   });
 
+  if (typeof window !== "undefined" && "scrollRestoration" in window.history) {
+    window.history.scrollRestoration = "manual";
+  }
+
   Router.beforeEach((to) => {
     const authStore = useAuthStore()
 

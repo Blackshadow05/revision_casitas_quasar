@@ -173,7 +173,14 @@
             </div>
           </div>
         </div>
-        <q-btn flat dense no-caps class="home-profile__logout logout-btn" @click="handleLogout">
+        <q-btn
+          unelevated
+          dense
+          no-caps
+          color="negative"
+          class="home-profile__logout logout-btn"
+          @click="handleLogout"
+        >
           <q-icon name="logout" size="14px" class="q-mr-xs" />
           <span>Cerrar sesión</span>
         </q-btn>
@@ -181,11 +188,10 @@
       </div>
 
       <div class="home-toolbar">
-        <div class="home-title text-h5 text-weight-bold">Revisiones de Casitas</div>
-
         <div class="home-actions">
           <q-btn
             color="orange-8"
+            text-color="white"
             icon="schedule"
             label="Horario"
             no-caps
@@ -1415,9 +1421,9 @@ export default defineComponent({
 }
 
 .logout-btn {
-  background: transparent;
-  color: #78909c;
-  padding: 4px 8px;
+  background: #ffebee;
+  color: #e53935;
+  padding: 4px 10px;
   border-radius: 8px;
   font-size: 11px;
   font-weight: 600;
@@ -1466,13 +1472,6 @@ export default defineComponent({
   grid-area: logout;
 }
 
-.home-title {
-  display: none;
-  margin: 0;
-  color: #546e7a;
-  font-size: 0.95rem;
-}
-
 .home-toolbar {
   display: grid;
   grid-template-areas:
@@ -1492,9 +1491,6 @@ export default defineComponent({
 .dashboard-action-btn {
   width: 100%;
   min-height: 36px;
-  background: #fff !important;
-  color: #546e7a !important;
-  border: 1px solid #cfd8dc;
   box-shadow: none;
 }
 
@@ -1747,8 +1743,8 @@ export default defineComponent({
   }
 
   .logout-btn {
-    background: transparent;
-    color: #78909c;
+    background: #ffebee;
+    color: #e53935;
     font-weight: 600;
   }
 
@@ -1760,18 +1756,11 @@ export default defineComponent({
     margin-bottom: 10px;
   }
 
-  .home-title {
-    display: block;
-    margin-right: auto;
-    color: #455a64;
-    font-size: 1.15rem;
-    line-height: 1.2;
-  }
-
   .home-search {
     flex: 1 1 240px;
     max-width: 360px;
     min-width: 200px;
+    margin-left: auto;
   }
 
   .home-search .search-input {
@@ -1789,9 +1778,6 @@ export default defineComponent({
     min-width: 0;
     height: 34px;
     padding: 0 12px;
-    background: #fff !important;
-    color: #546e7a !important;
-    border: 1px solid #cfd8dc;
     box-shadow: none;
   }
 

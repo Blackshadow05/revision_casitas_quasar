@@ -2,10 +2,6 @@
   <q-layout view="lHh Lpr lFf" :class="{ 'app-shell': isMobileNav }">
     <q-header class="app-header bg-primary text-white">
       <q-toolbar class="app-header__toolbar">
-        <q-toolbar-title class="text-weight-bold">
-          Revisiones Casitas
-        </q-toolbar-title>
-
         <div v-if="authStore.isLoggedIn && $q.screen.gt.md" class="desktop-shortcuts row no-wrap items-center">
           <q-btn
             flat

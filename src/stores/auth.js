@@ -93,6 +93,7 @@ export const useAuthStore = defineStore('auth', {
     authMode: loadStoredAuthMode(),
     loading: false,
     restoring: false,
+    googleLoginPending: false,
     error: null,
     mfa: {
       step: null,
@@ -172,6 +173,7 @@ export const useAuthStore = defineStore('auth', {
       this.sessionExpiry = null
       this.authMode = null
       this.error = null
+      this.googleLoginPending = false
       this.clearMfaState()
       localStorage.removeItem(USER_STORAGE_KEY)
       localStorage.removeItem(EXPIRY_STORAGE_KEY)
@@ -279,6 +281,7 @@ export const useAuthStore = defineStore('auth', {
       }
 
       this.persistLocalSession(nextProfile, this.buildExpiry('google'), 'google')
+      this.googleLoginPending = false
       this.clearMfaState()
       return { success: true, userId: nextProfile.id }
     },
@@ -472,30 +475,42 @@ export const useAuthStore = defineStore('auth', {
       this.loading = true
       this.error = null
       try {
-        const redirectTo = `${window.location.origin}/`
-        const { error } = await supabase.auth.signInWithOAuth({
+        const redirectTo = `${window.location.origin}/?google_return=1`
+        const { data, error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: {
             redirectTo,
+            skipBrowserRedirect: true,
             queryParams: {
               prompt: 'select_account'
             }
           }
         })
 
-        if (error) {
-          this.error = error.message || 'No se pudo abrir Google'
+        if (error || !data?.url) {
+          this.googleLoginPending = false
+          this.error = error?.message || 'No se pudo abrir Google'
           return { success: false, message: this.error }
         }
 
-        return { success: true, redirected: true }
+        this.googleLoginPending = true
+        return { success: true, url: data.url }
       } catch (err) {
+        this.googleLoginPending = false
         this.error = 'Ocurrió un error inesperado'
         console.error('Google login error:', err)
         return { success: false, message: this.error }
       } finally {
         this.loading = false
       }
+    },
+
+    async resumeAfterExternalGoogleLogin () {
+      if (this.restoring || this.isLoggedIn || !this.googleLoginPending) {
+        return this.isLoggedIn
+      }
+
+      return this.restoreSession()
     },
 
     async loginWithAuthenticator(email, password) {

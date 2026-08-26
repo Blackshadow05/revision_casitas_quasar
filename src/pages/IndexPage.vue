@@ -1,105 +1,103 @@
 <template>
   <q-page class="home-page q-pa-md bg-grey-1">
     <!-- Login Modal -->
-    <q-dialog v-model="showLoginModal" persistent backdrop-filter="blur(4px)">
-      <q-card style="width: 350px; border-radius: 20px;" class="q-pa-lg">
-        <div class="text-center q-mb-lg">
-          <q-avatar size="100px" font-size="52px" color="primary" text-color="white" icon="lock_person" class="shadow-10 q-mb-md" />
-          <div class="text-h5 text-weight-bold" style="color: #2e7d32;">Iniciar Sesión</div>
-          <div class="text-grey-7">Acceso exclusivo a revisiones</div>
-        </div>
+    <q-dialog v-model="showLoginModal" persistent class="auth-dialog" backdrop-filter="blur(18px)">
+      <q-card class="auth-sheet">
+        <button
+          type="button"
+          class="auth-sheet__close"
+          aria-label="Cerrar"
+          :disabled="loginLoading"
+          @click="showLoginModal = false"
+        >
+          <q-icon name="close" size="18px" />
+        </button>
 
-        <div v-if="loginError" class="text-negative text-center text-caption q-mb-md">
+        <header class="auth-sheet__header">
+          <div class="auth-sheet__mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none">
+              <path d="M5 14.2 16 5l11 9.2V26a1.5 1.5 0 0 1-1.5 1.5h-7.2v-7.4h-6.6v7.4H6.5A1.5 1.5 0 0 1 5 26V14.2Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+            </svg>
+          </div>
+          <p class="auth-sheet__eyebrow">Revisiones · Casitas</p>
+          <h2 class="auth-sheet__title">Inicia sesión</h2>
+        </header>
+
+        <div v-if="loginError" class="auth-sheet__alert" role="alert">
           {{ loginError }}
         </div>
 
         <q-btn
           type="button"
-          class="google-login-btn full-width"
+          class="auth-sheet__google"
           unelevated
           no-caps
           :loading="loginLoading"
           :disable="loginLoading"
           @click="handleGoogleLogin"
         >
-          <qn-google-mark class="q-mr-sm" />
+          <qn-google-mark class="auth-sheet__google-mark" />
           <span>Continuar con Google</span>
         </q-btn>
-        <div v-if="googleLoginPending" class="text-caption text-grey-7 text-center q-mt-sm">
-          Se abrió Google en el navegador. Después te pedirá el código de Authenticator.
+
+        <p v-if="googleLoginPending" class="auth-sheet__hint">
+          Se abrió Google en el navegador. Luego te pedirá el código de Authenticator.
+        </p>
+
+        <div class="auth-sheet__rule" role="separator">
+          <span>o con usuario</span>
         </div>
 
-        <div class="login-divider row items-center q-my-md">
-          <div class="col login-divider__line" />
-          <div class="q-px-sm text-caption text-grey-6">o con usuario</div>
-          <div class="col login-divider__line" />
-        </div>
-
-        <q-form @submit="handleLogin" class="q-gutter-md">
-          <q-input
-            v-model="loginData.username"
-            label="Usuario"
-            outlined
-            rounded
-            dense
-            :rules="[val => !!val || 'El usuario es requerido']"
-          >
-            <template v-slot:prepend>
-              <q-icon name="person" color="primary" />
-            </template>
-          </q-input>
-
-          <q-input
-            v-model="loginData.password"
-            label="Contraseña"
-            :type="showLoginPassword ? 'text' : 'password'"
-            outlined
-            rounded
-            dense
-            :rules="[val => !!val || 'La contraseña es requerida']"
-          >
-            <template v-slot:prepend>
-              <q-icon name="lock" color="primary" />
-            </template>
-            <template v-slot:append>
-              <q-icon
-                :name="showLoginPassword ? 'visibility' : 'visibility_off'"
-                class="cursor-pointer"
-                color="grey-7"
-                @click="showLoginPassword = !showLoginPassword"
-              />
-            </template>
-          </q-input>
-
-          <div class="q-pt-md q-gutter-sm">
-            <q-btn
-              label="Ingresar"
-              type="submit"
-              color="primary"
-              class="full-width rounded-btn text-weight-bold"
-              size="lg"
-              unelevated
-              :loading="loginLoading"
-            />
-            <q-btn
-              label="Cancelar"
-              color="grey-7"
-              class="full-width rounded-btn text-weight-bold"
-              size="lg"
-              flat
-              @click="showLoginModal = false"
-            />
-            <q-btn
-              label="Usar Google Authenticator"
-              color="primary"
-              class="full-width rounded-btn"
-              size="md"
-              flat
-              icon="security"
-              @click="switchToAuthenticatorLogin"
+        <q-form class="auth-sheet__form" @submit="handleLogin">
+          <div class="auth-sheet__field">
+            <q-input
+              v-model="loginData.username"
+              label="Usuario"
+              borderless
+              dense
+              autocomplete="username"
+              :rules="[val => !!val || 'El usuario es requerido']"
             />
           </div>
+
+          <div class="auth-sheet__field">
+            <q-input
+              v-model="loginData.password"
+              label="Contraseña"
+              :type="showLoginPassword ? 'text' : 'password'"
+              borderless
+              dense
+              autocomplete="current-password"
+              :rules="[val => !!val || 'La contraseña es requerida']"
+            >
+              <template v-slot:append>
+                <q-icon
+                  :name="showLoginPassword ? 'visibility' : 'visibility_off'"
+                  class="cursor-pointer auth-sheet__eye"
+                  @click="showLoginPassword = !showLoginPassword"
+                />
+              </template>
+            </q-input>
+          </div>
+
+          <q-btn
+            label="Ingresar"
+            type="submit"
+            class="auth-sheet__submit"
+            unelevated
+            no-caps
+            :loading="loginLoading"
+          />
         </q-form>
+
+        <button
+          type="button"
+          class="auth-sheet__alt"
+          :disabled="loginLoading"
+          @click="switchToAuthenticatorLogin"
+        >
+          Usar Google Authenticator
+        </button>
       </q-card>
     </q-dialog>
 
@@ -148,7 +146,7 @@
 
     <!-- Main Content (Only visible if logged in) -->
     <div v-if="isLoggedIn">
-      <q-scroll-observer @scroll="onScroll" />
+      <q-scroll-observer :scroll-target="pageScrollTarget" @scroll="onScroll" />
 
       <div class="home-top q-mb-md">
       <!-- Top Bar / Profile Section -->
@@ -308,8 +306,9 @@
           v-if="isLoggedIn && !$q.screen.gt.md && !firstSyncPending"
           @load="onLoad"
           :offset="250"
+          :scroll-target="pageScrollTarget"
           ref="infiniteScroll"
-          :disable="!!store.activeFilter || loading || casas.length === 0"
+          :disable="!!store.activeFilter || searchLoading || casas.length === 0 || !userHasScrolledList"
         >
           <div class="row q-col-gutter-sm mobile-cards-grid">
             <div v-for="casa in casas" :key="casa.id" class="col-6 col-md-4">
@@ -363,8 +362,9 @@
               dense
               bordered
               v-model:pagination="tablePagination"
-              :rows-per-page-options="[50, 100, 200]"
+              :rows-per-page-options="[50, 100, 200, 300]"
               rows-per-page-label="Filas por página"
+              :loading="loading || searchLoading"
               :style="{ height: tableHeight }"
               class="modern-table"
             >
@@ -600,7 +600,7 @@
 <script>
 import { computed, defineComponent, onMounted, onUnmounted, ref, watch, reactive, nextTick } from 'vue'
 import { notify } from '../utils/notify'
-import { scrollAppToTop } from '../utils/appScroll'
+import { APP_PAGE_SCROLL_ID, scrollAppToTop } from '../utils/appScroll'
 import { useCasasStore } from '../stores/casas'
 import { useAuthStore } from '../stores/auth'
 import { date, useQuasar } from 'quasar'
@@ -622,12 +622,17 @@ export default defineComponent({
     const route = useRoute()
     const $q = useQuasar()
     const infiniteScroll = ref(null)
+    const pageScrollTarget = `#${APP_PAGE_SCROLL_ID}`
     const showFloatingSearch = ref(false)
     const showScrollTop = ref(false)
+    const userHasScrolledList = ref(false)
 
     const onScroll = (info) => {
       showFloatingSearch.value = info.position.top > 420
       showScrollTop.value = info.position.top > 600
+      if (info.position.top > 160) {
+        userHasScrolledList.value = true
+      }
     }
 
     const scrollToTop = () => {
@@ -841,7 +846,7 @@ export default defineComponent({
     })
 
     const casas = computed(() => store.filteredCasas)
-    const desktopCasas = computed(() => store.matchedCasas)
+    const desktopCasas = computed(() => store.filteredCasas)
     const loading = computed(() => store.loading)
     const searchLoading = computed(() => store.searchLoading)
     const syncState = computed(() => store.homeSyncState)
@@ -862,18 +867,14 @@ export default defineComponent({
 
     const isDesktopView = computed(() => isLoggedIn.value && $q.screen.gt.md)
 
-    const visibleRecordsCount = computed(() => {
-      return isDesktopView.value
-        ? desktopCasas.value.length
-        : casas.value.length
-    })
+    const visibleRecordsCount = computed(() => casas.value.length)
 
     const recordsBadgeText = computed(() => {
-      const total = desktopCasas.value.length
       const shown = visibleRecordsCount.value
+      const matched = store.matchedCasas.length
 
-      if (!isDesktopView.value && total > shown) {
-        return `Mostrando ${shown} de ${total} registros`
+      if (matched > shown) {
+        return `Mostrando ${shown} de ${matched} registros`
       }
 
       return `Mostrando ${shown} registros`
@@ -922,12 +923,17 @@ export default defineComponent({
     })
 
     const onLoad = async (_, done) => {
-      if (store.loading || casas.value.length === 0) {
+      if (searchLoading.value || store.activeFilter || casas.value.length === 0) {
+        done(true)
+        return
+      }
+
+      if (store.loading) {
         done()
         return
       }
 
-      if (!store.hasMore || store.activeFilter) {
+      if (!store.hasMore) {
         done(true)
         return
       }
@@ -936,12 +942,38 @@ export default defineComponent({
       done(!store.hasMore)
     }
 
+    const maybeLoadMoreDesktop = async () => {
+      if (!isDesktopView.value || store.activeFilter || store.loading || searchLoading.value) {
+        return
+      }
+
+      if (!store.hasMore || casas.value.length === 0) {
+        return
+      }
+
+      const { page, rowsPerPage } = tablePagination.value
+
+      if (!rowsPerPage) {
+        return
+      }
+
+      if (page * rowsPerPage >= casas.value.length) {
+        await store.fetchMoreCasas()
+      }
+    }
+
     watch(() => store.search, () => {
-      infiniteScroll.value?.reset()
+      tablePagination.value = { ...tablePagination.value, page: 1 }
+      userHasScrolledList.value = false
       nextTick(() => {
+        infiniteScroll.value?.reset()
         scrollAppToTop()
       })
     })
+
+    watch([tablePagination, () => store.casas.length, isDesktopView], () => {
+      maybeLoadMoreDesktop()
+    }, { deep: true })
 
     const checkSessionInterval = setInterval(async () => {
       if (isLoggedIn.value && !(await authStore.checkSessionExpiry())) {
@@ -1074,11 +1106,14 @@ export default defineComponent({
       desktopCasas,
       canAdd,
       loading,
+      searchLoading,
       addNew,
       formatFullDate,
       loadData,
       onLoad,
       infiniteScroll,
+      pageScrollTarget,
+      userHasScrolledList,
       showFloatingSearch,
       onScroll,
       showScrollTop,
@@ -1138,25 +1173,6 @@ export default defineComponent({
 </script>
 
 <style scoped>
-.google-login-btn {
-  background: #fff !important;
-  color: #3c4043 !important;
-  border: 1px solid #dadce0;
-  border-radius: 999px;
-  height: 44px;
-  font-weight: 600;
-}
-
-.google-login-btn:hover {
-  background: #f8f9fa !important;
-}
-
-.login-divider__line {
-  height: 1px;
-  background: #e0e0e0;
-}
-
-/* ===== Resumen de check-in / check-out ===== */
 .home-page {
   padding: 12px !important;
 }

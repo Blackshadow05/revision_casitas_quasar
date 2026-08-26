@@ -12,7 +12,7 @@ import {
   subscribeHomeSyncState
 } from '../services/homeSync'
 
-const PAGE_SIZE = 100
+const PAGE_SIZE = 300
 const SEARCH_BATCH_SIZE = 1000
 const SEARCH_DEBOUNCE_MS = 350
 const REMOTE_SEARCH_CACHE_KEY = 'remoteSearchResults'
@@ -162,6 +162,9 @@ export const useCasasStore = defineStore('casas', {
     page: 0,
     hasMore: true,
     allLoaded: false,
+    remoteFetchedCount: 0,
+    remoteHasMore: true,
+    listFetchInFlight: false,
     activeFilter: null,
     filteredByLatest: [],
     searchRequestId: 0,
@@ -266,10 +269,23 @@ export const useCasasStore = defineStore('casas', {
         this.page = 1
       }
 
-      const visibleCount = this.page * PAGE_SIZE
+      if (this.activeFilter) {
+        this.casas = searchedRecords
+        this.hasMore = false
+        this.allLoaded = true
+        return
+      }
 
-      this.casas = searchedRecords.slice(0, visibleCount)
-      this.hasMore = searchedRecords.length > visibleCount
+      if (searchTerm) {
+        const visibleCount = this.page * PAGE_SIZE
+        this.casas = searchedRecords.slice(0, visibleCount)
+        this.hasMore = searchedRecords.length > visibleCount
+        this.allLoaded = !this.hasMore
+        return
+      }
+
+      this.casas = this.allCasas
+      this.hasMore = this.remoteHasMore
       this.allLoaded = !this.hasMore
     },
     notifyHomeRealtime(change) {
@@ -289,34 +305,71 @@ export const useCasasStore = defineStore('casas', {
       this.selectedCasa = updatedRecord
       localStorage.setItem('selectedCasa', JSON.stringify(updatedRecord))
     },
-    handleLocalRowsChanged(rows) {
-      // While the initial sync is still in progress and we already have quick-loaded
-      // recent data, merge partial RxDB batches instead of replacing the visible cache.
-      if (
-        this.quickLoadReady &&
-        !this.homeSyncState.firstSyncCompleted &&
-        this.allCasas.length > 0 &&
-        rows.length > 0
-      ) {
-        this.allCasas = mergeUniqueRowsById(this.allCasas, rows)
-        this.updateSelectedCasa(this.allCasas)
+    patchVisibleRecord(record) {
+      const normalized = normalizeRecord(record)
+      const recordId = String(normalized.id)
+      const existsInList = this.allCasas.some((row) => String(row.id) === recordId)
+      const oldestVisible = this.allCasas[this.allCasas.length - 1]
+      const belongsInLoadedWindow = !oldestVisible || compareByMostRecentDesc(normalized, oldestVisible) <= 0
 
-        if (this.activeFilter) {
-          this.filteredByLatest = this.buildAdvancedFilter(this.allCasas, this.activeFilter)
-        }
-
-        this.recomputeVisibleCasas()
-        return
+      if (existsInList || belongsInLoadedWindow) {
+        this.allCasas = mergeUniqueRowsById([normalized], this.allCasas)
       }
 
-      this.allCasas = rows
-      this.updateSelectedCasa(rows)
+      if (this.remoteSearchTerm) {
+        const matchesSearch = this.applySearch([normalized]).length > 0
+
+        if (matchesSearch) {
+          this.remoteSearchRows = mergeUniqueRowsById([normalized], this.remoteSearchRows)
+        } else {
+          this.remoteSearchRows = this.remoteSearchRows.filter((row) => String(row.id) !== recordId)
+        }
+      }
+
+      this.updateSelectedCasa([normalized])
 
       if (this.activeFilter) {
-        this.filteredByLatest = this.buildAdvancedFilter(rows, this.activeFilter)
+        this.filteredByLatest = this.buildAdvancedFilter(
+          mergeUniqueRowsById([normalized], this.filteredByLatest),
+          this.activeFilter
+        )
       }
 
       this.recomputeVisibleCasas()
+    },
+    removeVisibleRecord(recordId) {
+      const id = String(recordId || '')
+
+      if (!id) {
+        return
+      }
+
+      const withoutRecord = (rows) => rows.filter((record) => String(record.id) !== id)
+
+      this.allCasas = withoutRecord(this.allCasas)
+      this.remoteSearchRows = withoutRecord(this.remoteSearchRows)
+      this.filteredByLatest = withoutRecord(this.filteredByLatest)
+
+      if (this.selectedCasa?.id && String(this.selectedCasa.id) === id) {
+        this.selectedCasa = null
+        localStorage.removeItem('selectedCasa')
+      }
+
+      this.recomputeVisibleCasas()
+    },
+    applyRealtimeToVisibleData(change) {
+      const record = change?.record
+
+      if (change?.eventType === 'DELETE') {
+        this.removeVisibleRecord(record?.id)
+        return
+      }
+
+      if (!record?.id) {
+        return
+      }
+
+      this.patchVisibleRecord(record)
     },
     bindHomeSyncState() {
       if (this.homeSyncUnsubscribe) {
@@ -324,26 +377,7 @@ export const useCasasStore = defineStore('casas', {
       }
 
       this.homeSyncUnsubscribe = subscribeHomeSyncState((nextState) => {
-        const wasFirstSyncPending = this.homeSyncState.firstSyncPending
         this.homeSyncState = nextState
-        if (wasFirstSyncPending && !nextState.firstSyncPending) {
-          this.recomputeVisibleCasas(true)
-        }
-      })
-    },
-    async bindHomeQuery() {
-      if (this.homeQuerySubscription) {
-        return
-      }
-
-      const collection = await getHomeCollection()
-
-      this.homeQuerySubscription = collection.find().$.subscribe((documents) => {
-        const rows = documents
-          .map((document) => normalizeRecord(document.toJSON()))
-          .sort(compareByMostRecentDesc)
-
-        this.handleLocalRowsChanged(rows)
       })
     },
     async ensureLocalReady() {
@@ -355,47 +389,81 @@ export const useCasasStore = defineStore('casas', {
       this.bindHomeSyncState()
       if (!this.homeRealtimeUnsubscribe) {
         this.homeRealtimeUnsubscribe = subscribeHomeRealtime((change) => {
+          this.applyRealtimeToVisibleData(change)
           this.notifyHomeRealtime(change)
         })
       }
-      await this.bindHomeQuery()
       await ensureHomeReplication()
       this.notificationsReady = true
       this.localReady = true
     },
-    async quickLoadRecentCasas() {
+    async fetchLocalCacheRows() {
+      await this.ensureLocalReady()
+
+      if (!this.homeSyncState.firstSyncCompleted) {
+        await awaitFirstHomeSync()
+      }
+
+      const collection = await getHomeCollection()
+      const documents = await collection.find().exec()
+
+      return documents
+        .map((document) => normalizeRecord(document.toJSON()))
+        .sort(compareByMostRecentDesc)
+    },
+    async fetchListPage({ reset = false } = {}) {
+      if (this.listFetchInFlight && !reset) {
+        return
+      }
+
+      this.listFetchInFlight = true
+
       try {
+        const from = reset ? 0 : this.remoteFetchedCount
+        const to = from + PAGE_SIZE - 1
         const { data, error } = await supabase
           .from('revisiones_casitas')
           .select('*')
           .order('created_at', { ascending: false })
-          .limit(200)
+          .order('id', { ascending: false })
+          .range(from, to)
 
-        if (error) throw error
+        if (error) {
+          throw error
+        }
 
         const rows = (data || [])
           .map((record) => normalizeRecord(record))
           .sort(compareByMostRecentDesc)
 
-        if (rows.length > 0) {
+        if (reset) {
           this.allCasas = rows
-          this.quickLoadReady = true
-          this.recomputeVisibleCasas(true)
+          this.remoteFetchedCount = rows.length
+        } else {
+          this.allCasas = mergeUniqueRowsById(this.allCasas, rows)
+          this.remoteFetchedCount += rows.length
         }
-      } catch (error) {
-        console.error('[CasasStore] Error en quickLoad:', error.message)
+
+        this.remoteHasMore = rows.length === PAGE_SIZE
+        this.quickLoadReady = this.allCasas.length > 0
+        this.recomputeVisibleCasas(reset)
+      } finally {
+        this.listFetchInFlight = false
       }
     },
     async fetchCasas() {
       this.loading = true
       try {
-        // 1. Fetch the most recent records immediately so the user sees them right away.
-        await this.quickLoadRecentCasas()
+        await this.fetchListPage({ reset: true })
 
-        // 2. Start full RxDB background sync without blocking the UI.
         this.ensureLocalReady().catch((error) => {
           console.error('[CasasStore] Error en background sync:', error.message)
         })
+
+        const savedSearch = String(this.search || '').trim()
+        if (savedSearch && this.remoteSearchTerm !== savedSearch) {
+          this.setSearch(savedSearch)
+        }
 
         this.notificationsReady = true
       } catch (error) {
@@ -405,11 +473,21 @@ export const useCasasStore = defineStore('casas', {
       }
     },
     async fetchMoreCasas() {
-      if (this.loading || !this.hasMore) return
-      this.loading = true
-      try {
+      if (this.loading || !this.hasMore || this.activeFilter) {
+        return
+      }
+
+      const searchTerm = String(this.search || '').trim()
+
+      if (searchTerm) {
         this.page += 1
         this.recomputeVisibleCasas()
+        return
+      }
+
+      this.loading = true
+      try {
+        await this.fetchListPage({ reset: false })
       } catch (error) {
         console.error('Error fetching more casas:', error.message)
       } finally {
@@ -492,8 +570,8 @@ export const useCasasStore = defineStore('casas', {
       try {
         await this.ensureLocalReady()
         await resyncHomeReplication()
+        await this.fetchListPage({ reset: true })
         this.notificationsReady = true
-        this.recomputeVisibleCasas()
       } catch (error) {
         console.error('Error resyncing casas:', error.message)
       } finally {
@@ -511,8 +589,8 @@ export const useCasasStore = defineStore('casas', {
       this.loading = true
       this.activeFilter = filter
       try {
-        await this.ensureLocalReady()
-        this.filteredByLatest = this.buildAdvancedFilter(this.allCasas, filter)
+        const localRows = await this.fetchLocalCacheRows()
+        this.filteredByLatest = this.buildAdvancedFilter(localRows, filter)
         this.recomputeVisibleCasas(true)
       } catch (error) {
         console.error('Error applying advanced filter:', error.message)
@@ -610,6 +688,9 @@ export const useCasasStore = defineStore('casas', {
       this.page = 0
       this.hasMore = true
       this.allLoaded = false
+      this.remoteFetchedCount = 0
+      this.remoteHasMore = true
+      this.listFetchInFlight = false
       this.search = ''
       this.selectedCasa = null
       this.homeSyncState = getHomeSyncState()

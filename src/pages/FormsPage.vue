@@ -30,6 +30,28 @@
           </q-item>
           <q-separator inset="72px" />
         </template>
+        <template v-if="isSuperAdmin">
+          <q-item
+            clickable
+            v-ripple
+            class="settings-item"
+            @click="goToIngresos"
+          >
+            <q-item-section avatar>
+              <div class="settings-icon-wrap bg-blue-grey">
+                <q-icon name="login" color="white" size="20px" />
+              </div>
+            </q-item-section>
+            <q-item-section>
+              <q-item-label class="text-weight-medium">Ingresos</q-item-label>
+              <q-item-label caption>IP, hora y quién inició sesión</q-item-label>
+            </q-item-section>
+            <q-item-section side>
+              <q-icon name="chevron_right" color="grey-4" size="18px" />
+            </q-item-section>
+          </q-item>
+          <q-separator inset="72px" />
+        </template>
         <q-item
           clickable
           v-ripple
@@ -170,9 +192,14 @@ export default defineComponent({
     const router = useRouter();
     const authStore = useAuthStore();
     const canManageUsers = computed(() => authStore.canManageUsers);
+    const isSuperAdmin = computed(() => authStore.isSuperAdmin);
 
     const goToAdminUsers = () => {
       router.push('/admin-users');
+    };
+
+    const goToIngresos = () => {
+      router.push('/ingresos');
     };
 
     const goToReportePantallas = () => {
@@ -269,7 +296,9 @@ export default defineComponent({
       openExternal,
       onIFrameLoad,
       canManageUsers,
+      isSuperAdmin,
       goToAdminUsers,
+      goToIngresos,
       goToReportePantallas,
     };
   },

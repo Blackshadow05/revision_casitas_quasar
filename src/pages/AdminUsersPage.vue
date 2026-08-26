@@ -15,6 +15,18 @@
         <p class="users-hero__subtitle">{{ userStats.total }} personas con acceso al sistema</p>
       </div>
       <q-btn
+        v-if="isSuperAdmin"
+        unelevated
+        round
+        dense
+        icon="history"
+        class="users-logs-btn"
+        aria-label="Ver ingresos"
+        @click="goToIngresos"
+      >
+        <q-tooltip>Ingresos</q-tooltip>
+      </q-btn>
+      <q-btn
         unelevated
         no-caps
         icon="add"
@@ -143,6 +155,20 @@
             </q-btn>
           </template>
         </div>
+
+        <button
+          v-if="isSuperAdmin"
+          type="button"
+          class="user-card__login"
+          @click="openLoginHistory(user)"
+        >
+          <q-icon name="schedule" size="14px" />
+          <span class="user-card__login-copy">
+            <strong>{{ formatLoginDateTime(user.ultimo_login_at) }}</strong>
+            <span>{{ user.ultimo_login_ip || 'Sin IP registrada' }}</span>
+          </span>
+          <q-icon name="history" size="16px" class="user-card__login-more" />
+        </button>
       </article>
     </div>
 
@@ -217,6 +243,19 @@
             >
               {{ getAuthStatus(props.row).label }}
             </span>
+          </q-td>
+        </template>
+
+        <template v-slot:body-cell-login="props">
+          <q-td :props="props">
+            <button
+              type="button"
+              class="table-login"
+              @click="openLoginHistory(props.row)"
+            >
+              <span class="table-login__time">{{ formatLoginDateTime(props.row.ultimo_login_at) }}</span>
+              <span class="table-login__ip">{{ props.row.ultimo_login_ip || 'Sin IP' }}</span>
+            </button>
           </q-td>
         </template>
 
@@ -684,6 +723,7 @@ import { useRouter } from "vue-router";
 import { supabase } from "../supabase";
 import { useAuthStore, LOGIN_METHODS, normalizeEmail } from "../stores/auth";
 import { inviteAuthenticatorUser, resetAuthenticatorFactor } from "../services/manageAuthUser";
+import { formatLoginDateTime } from "../utils/loginLogs";
 import QnGoogleMark from "../components/QnGoogleMark.vue";
 
 export default defineComponent({
@@ -739,46 +779,62 @@ export default defineComponent({
       { label: "Iniciar sesión con Google", value: LOGIN_METHODS.google },
     ];
 
-    const columns = [
-      {
-        name: "usuario",
-        label: "Persona",
-        field: "Usuario",
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "rol",
-        label: "Rol",
-        field: "Rol",
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "acceso",
-        label: "Acceso",
-        field: "metodo_login",
-        align: "left",
-      },
-      {
-        name: "auth",
-        label: "Authenticator",
-        field: "totp_enrolled",
-        align: "left",
-      },
-      {
+    const currentUser = computed(() => authStore.user);
+    const canManageUsers = computed(() => authStore.canManageUsers);
+    const isSuperAdmin = computed(() => authStore.isSuperAdmin);
+    const canDeleteUsers = computed(() => currentUser.value?.Usuario === "Esteban B");
+    const needsManagerPassword = computed(() => authStore.authMode === "legacy" || !authStore.authMode);
+
+    const columns = computed(() => {
+      const base = [
+        {
+          name: "usuario",
+          label: "Persona",
+          field: "Usuario",
+          align: "left",
+          sortable: true,
+        },
+        {
+          name: "rol",
+          label: "Rol",
+          field: "Rol",
+          align: "left",
+          sortable: true,
+        },
+        {
+          name: "acceso",
+          label: "Acceso",
+          field: "metodo_login",
+          align: "left",
+        },
+        {
+          name: "auth",
+          label: "Authenticator",
+          field: "totp_enrolled",
+          align: "left",
+        },
+      ];
+
+      if (isSuperAdmin.value) {
+        base.push({
+          name: "login",
+          label: "Último acceso",
+          field: "ultimo_login_at",
+          align: "left",
+          sortable: true,
+        });
+      }
+
+      base.push({
         name: "actions",
         label: "",
         field: "actions",
         align: "right",
         style: "width: 140px",
-      },
-    ];
+      });
 
-    const currentUser = computed(() => authStore.user);
-    const canManageUsers = computed(() => authStore.canManageUsers);
-    const canDeleteUsers = computed(() => currentUser.value?.Usuario === "Esteban B");
-    const needsManagerPassword = computed(() => authStore.authMode === "legacy" || !authStore.authMode);
+      return base;
+    });
 
     const isPasswordVisible = (userId) => Boolean(visiblePasswords.value[userId]);
 
@@ -802,7 +858,13 @@ export default defineComponent({
       const query = searchQuery.value.trim().toLowerCase();
       if (!query) return users.value;
       return users.value.filter((user) => {
-        const haystack = [user.Usuario, user.Rol, user.email, user.metodo_login]
+        const haystack = [
+          user.Usuario,
+          user.Rol,
+          user.email,
+          user.metodo_login,
+          isSuperAdmin.value ? user.ultimo_login_ip : null,
+        ]
           .filter(Boolean)
           .join(" ")
           .toLowerCase();
@@ -867,9 +929,13 @@ export default defineComponent({
     const loadUsers = async () => {
       loading.value = true;
       try {
+        const profileColumns = isSuperAdmin.value
+          ? "id, Usuario, Rol, password_hash, metodo_login, email, auth_user_id, totp_enrolled, ultimo_login_at, ultimo_login_ip"
+          : "id, Usuario, Rol, password_hash, metodo_login, email, auth_user_id, totp_enrolled";
+
         const { data, error } = await supabase
           .from("Usuarios")
-          .select("id, Usuario, Rol, password_hash, metodo_login, email, auth_user_id, totp_enrolled")
+          .select(profileColumns)
           .order("Usuario", { ascending: true });
 
         if (error) throw error;
@@ -1031,6 +1097,17 @@ export default defineComponent({
       } finally {
         loading.value = false;
       }
+    };
+
+    const goToIngresos = () => {
+      router.push("/ingresos");
+    };
+
+    const openLoginHistory = (user) => {
+      router.push({
+        path: "/ingresos",
+        query: user?.Usuario ? { usuario: user.Usuario } : {},
+      });
     };
 
     const getAuthStatus = (user) => {
@@ -1250,6 +1327,7 @@ export default defineComponent({
       loginMethodOptions,
       columns,
       canDeleteUsers,
+      isSuperAdmin,
       needsManagerPassword,
       isGoogleLogin,
       isAuthGoogle,
@@ -1273,9 +1351,12 @@ export default defineComponent({
       inviteUserAuthenticator,
       resetUserAuthenticator,
       goBack,
+      goToIngresos,
       getRolTone,
       getAvatarColor,
       getAuthStatus,
+      formatLoginDateTime,
+      openLoginHistory,
     };
   },
 });
@@ -1667,6 +1748,14 @@ export default defineComponent({
   box-shadow: none !important;
 }
 
+.users-logs-btn {
+  width: 40px;
+  height: 40px;
+  background: #f5f5f7 !important;
+  color: #3f3f46 !important;
+  box-shadow: none !important;
+}
+
 .users-toolbar {
   display: flex;
   flex-direction: column;
@@ -1919,6 +2008,76 @@ export default defineComponent({
 .table-secret {
   display: flex;
   align-items: center;
+}
+
+.user-card__login,
+.table-login {
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: #f8fafc;
+  border: 1px solid transparent;
+}
+
+.user-card__login {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  color: #3f3f46;
+}
+
+.user-card__login:hover,
+.table-login:hover {
+  background: #eef6ff;
+  border-color: rgba(0, 113, 227, 0.12);
+}
+
+.user-card__login-copy {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+
+.user-card__login-copy strong {
+  font-weight: 650;
+  color: var(--apple-text-primary);
+}
+
+.user-card__login-more {
+  color: #86868b;
+}
+
+.table-login {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 4px 6px;
+  border-radius: 10px;
+}
+
+.table-login__time {
+  font-size: 0.82rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--apple-text-primary);
+}
+
+.table-login__ip {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.72rem;
+  color: #6e6e73;
 }
 
 .users-desktop :deep(.q-table__container) {

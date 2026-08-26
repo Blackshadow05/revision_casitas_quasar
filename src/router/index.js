@@ -70,6 +70,10 @@ export default function (/* { store, ssrContext } */) {
       return { path: "/config" };
     }
 
+    if (to.meta.requiresSuperAdmin && !authStore.isSuperAdmin) {
+      return { path: "/config" };
+    }
+
     return true;
   });
 

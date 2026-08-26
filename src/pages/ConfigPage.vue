@@ -118,6 +118,30 @@
         </q-item>
       </template>
 
+      <template v-if="isSuperAdmin">
+        <q-separator inset="72px" />
+
+        <q-item
+          clickable
+          v-ripple
+          class="settings-item"
+          @click="goToIngresos"
+        >
+          <q-item-section avatar>
+            <div class="settings-icon-wrap bg-blue-grey">
+              <q-icon name="login" color="white" size="20px" />
+            </div>
+          </q-item-section>
+          <q-item-section>
+            <q-item-label class="text-weight-medium">Ingresos</q-item-label>
+            <q-item-label caption>IP, hora y quién inició sesión</q-item-label>
+          </q-item-section>
+          <q-item-section side>
+            <q-icon name="chevron_right" color="grey-4" size="18px" />
+          </q-item-section>
+        </q-item>
+      </template>
+
       <q-separator inset="72px" />
 
       <q-item
@@ -175,8 +199,10 @@ defineOptions({ name: 'ConfigPage' })
 const router = useRouter()
 const authStore = useAuthStore()
 const canManageUsers = computed(() => authStore.canManageUsers)
+const isSuperAdmin = computed(() => authStore.isSuperAdmin)
 
 const goToAdminUsers = () => router.push('/admin-users')
+const goToIngresos = () => router.push('/ingresos')
 const goToReportes = () => router.push('/reportes')
 const goToCajaFuerte = () => router.push('/caja-fuerte')
 const goToDanosCasitas = () => router.push('/danos-casitas')

@@ -16,6 +16,17 @@
       </div>
       <q-btn
         unelevated
+        round
+        dense
+        icon="history"
+        class="users-logs-btn"
+        aria-label="Ver ingresos"
+        @click="goToIngresos"
+      >
+        <q-tooltip>Ingresos</q-tooltip>
+      </q-btn>
+      <q-btn
+        unelevated
         no-caps
         icon="add"
         label="Nuevo"
@@ -32,7 +43,7 @@
         dense
         clearable
         debounce="80"
-        placeholder="Buscar por nombre, correo, rol o IP"
+        placeholder="Buscar por nombre, correo o rol"
         class="users-search"
         hide-bottom-space
       >
@@ -151,7 +162,7 @@
         >
           <q-icon name="schedule" size="14px" />
           <span class="user-card__login-copy">
-            <strong>{{ formatLastLoginAt(user.ultimo_login_at) }}</strong>
+            <strong>{{ formatLoginDateTime(user.ultimo_login_at) }}</strong>
             <span>{{ user.ultimo_login_ip || 'Sin IP registrada' }}</span>
           </span>
           <q-icon name="history" size="16px" class="user-card__login-more" />
@@ -240,7 +251,7 @@
               class="table-login"
               @click="openLoginHistory(props.row)"
             >
-              <span class="table-login__time">{{ formatLastLoginAt(props.row.ultimo_login_at) }}</span>
+              <span class="table-login__time">{{ formatLoginDateTime(props.row.ultimo_login_at) }}</span>
               <span class="table-login__ip">{{ props.row.ultimo_login_ip || 'Sin IP' }}</span>
             </button>
           </q-td>
@@ -700,52 +711,6 @@
         </footer>
       </q-card>
     </q-dialog>
-
-    <q-dialog v-model="showLoginHistory" backdrop-filter="blur(12px)">
-      <q-card class="auth-access-card">
-        <header class="auth-access-head">
-          <div class="auth-access-head__mark" aria-hidden="true">
-            <q-icon name="history" size="22px" />
-          </div>
-          <div class="auth-access-head__copy">
-            <div class="auth-access-title">Accesos recientes</div>
-            <div class="auth-access-user">{{ loginHistoryUser?.Usuario || 'Usuario' }}</div>
-          </div>
-          <q-btn flat round dense icon="close" class="auth-access-close" v-close-popup aria-label="Cerrar" />
-        </header>
-
-        <div class="auth-access-body">
-          <div v-if="loginHistoryLoading" class="users-empty users-empty--table">
-            <q-spinner color="primary" size="24px" />
-            <p class="users-empty__title q-mt-md">Cargando accesos</p>
-          </div>
-          <div v-else-if="!loginHistory.length" class="users-empty users-empty--table">
-            <p class="users-empty__title">Sin registros todavía</p>
-            <p class="users-empty__copy">Se guardarán la IP y la hora en el próximo inicio de sesión.</p>
-          </div>
-          <ol v-else class="login-history">
-            <li v-for="entry in loginHistory" :key="entry.id" class="login-history__item">
-              <div class="login-history__when">{{ formatLastLoginAt(entry.logged_at) }}</div>
-              <div class="login-history__meta">
-                <span>{{ entry.ip_address || 'IP no disponible' }}</span>
-                <span>{{ loginMethodHistoryLabel(entry.metodo) }}</span>
-              </div>
-            </li>
-          </ol>
-        </div>
-
-        <footer class="auth-access-footer">
-          <q-btn
-            flat
-            no-caps
-            unelevated
-            label="Cerrar"
-            class="auth-btn-ghost"
-            v-close-popup
-          />
-        </footer>
-      </q-card>
-    </q-dialog>
   </q-page>
 </template>
 
@@ -756,6 +721,7 @@ import { useRouter } from "vue-router";
 import { supabase } from "../supabase";
 import { useAuthStore, LOGIN_METHODS, normalizeEmail } from "../stores/auth";
 import { inviteAuthenticatorUser, resetAuthenticatorFactor } from "../services/manageAuthUser";
+import { formatLoginDateTime } from "../utils/loginLogs";
 import QnGoogleMark from "../components/QnGoogleMark.vue";
 
 export default defineComponent({
@@ -774,17 +740,13 @@ export default defineComponent({
     const showPassword = ref(false);
     const showAuthPassword = ref(false);
     const showManagerPassword = ref(false);
-    const showLoginHistory = ref(false);
     const authLoading = ref(false);
-    const loginHistoryLoading = ref(false);
     const searchQuery = ref("");
     const tablePagination = ref({
       page: 1,
       rowsPerPage: 12,
     });
     const visiblePasswords = ref({});
-    const loginHistoryUser = ref(null);
-    const loginHistory = ref([]);
 
     const newUser = ref({
       Usuario: "",
@@ -1116,50 +1078,15 @@ export default defineComponent({
       }
     };
 
-    const formatLastLoginAt = (value) => {
-      if (!value) return "Sin accesos";
-      const date = new Date(value);
-      if (Number.isNaN(date.getTime())) return "Sin accesos";
-      return date.toLocaleString("es-CR", {
-        timeZone: "America/Costa_Rica",
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
+    const goToIngresos = () => {
+      router.push("/ingresos");
+    };
+
+    const openLoginHistory = (user) => {
+      router.push({
+        path: "/ingresos",
+        query: user?.Usuario ? { usuario: user.Usuario } : {},
       });
-    };
-
-    const loginMethodHistoryLabel = (metodo) => {
-      if (metodo === LOGIN_METHODS.google) return "Google";
-      if (metodo === "authenticator") return "Authenticator";
-      return "Contraseña";
-    };
-
-    const openLoginHistory = async (user) => {
-      loginHistoryUser.value = user;
-      loginHistory.value = [];
-      showLoginHistory.value = true;
-      loginHistoryLoading.value = true;
-      try {
-        const { data, error } = await supabase
-          .from("login_logs")
-          .select("id, logged_at, ip_address, metodo")
-          .eq("usuario", user.Usuario)
-          .order("logged_at", { ascending: false })
-          .limit(40);
-
-        if (error) throw error;
-        loginHistory.value = data || [];
-      } catch (error) {
-        console.error("Error loading login history:", error);
-        notify({
-          color: "negative",
-          message: "No se pudo cargar el historial de accesos",
-        });
-      } finally {
-        loginHistoryLoading.value = false;
-      }
     };
 
     const getAuthStatus = (user) => {
@@ -1370,11 +1297,7 @@ export default defineComponent({
       showPassword,
       showAuthPassword,
       showManagerPassword,
-      showLoginHistory,
       authLoading,
-      loginHistoryLoading,
-      loginHistoryUser,
-      loginHistory,
       newUser,
       editingUser,
       userToDelete,
@@ -1406,11 +1329,11 @@ export default defineComponent({
       inviteUserAuthenticator,
       resetUserAuthenticator,
       goBack,
+      goToIngresos,
       getRolTone,
       getAvatarColor,
       getAuthStatus,
-      formatLastLoginAt,
-      loginMethodHistoryLabel,
+      formatLoginDateTime,
       openLoginHistory,
     };
   },
@@ -1803,6 +1726,14 @@ export default defineComponent({
   box-shadow: none !important;
 }
 
+.users-logs-btn {
+  width: 40px;
+  height: 40px;
+  background: #f5f5f7 !important;
+  color: #3f3f46 !important;
+  box-shadow: none !important;
+}
+
 .users-toolbar {
   display: flex;
   flex-direction: column;
@@ -2125,42 +2056,6 @@ export default defineComponent({
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-size: 0.72rem;
   color: #6e6e73;
-}
-
-.login-history {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.login-history__item {
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: #f8fafc;
-  border: 1px solid var(--apple-separator);
-}
-
-.login-history__when {
-  font-weight: 700;
-  font-size: 0.88rem;
-  letter-spacing: -0.01em;
-  color: var(--apple-text-primary);
-}
-
-.login-history__meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 4px;
-  font-size: 0.75rem;
-  color: #6e6e73;
-}
-
-.login-history__meta span:first-child {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 .users-desktop :deep(.q-table__container) {

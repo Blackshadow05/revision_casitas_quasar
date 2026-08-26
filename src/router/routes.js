@@ -21,6 +21,11 @@ const routes = [
         component: () => import('pages/AdminUsersPage.vue'),
         meta: { requiresAuth: true, requiresUserManager: true }
       },
+      {
+        path: 'ingresos',
+        component: () => import('pages/LoginLogsPage.vue'),
+        meta: { requiresAuth: true, requiresUserManager: true }
+      },
       { path: 'forms', component: () => import('pages/FormsPage.vue') },
       { path: 'reportes', component: () => import('pages/ReportesPage.vue') },
       { path: 'danos-casitas', component: () => import('pages/DanosCasitasListPage.vue') },

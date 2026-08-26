@@ -24,7 +24,7 @@ const routes = [
       {
         path: 'ingresos',
         component: () => import('pages/LoginLogsPage.vue'),
-        meta: { requiresAuth: true, requiresUserManager: true }
+        meta: { requiresAuth: true, requiresSuperAdmin: true }
       },
       { path: 'forms', component: () => import('pages/FormsPage.vue') },
       { path: 'reportes', component: () => import('pages/ReportesPage.vue') },

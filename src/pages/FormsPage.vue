@@ -21,14 +21,16 @@
               </div>
             </q-item-section>
             <q-item-section>
-            <q-item-label class="text-weight-medium">Administrar Usuarios</q-item-label>
-            <q-item-label caption>Roles, contraseñas y Google Authenticator</q-item-label>
-          </q-item-section>
-          <q-item-section side>
-            <q-icon name="chevron_right" color="grey-4" size="18px" />
-          </q-item-section>
-        </q-item>
+              <q-item-label class="text-weight-medium">Administrar Usuarios</q-item-label>
+              <q-item-label caption>Roles, contraseñas y Google Authenticator</q-item-label>
+            </q-item-section>
+            <q-item-section side>
+              <q-icon name="chevron_right" color="grey-4" size="18px" />
+            </q-item-section>
+          </q-item>
           <q-separator inset="72px" />
+        </template>
+        <template v-if="isSuperAdmin">
           <q-item
             clickable
             v-ripple
@@ -190,6 +192,7 @@ export default defineComponent({
     const router = useRouter();
     const authStore = useAuthStore();
     const canManageUsers = computed(() => authStore.canManageUsers);
+    const isSuperAdmin = computed(() => authStore.isSuperAdmin);
 
     const goToAdminUsers = () => {
       router.push('/admin-users');
@@ -293,6 +296,7 @@ export default defineComponent({
       openExternal,
       onIFrameLoad,
       canManageUsers,
+      isSuperAdmin,
       goToAdminUsers,
       goToIngresos,
       goToReportePantallas,

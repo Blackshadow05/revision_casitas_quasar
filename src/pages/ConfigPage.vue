@@ -116,7 +116,9 @@
             <q-icon name="chevron_right" color="grey-4" size="18px" />
           </q-item-section>
         </q-item>
+      </template>
 
+      <template v-if="isSuperAdmin">
         <q-separator inset="72px" />
 
         <q-item
@@ -197,6 +199,7 @@ defineOptions({ name: 'ConfigPage' })
 const router = useRouter()
 const authStore = useAuthStore()
 const canManageUsers = computed(() => authStore.canManageUsers)
+const isSuperAdmin = computed(() => authStore.isSuperAdmin)
 
 const goToAdminUsers = () => router.push('/admin-users')
 const goToIngresos = () => router.push('/ingresos')

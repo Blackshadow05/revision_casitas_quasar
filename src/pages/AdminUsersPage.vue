@@ -15,6 +15,7 @@
         <p class="users-hero__subtitle">{{ userStats.total }} personas con acceso al sistema</p>
       </div>
       <q-btn
+        v-if="isSuperAdmin"
         unelevated
         round
         dense
@@ -156,6 +157,7 @@
         </div>
 
         <button
+          v-if="isSuperAdmin"
           type="button"
           class="user-card__login"
           @click="openLoginHistory(user)"
@@ -777,53 +779,62 @@ export default defineComponent({
       { label: "Iniciar sesión con Google", value: LOGIN_METHODS.google },
     ];
 
-    const columns = [
-      {
-        name: "usuario",
-        label: "Persona",
-        field: "Usuario",
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "rol",
-        label: "Rol",
-        field: "Rol",
-        align: "left",
-        sortable: true,
-      },
-      {
-        name: "acceso",
-        label: "Acceso",
-        field: "metodo_login",
-        align: "left",
-      },
-      {
-        name: "auth",
-        label: "Authenticator",
-        field: "totp_enrolled",
-        align: "left",
-      },
-      {
-        name: "login",
-        label: "Último acceso",
-        field: "ultimo_login_at",
-        align: "left",
-        sortable: true,
-      },
-      {
+    const currentUser = computed(() => authStore.user);
+    const canManageUsers = computed(() => authStore.canManageUsers);
+    const isSuperAdmin = computed(() => authStore.isSuperAdmin);
+    const canDeleteUsers = computed(() => currentUser.value?.Usuario === "Esteban B");
+    const needsManagerPassword = computed(() => authStore.authMode === "legacy" || !authStore.authMode);
+
+    const columns = computed(() => {
+      const base = [
+        {
+          name: "usuario",
+          label: "Persona",
+          field: "Usuario",
+          align: "left",
+          sortable: true,
+        },
+        {
+          name: "rol",
+          label: "Rol",
+          field: "Rol",
+          align: "left",
+          sortable: true,
+        },
+        {
+          name: "acceso",
+          label: "Acceso",
+          field: "metodo_login",
+          align: "left",
+        },
+        {
+          name: "auth",
+          label: "Authenticator",
+          field: "totp_enrolled",
+          align: "left",
+        },
+      ];
+
+      if (isSuperAdmin.value) {
+        base.push({
+          name: "login",
+          label: "Último acceso",
+          field: "ultimo_login_at",
+          align: "left",
+          sortable: true,
+        });
+      }
+
+      base.push({
         name: "actions",
         label: "",
         field: "actions",
         align: "right",
         style: "width: 140px",
-      },
-    ];
+      });
 
-    const currentUser = computed(() => authStore.user);
-    const canManageUsers = computed(() => authStore.canManageUsers);
-    const canDeleteUsers = computed(() => currentUser.value?.Usuario === "Esteban B");
-    const needsManagerPassword = computed(() => authStore.authMode === "legacy" || !authStore.authMode);
+      return base;
+    });
 
     const isPasswordVisible = (userId) => Boolean(visiblePasswords.value[userId]);
 
@@ -847,7 +858,13 @@ export default defineComponent({
       const query = searchQuery.value.trim().toLowerCase();
       if (!query) return users.value;
       return users.value.filter((user) => {
-        const haystack = [user.Usuario, user.Rol, user.email, user.metodo_login, user.ultimo_login_ip]
+        const haystack = [
+          user.Usuario,
+          user.Rol,
+          user.email,
+          user.metodo_login,
+          isSuperAdmin.value ? user.ultimo_login_ip : null,
+        ]
           .filter(Boolean)
           .join(" ")
           .toLowerCase();
@@ -912,9 +929,13 @@ export default defineComponent({
     const loadUsers = async () => {
       loading.value = true;
       try {
+        const profileColumns = isSuperAdmin.value
+          ? "id, Usuario, Rol, password_hash, metodo_login, email, auth_user_id, totp_enrolled, ultimo_login_at, ultimo_login_ip"
+          : "id, Usuario, Rol, password_hash, metodo_login, email, auth_user_id, totp_enrolled";
+
         const { data, error } = await supabase
           .from("Usuarios")
-          .select("id, Usuario, Rol, password_hash, metodo_login, email, auth_user_id, totp_enrolled, ultimo_login_at, ultimo_login_ip")
+          .select(profileColumns)
           .order("Usuario", { ascending: true });
 
         if (error) throw error;
@@ -1306,6 +1327,7 @@ export default defineComponent({
       loginMethodOptions,
       columns,
       canDeleteUsers,
+      isSuperAdmin,
       needsManagerPassword,
       isGoogleLogin,
       isAuthGoogle,

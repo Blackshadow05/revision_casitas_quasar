@@ -236,10 +236,10 @@ const loadLogs = async () => {
 watch(() => route.query.usuario, applyRouteFilter)
 
 onMounted(() => {
-  if (!authStore.canManageUsers) {
+  if (!authStore.isSuperAdmin) {
     notify({
       type: 'negative',
-      message: 'No tienes permiso para acceder a esta sección.'
+      message: 'Solo SuperAdmin puede ver los ingresos.'
     })
     router.replace('/config')
     return

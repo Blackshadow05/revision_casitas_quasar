@@ -1,5 +1,5 @@
 <template>
-  <q-page class="q-pa-md bg-grey-1">
+  <q-page class="home-page q-pa-md bg-grey-1">
     <!-- Login Modal -->
     <q-dialog v-model="showLoginModal" persistent backdrop-filter="blur(4px)">
       <q-card style="width: 350px; border-radius: 20px;" class="q-pa-lg">
@@ -93,23 +93,15 @@
       <q-scroll-observer @scroll="onScroll" />
 
       <!-- Top Bar / Profile Section -->
-      <div class="q-mb-md">
-        <!-- Fila principal con usuario y botón logout -->
-        <div class="row items-center justify-between">
-          <div class="row items-center">
-            <q-avatar size="40px" color="grey-2" text-color="dark" icon="person" class="q-mr-sm" />
-            <div>
-              <div class="text-weight-bold text-orange-9" style="font-size: 14px;">Bienvenido, {{ currentUser?.Usuario || 'Usuario' }}</div>
-              <div class="text-weight-bold text-orange-9" style="font-size: 14px; line-height: 1;">{{ currentUser?.Rol || '' }}</div>
-            </div>
+      <div class="home-profile q-mb-md">
+        <div class="home-profile__user row items-center">
+          <q-avatar size="40px" color="grey-2" text-color="dark" icon="person" class="q-mr-sm" />
+          <div>
+            <div class="text-weight-bold text-orange-9" style="font-size: 14px;">Bienvenido, {{ currentUser?.Usuario || 'Usuario' }}</div>
+            <div class="text-weight-bold text-orange-9" style="font-size: 14px; line-height: 1;">{{ currentUser?.Rol || '' }}</div>
           </div>
-          <q-btn flat dense no-caps class="logout-btn" @click="handleLogout">
-            <q-icon name="logout" size="14px" class="q-mr-xs" />
-            <span>Cerrar sesión</span>
-          </q-btn>
         </div>
-        <!-- Fila de puntos de sesión (debajo en móvil, al lado en desktop) -->
-        <div class="row q-mt-xs items-center">
+        <div class="home-profile__session row items-center">
           <div v-if="daysRemaining > 0" class="session-dots row items-center">
             <q-icon name="history" size="14px" color="grey-7" class="q-mr-xs" />
             <span class="q-mr-xs text-caption text-grey-7">Sesión:</span>
@@ -118,149 +110,16 @@
             </div>
           </div>
         </div>
+        <q-btn flat dense no-caps class="home-profile__logout logout-btn" @click="handleLogout">
+          <q-icon name="logout" size="14px" class="q-mr-xs" />
+          <span>Cerrar sesión</span>
+        </q-btn>
       </div>
 
-      <!-- Resumen de check-in, check-out y ocupación del día -->
-      <section
-        class="daily-operations-mobile q-mb-md"
-        aria-labelledby="daily-operations-title"
-      >
-        <div class="daily-operations-mobile__header row items-center no-wrap q-mb-sm">
-          <div class="daily-operations-mobile__title row items-center no-wrap">
-            <q-icon name="event_note" color="primary" size="19px" class="q-mr-xs" />
-            <span id="daily-operations-title" class="text-subtitle2 text-weight-bold">Movimientos</span>
-          </div>
-          <q-space />
-          <q-btn-toggle
-            v-model="operationDay"
-            :options="[
-              { label: 'Hoy', value: 'today' },
-              { label: 'Mañana', value: 'tomorrow' }
-            ]"
-            color="grey-2"
-            text-color="grey-8"
-            toggle-color="primary"
-            toggle-text-color="white"
-            dense
-            no-caps
-            rounded
-            unelevated
-            class="daily-operations-mobile__day-toggle"
-            aria-label="Elegir día de movimientos"
-          />
-        </div>
+      <div class="home-toolbar">
+        <div class="home-title text-h5 text-weight-bold">Revisiones de Casitas</div>
 
-        <div class="daily-operations-mobile__grid">
-          <article
-            v-for="grupo in operacionesHoy"
-            :key="grupo.key"
-            class="daily-operation-card"
-            :class="`daily-operation-card--${grupo.key}`"
-          >
-            <div class="row items-center no-wrap q-mb-sm">
-              <q-icon :name="grupo.icon" :color="grupo.color" size="18px" class="q-mr-xs" />
-              <span class="daily-operation-card__label">{{ grupo.label }}</span>
-              <q-space />
-              <q-badge :color="grupo.color" rounded :label="grupo.casitas.length" />
-            </div>
-
-            <div v-if="grupo.casitas.length" class="daily-operation-card__numbers">
-              <span
-                v-for="casita in grupo.casitas.slice(0, 8)"
-                :key="casita"
-                class="daily-operation-number"
-              >
-                {{ casita }}
-              </span>
-
-              <q-slide-transition v-if="grupo.casitas.length > 8">
-                <div
-                  v-show="operationExpanded[grupo.key]"
-                  class="daily-operation-card__numbers daily-operation-card__numbers--extra"
-                >
-                  <span
-                    v-for="casita in grupo.casitas.slice(8)"
-                    :key="casita"
-                    class="daily-operation-number"
-                  >
-                    {{ casita }}
-                  </span>
-                </div>
-              </q-slide-transition>
-            </div>
-            <div v-else class="daily-operation-card__empty">—</div>
-
-            <q-btn
-              v-if="grupo.casitas.length > 8"
-              flat
-              dense
-              no-caps
-              size="sm"
-              :color="grupo.color"
-              class="daily-operation-card__expand full-width q-mt-xs"
-              :icon-right="operationExpanded[grupo.key] ? 'expand_less' : 'expand_more'"
-              :label="operationExpanded[grupo.key]
-                ? 'Ver menos'
-                : `+${grupo.casitas.length - 8} más`"
-              :aria-expanded="operationExpanded[grupo.key]"
-              @click="operationExpanded[grupo.key] = !operationExpanded[grupo.key]"
-            />
-          </article>
-
-          <article
-            class="daily-operation-card daily-operation-card--ocupacion"
-            aria-label="Ocupación del día"
-          >
-            <div class="row items-center no-wrap">
-              <q-icon name="hotel" color="indigo-6" size="18px" class="q-mr-xs" />
-              <span class="daily-operation-card__label">Ocupación</span>
-              <q-space />
-              <span class="ocupacion-count">{{ ocupacionCount }}</span>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <!-- ==================== AVISOS DE OPERACIÓN ==================== -->
-      <div v-if="avisos.length" class="avisos-wrapper q-mb-md">
-        <div class="avisos-header row items-center justify-between no-wrap q-mb-xs">
-          <div class="row items-center no-wrap">
-            <q-icon name="notifications_active" size="20px" color="orange-9" class="q-mr-xs" />
-            <span class="text-weight-bold text-orange-9">{{ avisosLabel }}</span>
-          </div>
-          <q-btn
-            flat
-            dense
-            no-caps
-            size="sm"
-            color="orange-9"
-            :icon="avisosOcultos ? 'visibility' : 'visibility_off'"
-            :label="avisosOcultos ? 'Mostrar' : 'Ocultar'"
-            @click="avisosOcultos = !avisosOcultos"
-          />
-        </div>
-        <transition-group v-show="!avisosOcultos" name="aviso-fade" tag="div">
-          <q-banner
-            v-for="a in avisos"
-            :key="a.key"
-            rounded
-            dense
-            class="aviso-banner q-mb-sm text-white"
-            :class="a.cssClass"
-          >
-            <template v-slot:avatar>
-              <q-icon :name="a.icon" color="white" />
-            </template>
-            <div class="text-weight-bold">{{ a.text }}</div>
-            <div class="text-caption aviso-restante">{{ a.restante }}</div>
-          </q-banner>
-        </transition-group>
-      </div>
-
-      <div class="text-h5 text-weight-bold q-mb-lg" style="color: #4CAF50;">Revisiones de Casitas</div>
-
-      <div class="row q-col-gutter-sm q-mb-lg">
-        <div class="col-6">
+        <div class="home-actions">
           <q-btn
             color="orange-8"
             icon="schedule"
@@ -268,50 +127,37 @@
             no-caps
             unelevated
             rounded
-            class="dashboard-horario-btn full-width"
+            class="dashboard-action-btn"
             @click="goToDashboardHorario"
           />
         </div>
-        <div class="col-6">
-          <q-btn
-            color="teal-7"
-            icon="today"
-            label="Operación Diaria"
-            no-caps
-            unelevated
-            rounded
-            class="dashboard-horario-btn full-width"
-            @click="goToOperacionDiaria"
-          />
-        </div>
-      </div>
 
-      <!-- Search Bar -->
-      <div class="row items-center q-gutter-x-md q-mb-lg">
-        <q-input
-          v-model="search"
-          placeholder="Buscar por casita, revisor o notas..."
-          outlined
-          rounded
-          dense
-          bg-color="white"
-          class="search-input col shadow-1"
-          clearable
-        >
-          <template v-slot:prepend>
-            <q-icon name="search" class="text-grey-5" />
-          </template>
-        </q-input>
-        <q-btn
-          round
-          flat
-          icon="filter_list"
-          color="primary"
-          class="filter-btn bg-white shadow-1"
-          @click="showFilterModal = true"
-        >
-          <q-tooltip>Filtros</q-tooltip>
-        </q-btn>
+        <div class="home-search row items-center no-wrap">
+          <q-input
+            v-model="search"
+            placeholder="Buscar por casita, revisor o notas..."
+            outlined
+            rounded
+            dense
+            bg-color="white"
+            class="search-input col shadow-1"
+            clearable
+          >
+            <template v-slot:prepend>
+              <q-icon name="search" class="text-grey-5" />
+            </template>
+          </q-input>
+          <q-btn
+            round
+            flat
+            icon="filter_list"
+            color="primary"
+            class="filter-btn bg-white shadow-1"
+            @click="showFilterModal = true"
+          >
+            <q-tooltip>Filtros</q-tooltip>
+          </q-btn>
+        </div>
       </div>
 
       <!-- Active Filter Badge -->
@@ -361,7 +207,7 @@
       </div>
 
       <!-- Mostrando registros badge -->
-      <div v-if="visibleRecordsCount > 0" class="flex justify-center q-mb-md">
+      <div v-if="visibleRecordsCount > 0" class="home-records-row flex justify-center q-mb-md">
         <div class="records-badge">{{ recordsBadgeText }}</div>
       </div>
 
@@ -688,64 +534,6 @@ import { useCasasStore } from '../stores/casas'
 import { useAuthStore } from '../stores/auth'
 import { date, useQuasar } from 'quasar'
 import { useRouter, useRoute } from 'vue-router'
-import { supabase } from '../supabase'
-
-// ===== Helpers para los avisos de operaciones_memo =====
-const MEMO_MONTHS = {
-  january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
-  july: 7, august: 8, september: 9, october: 10, november: 11, december: 12
-}
-
-// Normaliza texto: minúsculas, sin apóstrofes, espacios colapsados.
-function memoNorm (v) {
-  return String(v == null ? '' : v)
-    .toLowerCase()
-    .replace(/[''´`]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-// Extrae { month, day } de un texto como "Thursday, June 04th".
-function memoParseFecha (str) {
-  const s = String(str == null ? '' : str).toLowerCase()
-  let month = null
-  for (const name in MEMO_MONTHS) {
-    if (s.includes(name)) { month = MEMO_MONTHS[name]; break }
-  }
-  const m = s.match(/\d+/)
-  const day = m ? parseInt(m[0], 10) : null
-  return { month, day }
-}
-
-// Parsea horas tipo "11:30hrs", "2:00 PM", "14:00" -> { h, min }
-function memoParseHora (raw) {
-  const s = String(raw == null ? '' : raw).toLowerCase().trim()
-  if (!s) return null
-  const m = s.match(/(\d{1,2}):(\d{2})/)
-  if (!m) return null
-  let h = parseInt(m[1], 10)
-  const min = parseInt(m[2], 10)
-  const isPM = /p\.?\s?m/.test(s)
-  const isAM = /a\.?\s?m/.test(s)
-  if (isPM && h < 12) h += 12
-  if (isAM && h === 12) h = 0
-  if (h > 23 || min > 59) return null
-  return { h, min }
-}
-
-// Convierte una hora del registro en un Date de hoy (base = fecha/hora del dispositivo).
-function memoHoraToToday (raw, base) {
-  const t = memoParseHora(raw)
-  if (!t) return null
-  const d = new Date(base)
-  d.setHours(t.h, t.min, 0, 0)
-  return d
-}
-
-function memoTxt (v) {
-  const s = v == null ? '' : String(v).trim()
-  return s === '' ? '—' : s
-}
 
 export default defineComponent({
   name: 'IndexPage',
@@ -767,199 +555,6 @@ export default defineComponent({
     const scrollToTop = () => {
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
-
-    // ===== Avisos de operación (tabla operaciones_memo) =====
-    // Muestra mensajes cuando faltan <= 40 min para la hora del registro y se
-    // mantienen anclados hasta que esa hora llega (luego desaparecen).
-    const VENTANA_AVISO_MIN = 40
-    const AVISOS_OCULTOS_KEY = 'index_avisos_ocultos'
-    const memoRows = ref([])
-    const now = ref(new Date())
-    // Estado oculto/visible persistido durante la sesión.
-    const avisosOcultos = ref(sessionStorage.getItem(AVISOS_OCULTOS_KEY) === '1')
-    watch(avisosOcultos, (val) => {
-      sessionStorage.setItem(AVISOS_OCULTOS_KEY, val ? '1' : '0')
-    })
-    let avisoNowTimer = null
-    let avisoMemoTimer = null
-
-    const cargarMemos = async () => {
-      try {
-        const { data, error } = await supabase.from('operaciones_memo').select('*')
-        if (error) throw error
-        memoRows.value = data || []
-      } catch (e) {
-        // No bloqueamos la pantalla principal si fallan los avisos.
-        console.error('Error al cargar operaciones_memo:', e)
-      }
-    }
-
-    const avisos = computed(() => {
-      const ahora = now.value
-      const hoyMonth = ahora.getMonth() + 1
-      const hoyDay = ahora.getDate()
-      const out = []
-
-      // Estructuras para agrupar por hora
-      const arrivalsMap = {}
-      const departuresMap = {}
-
-      memoRows.value.forEach((r, idx) => {
-        const f = memoParseFecha(r.fecha)
-        if (f.month !== hoyMonth || f.day !== hoyDay) return
-        const tipo = memoNorm(r.tipo)
-
-        // Valida si la hora cae dentro de la ventana [ahora, ahora + 40min].
-        const evaluarHora = (rawHora) => {
-          const target = memoHoraToToday(rawHora, ahora)
-          if (!target) return null
-          const diff = Math.round((target.getTime() - ahora.getTime()) / 60000)
-          if (diff < 0 || diff > VENTANA_AVISO_MIN) return null
-          return { diff, orden: target.getTime() }
-        }
-
-        if (tipo === 'tour') {
-          const resSalida = evaluarHora(r.hora_salida)
-          if (resSalida) {
-            out.push({
-              text: `A las ${memoTxt(r.hora_salida)} sale el tour ${memoTxt(r.detalle_tour)}`,
-              icon: 'directions_bus', cssClass: 'aviso--salida',
-              diff: resSalida.diff, key: idx + '-tour-salida', orden: resSalida.orden
-            })
-          }
-          const resLlegada = evaluarHora(r.hora_llegada)
-          if (resLlegada) {
-            out.push({
-              text: `A las ${memoTxt(r.hora_llegada)} regresa el tour ${memoTxt(r.detalle_tour)}`,
-              icon: 'keyboard_return', cssClass: 'aviso--regreso',
-              diff: resLlegada.diff, key: idx + '-tour-regreso', orden: resLlegada.orden
-            })
-          }
-        } else if (tipo.includes('arrival')) {
-          const rawHora = r.hora_llegada_real
-          const res = evaluarHora(rawHora)
-          if (res) {
-            const horaKey = memoTxt(rawHora)
-            if (!arrivalsMap[horaKey]) {
-              arrivalsMap[horaKey] = {
-                rawHora,
-                casitas: [],
-                diff: res.diff,
-                orden: res.orden,
-                keys: []
-              }
-            }
-            const casitaTxt = memoTxt(r.casita)
-            if (!arrivalsMap[horaKey].casitas.includes(casitaTxt)) {
-              arrivalsMap[horaKey].casitas.push(casitaTxt)
-            }
-            arrivalsMap[horaKey].keys.push(idx)
-          }
-        } else if (tipo.includes('departure')) {
-          const rawHora = r.hora_salida_real
-          const res = evaluarHora(rawHora)
-          if (res) {
-            const horaKey = memoTxt(rawHora)
-            if (!departuresMap[horaKey]) {
-              departuresMap[horaKey] = {
-                rawHora,
-                casitas: [],
-                diff: res.diff,
-                orden: res.orden,
-                keys: []
-              }
-            }
-            const casitaTxt = memoTxt(r.casita)
-            if (!departuresMap[horaKey].casitas.includes(casitaTxt)) {
-              departuresMap[horaKey].casitas.push(casitaTxt)
-            }
-            departuresMap[horaKey].keys.push(idx)
-          }
-        }
-      })
-
-      // Agregar las llegadas agrupadas al arreglo de salida
-      Object.values(arrivalsMap).forEach(grupo => {
-        out.push({
-          text: `A las ${memoTxt(grupo.rawHora)} llega check in ${grupo.casitas.join(', ')}`,
-          icon: 'login', cssClass: 'aviso--checkin',
-          diff: grupo.diff, key: grupo.keys.join('-') + '-arrival', orden: grupo.orden
-        })
-      })
-
-      // Agregar las salidas agrupadas al arreglo de salida
-      Object.values(departuresMap).forEach(grupo => {
-        out.push({
-          text: `A las ${memoTxt(grupo.rawHora)} sale check out ${grupo.casitas.join(', ')}`,
-          icon: 'logout', cssClass: 'aviso--checkout',
-          diff: grupo.diff, key: grupo.keys.join('-') + '-departure', orden: grupo.orden
-        })
-      })
-
-      out.sort((a, b) => a.orden - b.orden)
-      return out.map((a) => ({
-        ...a,
-        restante: a.diff <= 0 ? '¡Es ahora!' : `Faltan ${a.diff} min`
-      }))
-    })
-
-    const avisosLabel = computed(() => {
-      const n = avisos.value.length
-      return `Hay ${n} ${n === 1 ? 'notificación' : 'notificaciones'}`
-    })
-
-    const operationDay = ref('today')
-    const operationExpanded = reactive({ checkin: false, checkout: false })
-
-    const coincideTipoOperacion = (row, tipoOperacion) => {
-      const tipo = memoNorm(row.tipo)
-      if (tipoOperacion === 'in house') {
-        return tipo.includes('in house') || tipo.includes('in-house') || tipo.includes('inhouse')
-      }
-      return tipo.includes(tipoOperacion)
-    }
-
-    const casitasDeOperacionSeleccionada = (tipoOperacion) => {
-      const fechaSeleccionada = new Date(now.value)
-      if (operationDay.value === 'tomorrow') {
-        fechaSeleccionada.setDate(fechaSeleccionada.getDate() + 1)
-      }
-      const month = fechaSeleccionada.getMonth() + 1
-      const day = fechaSeleccionada.getDate()
-      const casitas = memoRows.value
-        .filter((row) => {
-          const fecha = memoParseFecha(row.fecha)
-          return fecha.month === month && fecha.day === day && coincideTipoOperacion(row, tipoOperacion)
-        })
-        .map((row) => String(row.casita == null ? '' : row.casita).match(/\d+/)?.[0] || '')
-        .filter(Boolean)
-
-      return [...new Set(casitas)].sort((a, b) => Number(a) - Number(b))
-    }
-
-    const ocupacionCount = computed(() => casitasDeOperacionSeleccionada('in house').length)
-
-    const operacionesHoy = computed(() => [
-      {
-        key: 'checkin',
-        label: 'Check-in',
-        icon: 'login',
-        color: 'green-7',
-        casitas: casitasDeOperacionSeleccionada('arrival')
-      },
-      {
-        key: 'checkout',
-        label: 'Check-out',
-        icon: 'logout',
-        color: 'red-6',
-        casitas: casitasDeOperacionSeleccionada('departure')
-      }
-    ])
-
-    watch(operationDay, () => {
-      operationExpanded.checkin = false
-      operationExpanded.checkout = false
-    })
 
     // Desktop table columns
     const tableColumns = [
@@ -1112,7 +707,6 @@ export default defineComponent({
         loginData.username = ''
         loginData.password = ''
         await loadData()
-        await cargarMemos()
       }
     }
 
@@ -1120,7 +714,6 @@ export default defineComponent({
       await authStore.logout()
       loginData.username = ''
       loginData.password = ''
-      memoRows.value = []
       showLoginModal.value = true
     }
     
@@ -1224,8 +817,6 @@ export default defineComponent({
 
     onUnmounted(() => {
       clearInterval(checkSessionInterval)
-      if (avisoNowTimer) clearInterval(avisoNowTimer)
-      if (avisoMemoTimer) clearInterval(avisoMemoTimer)
       window.removeEventListener('resize', updateTableHeight)
     })
 
@@ -1234,21 +825,14 @@ export default defineComponent({
         if (store.allCasas.length === 0) {
           await initData()
         }
-        await cargarMemos()
       }
-      // Reloj para recalcular la ventana de 40 min.
-      avisoNowTimer = setInterval(() => { now.value = new Date() }, 30000)
-      // Refresca los datos de operaciones_memo cada 5 min.
-      avisoMemoTimer = setInterval(() => {
-        if (isLoggedIn.value) cargarMemos()
-      }, 5 * 60 * 1000)
 
       await nextTick()
       updateTableHeight()
       window.addEventListener('resize', updateTableHeight)
     })
 
-    watch([avisos, visibleRecordsCount, isLoggedIn], () => {
+    watch([visibleRecordsCount, isLoggedIn], () => {
       nextTick(updateTableHeight)
     })
 
@@ -1272,10 +856,6 @@ export default defineComponent({
 
     const goToDashboardHorario = () => {
       router.push('/dashboard-horario')
-    }
-
-    const goToOperacionDiaria = () => {
-      router.push('/operacion-diaria')
     }
 
     const goToDetails = (casa) => {
@@ -1345,13 +925,6 @@ export default defineComponent({
     return {
       store,
       search,
-      avisos,
-      avisosLabel,
-      avisosOcultos,
-      operacionesHoy,
-      ocupacionCount,
-      operationDay,
-      operationExpanded,
       casas,
       desktopCasas,
       canAdd,
@@ -1370,7 +943,6 @@ export default defineComponent({
       getActionIcon,
       getCardNoteText,
       goToDashboardHorario,
-      goToOperacionDiaria,
       goToDetails,
       showFilterModal,
       applyFilters,
@@ -1412,179 +984,6 @@ export default defineComponent({
 </script>
 
 <style scoped>
-/* ===== Resumen móvil de check-in / check-out ===== */
-.daily-operations-mobile {
-  padding: 12px;
-  border: 1px solid rgba(25, 118, 210, 0.12);
-  border-radius: 16px;
-  background: #fff;
-  box-shadow: 0 6px 18px rgba(25, 118, 210, 0.08);
-}
-
-.daily-operations-mobile__title {
-  color: #263238;
-}
-
-.daily-operations-mobile__day-toggle {
-  flex: 0 0 auto;
-  border: 1px solid rgba(25, 118, 210, 0.13);
-  font-size: 0.72rem;
-}
-
-.daily-operations-mobile__grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.daily-operation-card {
-  min-width: 0;
-  padding: 10px;
-  border: 1px solid transparent;
-  border-radius: 13px;
-}
-
-.daily-operation-card--checkin {
-  border-color: rgba(46, 125, 50, 0.17);
-  background: rgba(76, 175, 80, 0.07);
-}
-
-.daily-operation-card--checkout {
-  border-color: rgba(198, 40, 40, 0.15);
-  background: rgba(244, 67, 54, 0.06);
-}
-
-.daily-operation-card--ocupacion {
-  grid-column: 1 / -1;
-  border-color: rgba(63, 81, 181, 0.18);
-  background: rgba(63, 81, 181, 0.07);
-}
-
-.ocupacion-count {
-  color: #3949ab;
-  font-size: 1.35rem;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.daily-operation-card__label {
-  overflow: hidden;
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.daily-operation-card__numbers {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-
-.daily-operation-card__numbers--extra {
-  width: 100%;
-  padding-top: 5px;
-}
-
-.daily-operation-number {
-  display: inline-flex;
-  min-width: 32px;
-  min-height: 28px;
-  align-items: center;
-  justify-content: center;
-  padding: 3px 7px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.9);
-  color: #263238;
-  font-size: 0.82rem;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.daily-operation-card__empty {
-  padding: 5px 0;
-  color: #9e9e9e;
-  font-size: 1.1rem;
-  text-align: center;
-}
-
-.daily-operation-card__expand {
-  min-height: 26px;
-  font-size: 0.7rem;
-}
-
-:global(.body--dark) .daily-operations-mobile {
-  border-color: rgba(100, 181, 246, 0.18);
-  background: #1e1e1e;
-}
-
-:global(.body--dark) .daily-operations-mobile__title,
-:global(.body--dark) .daily-operation-card__label,
-:global(.body--dark) .daily-operation-number {
-  color: #f5f5f5;
-}
-
-:global(.body--dark) .daily-operation-card--checkin {
-  background: rgba(76, 175, 80, 0.12);
-}
-
-:global(.body--dark) .daily-operation-card--checkout {
-  background: rgba(244, 67, 54, 0.11);
-}
-
-:global(.body--dark) .daily-operation-card--ocupacion {
-  background: rgba(92, 107, 192, 0.16);
-}
-
-:global(.body--dark) .ocupacion-count {
-  color: #c5cae9;
-}
-
-:global(.body--dark) .daily-operation-number {
-  border-color: rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.07);
-}
-
-/* ===== Avisos de operación ===== */
-.avisos-header {
-  background: #fff8e1;
-  border-radius: 10px;
-  padding: 2px 4px 2px 10px;
-}
-
-.aviso-banner {
-  border-radius: 14px;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
-}
-
-.aviso-restante {
-  opacity: 0.9;
-}
-
-.aviso--salida {
-  background: linear-gradient(135deg, #1e88e5 0%, #1565c0 100%);
-}
-.aviso--regreso {
-  background: linear-gradient(135deg, #00897b 0%, #00695c 100%);
-}
-.aviso--checkin {
-  background: linear-gradient(135deg, #43a047 0%, #2e7d32 100%);
-}
-.aviso--checkout {
-  background: linear-gradient(135deg, #e53935 0%, #c62828 100%);
-}
-
-.aviso-fade-enter-active,
-.aviso-fade-leave-active {
-  transition: opacity 0.4s ease, transform 0.4s ease;
-}
-.aviso-fade-enter-from,
-.aviso-fade-leave-to {
-  opacity: 0;
-  transform: translateY(-8px);
-}
-
 .records-badge {
   background: #31a8ff;
   color: white;
@@ -1843,6 +1242,53 @@ export default defineComponent({
   flex-wrap: nowrap;
 }
 
+.home-profile {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "user logout"
+    "session session";
+  gap: 4px 8px;
+  align-items: center;
+}
+
+.home-profile__user {
+  grid-area: user;
+}
+
+.home-profile__session {
+  grid-area: session;
+}
+
+.home-profile__logout {
+  grid-area: logout;
+}
+
+.home-title {
+  margin: 0;
+  color: #4CAF50;
+}
+
+.home-toolbar {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.home-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.dashboard-action-btn {
+  width: 100%;
+}
+
+.home-search {
+  gap: 8px;
+}
+
 /* En pantallas grandes, ocultamos la fila inferior */
 @media (min-width: 600px) {
   .session-dots {
@@ -2013,6 +1459,64 @@ export default defineComponent({
   
   .modern-table {
     min-width: 1200px;
+  }
+}
+
+/* ===== Escritorio: layout compacto, sin estirar el diseño móvil ===== */
+@media (min-width: 1024px) {
+  .home-page {
+    padding: 20px 24px 24px !important;
+  }
+
+  .home-profile {
+    grid-template-columns: auto auto 1fr auto;
+    grid-template-areas: "user session . logout";
+    gap: 0 16px;
+  }
+
+  .home-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 16px;
+    margin-bottom: 12px;
+  }
+
+  .home-title {
+    margin-right: auto;
+    font-size: 1.45rem;
+    line-height: 1.2;
+  }
+
+  .home-search {
+    flex: 1 1 280px;
+    max-width: 420px;
+    min-width: 240px;
+  }
+
+  .home-actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 8px;
+  }
+
+  .dashboard-action-btn {
+    width: auto;
+    min-width: 168px;
+    height: 40px;
+    padding: 0 18px;
+  }
+
+  .home-records-row {
+    justify-content: flex-start !important;
+  }
+
+  .table-container {
+    margin-top: 0;
+  }
+
+  .filter-btn {
+    flex-shrink: 0;
   }
 }
 </style>

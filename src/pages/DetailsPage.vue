@@ -22,26 +22,32 @@
         height="250px"
         class="bg-transparent image-header__carousel"
       >
-        <q-carousel-slide 
-          v-for="(img, index) in images" 
-          :key="index" 
-          :name="index" 
-          :img-src="img" 
+        <q-carousel-slide
+          v-for="(img, index) in images"
+          :key="index"
+          :name="index"
+          class="rounded-header-img evidence-slide"
           @click="onOpenImage(index)"
-          class="rounded-header-img"
-        />
+        >
+          <img
+            :src="img"
+            class="evidence-original-img evidence-slide__img"
+            alt=""
+            decoding="async"
+          />
+        </q-carousel-slide>
       </q-carousel>
 
       <div v-else class="evidence-thumbs">
         <button
-          v-for="(img, index) in gridImages"
+          v-for="(img, index) in images"
           :key="index"
           type="button"
           class="evidence-thumb"
           :aria-label="`Ver evidencia ${index + 1}`"
           @click="onOpenImage(index)"
         >
-          <img :src="img" alt="" decoding="async" />
+          <img :src="img" class="evidence-original-img" alt="" decoding="async" />
         </button>
       </div>
     </div>
@@ -702,8 +708,8 @@
           </div>
           <div v-if="nota.imagen" class="q-mt-md">
             <img
-              :src="getThumbUrl(nota.imagen)"
-              class="nota-extra-image"
+              :src="getOriginalUrl(nota.imagen)"
+              class="nota-extra-image evidence-original-img"
               loading="lazy"
               decoding="async"
               alt="Imagen de la nota extra"
@@ -971,40 +977,49 @@ export default defineComponent({
     let lightbox = null
 
     const CLOUDINARY_BASE = 'https://res.cloudinary.com/dhd61lan4/image/upload'
-    const CAROUSEL_TRANSFORM = 'f_auto,q_auto,w_900'
-    const THUMB_TRANSFORM = 'f_auto,q_auto,w_600'
-    const GRID_TRANSFORM = 'f_auto,q_auto,w_360'
-    const FULL_TRANSFORM = 'f_auto,q_auto,c_limit,w_1200'
-    const FULL_WIDTH = 1200
 
-    const buildCloudinaryUrl = (path, transform) => {
+    const isCloudinaryTransformSegment = (part) => {
+      if (!part) return false
+      if (/\.(jpe?g|png|webp|gif|avif|bmp)$/i.test(part)) return false
+      if (part.includes(',')) return true
+      if (/^v\d+$/.test(part)) return true
+      return /^[a-z]{1,4}_/i.test(part)
+    }
+
+    const stripCloudinaryTransforms = (url) => {
+      const marker = '/image/upload/'
+      const idx = url.indexOf(marker)
+      if (idx === -1) return url
+      const prefix = url.slice(0, idx + marker.length)
+      const rest = url.slice(idx + marker.length)
+      const kept = rest.split('/').filter((part) => !isCloudinaryTransformSegment(part))
+      return prefix + kept.join('/')
+    }
+
+    const buildCloudinaryUrl = (path) => {
       if (!path) return ''
-      if (path.startsWith('http')) return path
+      if (path.startsWith('http')) return stripCloudinaryTransforms(path)
       let cleanPath = path.split(' ').join('%20')
       if (!/\.(jpg|jpeg|png|webp)$/i.test(cleanPath)) {
         cleanPath += '.jpg'
       }
-      return transform
-        ? `${CLOUDINARY_BASE}/${transform}/${cleanPath}`
-        : `${CLOUDINARY_BASE}/${cleanPath}`
+      return stripCloudinaryTransforms(`${CLOUDINARY_BASE}/${cleanPath}`)
     }
 
     const aspectCache = new Map()
 
     const buildLightboxItem = (path, naturalWidth = 0, naturalHeight = 0) => {
-      const width = naturalWidth || 4
-      const height = naturalHeight || 3
-      const scale = FULL_WIDTH / width
+      const src = buildCloudinaryUrl(path)
       return {
-        src: buildCloudinaryUrl(path, FULL_TRANSFORM),
-        msrc: buildCloudinaryUrl(path, isDesktop.value ? GRID_TRANSFORM : CAROUSEL_TRANSFORM),
-        width: FULL_WIDTH,
-        height: Math.round(height * scale)
+        src,
+        msrc: src,
+        width: naturalWidth || 1,
+        height: naturalHeight || 1
       }
     }
 
     const loadImageSize = (path) => {
-      if (aspectCache.has(path)) {
+      if (aspectCache.has(path) && aspectCache.get(path).width > 1) {
         return Promise.resolve(aspectCache.get(path))
       }
 
@@ -1016,17 +1031,32 @@ export default defineComponent({
           resolve(item)
         }
         probe.onload = () => finish(probe.naturalWidth, probe.naturalHeight)
-        probe.onerror = () => finish(0, 0)
+        probe.onerror = () => finish(1, 1)
         probe.decoding = 'async'
-        probe.src = buildCloudinaryUrl(path, FULL_TRANSFORM)
+        probe.src = buildCloudinaryUrl(path)
       })
     }
 
     const getCurrentImageUrl = () => {
       if (lightbox && lightbox.pswp) {
-        return buildCloudinaryUrl(imagePaths.value[lightbox.pswp.currIndex], FULL_TRANSFORM)
+        return buildCloudinaryUrl(imagePaths.value[lightbox.pswp.currIndex])
       }
       return null
+    }
+
+    const lightboxItemFromDom = (path, index) => {
+      const displayed = document.querySelectorAll('.evidence-original-img')[index]
+      if (displayed?.naturalWidth && displayed?.naturalHeight) {
+        const item = {
+          src: displayed.currentSrc || displayed.src || buildCloudinaryUrl(path),
+          msrc: displayed.currentSrc || displayed.src,
+          width: displayed.naturalWidth,
+          height: displayed.naturalHeight
+        }
+        aspectCache.set(path, item)
+        return item
+      }
+      return aspectCache.get(path) || buildLightboxItem(path)
     }
 
     const initLightbox = () => {
@@ -1067,6 +1097,15 @@ export default defineComponent({
       })
 
       lightbox.init()
+
+      lightbox.on('loadComplete', (e) => {
+        const img = e.content?.element
+        if (!img?.naturalWidth || !e.slide) return
+        if (e.slide.width === img.naturalWidth && e.slide.height === img.naturalHeight) return
+        e.slide.width = img.naturalWidth
+        e.slide.height = img.naturalHeight
+        e.slide.updateContentSize(true)
+      })
     }
 
     const casa = computed(() => store.selectedCasa)
@@ -1514,8 +1553,6 @@ export default defineComponent({
         formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset)
         formData.append('folder', folderPath)
         formData.append('public_id', publicId)
-        formData.append('quality', 'auto:good')
-        formData.append('fetch_format', 'auto')
 
         const response = await fetch(CLOUDINARY_CONFIG.uploadUrl(CLOUDINARY_CONFIG.cloudName), {
           method: 'POST',
@@ -1796,14 +1833,16 @@ export default defineComponent({
       router.replace('/')
     }
 
-    const getThumbUrl = (path) => buildCloudinaryUrl(path, THUMB_TRANSFORM)
+    const getOriginalUrl = (path) => buildCloudinaryUrl(path)
 
     const onOpenImage = (index) => {
       if (!imagePaths.value.length) return
       if (!lightbox) initLightbox()
-      const dataSource = imagePaths.value.map((path) =>
-        aspectCache.get(path) || buildLightboxItem(path)
-      )
+      const dataSource = imagePaths.value.map((path, i) => {
+        const cached = aspectCache.get(path)
+        if (cached && cached.width > 1 && cached.height > 1) return cached
+        return lightboxItemFromDom(path, i)
+      })
       lightbox.loadAndOpen(index, dataSource)
     }
 
@@ -1999,8 +2038,7 @@ export default defineComponent({
       return found
     })
 
-    const images = computed(() => imagePaths.value.map(path => buildCloudinaryUrl(path, CAROUSEL_TRANSFORM)))
-    const gridImages = computed(() => imagePaths.value.map(path => buildCloudinaryUrl(path, GRID_TRANSFORM)))
+    const images = computed(() => imagePaths.value.map(path => buildCloudinaryUrl(path)))
 
     watch(imagePaths, (paths) => {
       if (!paths.length) return
@@ -2080,7 +2118,6 @@ export default defineComponent({
     return {
       casa,
       images,
-      gridImages,
       isDesktop,
       slide,
       bootstrapping,
@@ -2117,7 +2154,7 @@ export default defineComponent({
       openImageModal,
       removePhoto,
       saveNotaExtra,
-      getThumbUrl,
+      getOriginalUrl,
       // Edit mode
       isEditing,
       editForm,
@@ -2167,16 +2204,6 @@ export default defineComponent({
   margin: 12px 16px 0 16px;
 }
 
-.image-header__back {
-  flex-shrink: 0;
-  z-index: 3;
-  pointer-events: auto;
-}
-
-.image-header__carousel {
-  width: 100%;
-}
-
 @media (min-width: 768px) {
   .image-header {
     margin: 16px 20px 0 20px;
@@ -2192,13 +2219,37 @@ export default defineComponent({
   }
 }
 
-.rounded-header-img {
-  border-radius: 18px;
-  transition: transform 0.3s ease;
+.image-header__back {
+  flex-shrink: 0;
+  z-index: 3;
+  pointer-events: auto;
 }
 
-.rounded-header-img:hover {
-  transform: translateY(-3px);
+.image-header__carousel {
+  width: 100%;
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.image-header__carousel :deep(.q-carousel__slide) {
+  padding: 0;
+}
+
+.rounded-header-img {
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.evidence-slide {
+  padding: 0;
+  cursor: pointer;
+}
+
+.evidence-slide__img {
+  width: 100%;
+  height: 250px;
+  object-fit: cover;
+  display: block;
 }
 
 .evidence-thumbs {
@@ -2451,12 +2502,12 @@ export default defineComponent({
 
 /* ─── Nota Extra ─── */
 .nota-extra-image {
-  width: 100%;
+  width: auto;
   max-width: 300px;
   height: auto;
   border-radius: 12px;
   cursor: pointer;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .nota-extra-badge {

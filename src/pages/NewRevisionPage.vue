@@ -969,8 +969,6 @@ export default defineComponent({
       formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset)
       formData.append('folder', folderPath)
       formData.append('public_id', publicId)
-      formData.append('quality', 'auto:good')
-      formData.append('fetch_format', 'auto')
 
       const timeoutController = new AbortController()
       const timer = setTimeout(() => timeoutController.abort(), UPLOAD_TIMEOUT_MS)
@@ -1329,7 +1327,7 @@ export default defineComponent({
         const baseUrl = `https://res.cloudinary.com/${CLOUDINARY_CONFIG.cloudName}/image/upload`
         const urls = {}
         EVIDENCIA_FIELDS.forEach((field) => {
-          if (evidenciaUrls[field]) urls[field] = `${baseUrl}/f_auto,q_auto/${evidenciaUrls[field]}`
+          if (evidenciaUrls[field]) urls[field] = `${baseUrl}/${evidenciaUrls[field]}`
         })
         shareEvidenciaUrls.value = urls
 

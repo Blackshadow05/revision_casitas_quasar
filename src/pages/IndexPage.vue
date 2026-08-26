@@ -9,6 +9,32 @@
           <div class="text-grey-7">Acceso exclusivo a revisiones</div>
         </div>
 
+        <div v-if="loginError" class="text-negative text-center text-caption q-mb-md">
+          {{ loginError }}
+        </div>
+
+        <q-btn
+          type="button"
+          class="google-login-btn full-width"
+          unelevated
+          no-caps
+          :loading="loginLoading"
+          :disable="loginLoading"
+          @click="handleGoogleLogin"
+        >
+          <qn-google-mark class="q-mr-sm" />
+          <span>Continuar con Google</span>
+        </q-btn>
+        <div v-if="googleLoginPending" class="text-caption text-grey-7 text-center q-mt-sm">
+          Se abrió Google en el navegador. Cuando termines, vuelve a esta app.
+        </div>
+
+        <div class="login-divider row items-center q-my-md">
+          <div class="col login-divider__line" />
+          <div class="q-px-sm text-caption text-grey-6">o con usuario</div>
+          <div class="col login-divider__line" />
+        </div>
+
         <q-form @submit="handleLogin" class="q-gutter-md">
           <q-input
             v-model="loginData.username"
@@ -45,10 +71,6 @@
             </template>
           </q-input>
 
-          <div v-if="loginError" class="text-negative text-center text-caption q-mt-sm">
-            {{ loginError }}
-          </div>
-
           <div class="q-pt-md q-gutter-sm">
             <q-btn
               label="Ingresar"
@@ -67,10 +89,35 @@
               flat
               @click="showLoginModal = false"
             />
+            <q-btn
+              label="Usar Google Authenticator"
+              color="primary"
+              class="full-width rounded-btn"
+              size="md"
+              flat
+              icon="security"
+              @click="switchToAuthenticatorLogin"
+            />
           </div>
         </q-form>
       </q-card>
     </q-dialog>
+
+    <authenticator-login-dialog
+      v-model="showAuthenticatorModal"
+      @success="handleAuthenticatorSuccess"
+    />
+
+    <q-banner
+      v-if="showGoogleReturnHint"
+      class="bg-positive text-white q-mb-md"
+      rounded
+    >
+      Sesión iniciada. Ya puedes cerrar esta pestaña y volver a la app instalada.
+      <template v-slot:action>
+        <q-btn flat label="Ocultar" color="white" @click="showGoogleReturnHint = false" />
+      </template>
+    </q-banner>
 
     <!-- Login Button (Only visible if not logged in) -->
     <div v-if="!isLoggedIn" class="flex flex-center q-pa-xl column">
@@ -86,27 +133,43 @@
         rounded
         @click="showLoginModal = true"
       />
+      <q-btn
+        label="Tengo Authenticator"
+        icon="security"
+        color="primary"
+        outline
+        size="lg"
+        padding="12px 48px"
+        rounded
+        class="q-mt-md"
+        @click="openAuthenticatorLogin"
+      />
     </div>
 
     <!-- Main Content (Only visible if logged in) -->
     <div v-if="isLoggedIn">
       <q-scroll-observer @scroll="onScroll" />
 
+      <div class="home-top q-mb-md">
       <!-- Top Bar / Profile Section -->
-      <div class="home-profile q-mb-md">
+      <div class="home-profile">
         <div class="home-profile__user row items-center">
-          <q-avatar size="40px" color="grey-2" text-color="dark" icon="person" class="q-mr-sm" />
+          <q-avatar size="36px" color="grey-3" text-color="grey-8" icon="person" class="q-mr-sm" />
           <div>
-            <div class="text-weight-bold text-orange-9" style="font-size: 14px;">Bienvenido, {{ currentUser?.Usuario || 'Usuario' }}</div>
-            <div class="text-weight-bold text-orange-9" style="font-size: 14px; line-height: 1;">{{ currentUser?.Rol || '' }}</div>
+            <div class="home-profile__name">Bienvenido, {{ currentUser?.Usuario || 'Usuario' }}</div>
+            <div class="home-profile__role">{{ currentUser?.Rol || '' }}</div>
           </div>
         </div>
         <div class="home-profile__session row items-center">
-          <div v-if="daysRemaining > 0" class="session-dots row items-center">
-            <q-icon name="history" size="14px" color="grey-7" class="q-mr-xs" />
-            <span class="q-mr-xs text-caption text-grey-7">Sesión:</span>
+          <div v-if="usesAuthenticator && sessionRemainingLabel" class="session-dots row items-center">
+            <q-icon name="schedule" size="14px" color="grey-6" class="q-mr-xs" />
+            <span class="q-mr-xs text-caption text-grey-6">Sesión {{ sessionRemainingLabel }}</span>
+          </div>
+          <div v-else-if="daysRemaining > 0" class="session-dots row items-center">
+            <q-icon name="history" size="14px" color="grey-6" class="q-mr-xs" />
+            <span class="q-mr-xs text-caption text-grey-6">Sesión</span>
             <div class="row q-gutter-x-xs">
-              <q-icon v-for="i in daysRemaining" :key="i" name="circle" size="10px" color="green" />
+              <q-icon v-for="i in daysRemaining" :key="i" name="circle" size="8px" color="green-6" />
             </div>
           </div>
         </div>
@@ -114,6 +177,7 @@
           <q-icon name="logout" size="14px" class="q-mr-xs" />
           <span>Cerrar sesión</span>
         </q-btn>
+      </div>
       </div>
 
       <div class="home-toolbar">
@@ -241,7 +305,7 @@
           ref="infiniteScroll"
           :disable="!!store.activeFilter || loading || casas.length === 0"
         >
-          <div class="row q-col-gutter-md mobile-cards-grid">
+          <div class="row q-col-gutter-sm mobile-cards-grid">
             <div v-for="casa in casas" :key="casa.id" class="col-6 col-md-4">
               <q-card 
                 class="modern-card" 
@@ -530,13 +594,21 @@
 <script>
 import { computed, defineComponent, onMounted, onUnmounted, ref, watch, reactive, nextTick } from 'vue'
 import { notify } from '../utils/notify'
+import { scrollAppToTop } from '../utils/appScroll'
 import { useCasasStore } from '../stores/casas'
 import { useAuthStore } from '../stores/auth'
 import { date, useQuasar } from 'quasar'
 import { useRouter, useRoute } from 'vue-router'
+import AuthenticatorLoginDialog from '../components/auth/AuthenticatorLoginDialog.vue'
+import QnGoogleMark from '../components/QnGoogleMark.vue'
+import { isStandaloneDisplay, openBlankExternalTab, openInExternalBrowser } from '../utils/openExternalBrowser'
 
 export default defineComponent({
   name: 'IndexPage',
+  components: {
+    AuthenticatorLoginDialog,
+    QnGoogleMark
+  },
   setup () {
     const store = useCasasStore()
     const authStore = useAuthStore()
@@ -553,7 +625,7 @@ export default defineComponent({
     }
 
     const scrollToTop = () => {
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      scrollAppToTop({ smooth: true })
     }
 
     // Desktop table columns
@@ -596,6 +668,8 @@ export default defineComponent({
     const showFilterModal = ref(false)
     const showLoginModal = ref(false)
     const showLoginPassword = ref(false)
+    const showAuthenticatorModal = ref(false)
+    const showGoogleReturnHint = ref(false)
 
     // Opciones de filtro
     const filterOptions = [
@@ -627,7 +701,7 @@ export default defineComponent({
         showFilterModal.value = false
         filterDate.value = null
         selectedFilter.value = null
-        window.scrollTo({ top: 0 })
+        scrollAppToTop()
         notify({
           type: 'positive',
           message: `Filtro aplicado: ${store.activeFilter?.label}`,
@@ -648,7 +722,7 @@ export default defineComponent({
       })
       
       showFilterModal.value = false
-      window.scrollTo({ top: 0 })
+      scrollAppToTop()
       notify({
         type: 'positive',
         message: `Filtro aplicado: ${filterData.label}`,
@@ -661,7 +735,7 @@ export default defineComponent({
       filterDate.value = null
       await store.clearAdvancedFilter()
       showFilterModal.value = false
-      window.scrollTo({ top: 0 })
+      scrollAppToTop()
       notify({
         type: 'info',
         message: 'Filtros limpiados',
@@ -673,7 +747,7 @@ export default defineComponent({
       selectedFilter.value = null
       filterDate.value = null
       await store.clearAdvancedFilter()
-      window.scrollTo({ top: 0 })
+      scrollAppToTop()
       notify({
         type: 'info',
         message: 'Filtro limpiado',
@@ -686,10 +760,11 @@ export default defineComponent({
       filterDate.value = null
       store.setSearch('')
       await store.clearAdvancedFilter()
-      window.scrollTo({ top: 0 })
+      scrollAppToTop()
     }
     const loginLoading = computed(() => authStore.loading)
     const loginError = computed(() => authStore.error)
+    const googleLoginPending = computed(() => authStore.googleLoginPending)
     const isLoggedIn = computed(() => authStore.isLoggedIn)
     const currentUser = computed(() => authStore.user)
     const daysRemaining = computed(() => authStore.daysRemaining)
@@ -699,15 +774,49 @@ export default defineComponent({
       username: '',
       password: ''
     })
+    const usesAuthenticator = computed(() => authStore.usesAuthenticator)
+    const sessionRemainingLabel = computed(() => authStore.sessionRemainingLabel)
 
     const handleLogin = async () => {
       const result = await authStore.login(loginData.username, loginData.password)
+      if (result.useAuthenticator) {
+        switchToAuthenticatorLogin()
+        return
+      }
       if (result.success) {
         showLoginModal.value = false
         loginData.username = ''
         loginData.password = ''
         await loadData()
       }
+    }
+
+    const handleGoogleLogin = async () => {
+      const tab = openBlankExternalTab()
+      const result = await authStore.loginWithGoogle()
+      if (!result.url) {
+        if (tab && !tab.closed) tab.close()
+        return
+      }
+      openInExternalBrowser(result.url, tab)
+    }
+
+    const openAuthenticatorLogin = () => {
+      showLoginModal.value = false
+      showAuthenticatorModal.value = true
+    }
+
+    const switchToAuthenticatorLogin = () => {
+      showLoginModal.value = false
+      showAuthenticatorModal.value = true
+    }
+
+    const handleAuthenticatorSuccess = async () => {
+      showAuthenticatorModal.value = false
+      showLoginModal.value = false
+      loginData.username = ''
+      loginData.password = ''
+      await loadData()
     }
 
     const handleLogout = async () => {
@@ -787,6 +896,14 @@ export default defineComponent({
       await store.fetchCasas()
     }
 
+    watch(isLoggedIn, async (logged) => {
+      if (!logged) return
+      if (!authStore.googleLoginPending && route.query.google_return !== '1') return
+      showLoginModal.value = false
+      authStore.googleLoginPending = false
+      await loadData()
+    })
+
     const onLoad = async (_, done) => {
       if (store.loading || casas.value.length === 0) {
         done()
@@ -805,7 +922,7 @@ export default defineComponent({
     watch(() => store.search, () => {
       infiniteScroll.value?.reset()
       nextTick(() => {
-        window.scrollTo({ top: 0 })
+        scrollAppToTop()
       })
     })
 
@@ -821,6 +938,17 @@ export default defineComponent({
     })
 
     onMounted(async () => {
+      if (route.query.google_return === '1') {
+        if (isLoggedIn.value && !isStandaloneDisplay()) {
+          showGoogleReturnHint.value = true
+        }
+        router.replace({ path: '/', query: {} }).catch(() => null)
+      }
+      if (authStore.mfa.step && !isLoggedIn.value) {
+        showAuthenticatorModal.value = true
+      } else if ((authStore.error || authStore.googleLoginPending) && !isLoggedIn.value) {
+        showLoginModal.value = true
+      }
       if (isLoggedIn.value) {
         if (store.allCasas.length === 0) {
           await initData()
@@ -953,14 +1081,23 @@ export default defineComponent({
       clearFiltersFromBadge,
       showLoginModal,
       showLoginPassword,
+      showAuthenticatorModal,
+      showGoogleReturnHint,
       loginData,
       loginLoading,
       loginError,
+      googleLoginPending,
       isLoggedIn,
       currentUser,
       daysRemaining,
+      usesAuthenticator,
+      sessionRemainingLabel,
       handleLogin,
+      handleGoogleLogin,
       handleLogout,
+      openAuthenticatorLogin,
+      switchToAuthenticatorLogin,
+      handleAuthenticatorSuccess,
       firstSyncPending,
       syncError,
       syncTitle,
@@ -984,14 +1121,55 @@ export default defineComponent({
 </script>
 
 <style scoped>
+.google-login-btn {
+  background: #fff !important;
+  color: #3c4043 !important;
+  border: 1px solid #dadce0;
+  border-radius: 999px;
+  height: 44px;
+  font-weight: 600;
+}
+
+.google-login-btn:hover {
+  background: #f8f9fa !important;
+}
+
+.login-divider__line {
+  height: 1px;
+  background: #e0e0e0;
+}
+
+/* ===== Resumen de check-in / check-out ===== */
+.home-page {
+  padding: 12px !important;
+}
+
+.home-top {
+  padding: 10px 12px 12px;
+  border: 1px solid #eceff1;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.home-profile {
+  padding-bottom: 0;
+  margin-bottom: 0;
+  border-bottom: none;
+}
+
+:global(.body--dark) .home-top {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: #1e1e1e;
+}
+
 .records-badge {
-  background: #31a8ff;
-  color: white;
-  padding: 6px 20px;
+  background: #eceff1;
+  color: #607d8b;
+  padding: 4px 12px;
   border-radius: 20px;
   font-size: 11px;
   font-weight: 500;
-  box-shadow: 0 4px 10px rgba(49, 168, 255, 0.3);
+  box-shadow: none;
 }
 
 .sync-status-card {
@@ -1226,12 +1404,12 @@ export default defineComponent({
 }
 
 .logout-btn {
-  background: #ffebee;
-  color: #c62828;
+  background: transparent;
+  color: #78909c;
   padding: 4px 8px;
   border-radius: 8px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   min-width: auto;
 }
 
@@ -1256,6 +1434,19 @@ export default defineComponent({
   grid-area: user;
 }
 
+.home-profile__name {
+  color: #37474f;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.home-profile__role {
+  color: #90a4ae;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
 .home-profile__session {
   grid-area: session;
 }
@@ -1265,17 +1456,23 @@ export default defineComponent({
 }
 
 .home-title {
+  display: none;
   margin: 0;
-  color: #4CAF50;
+  color: #546e7a;
+  font-size: 0.95rem;
 }
 
 .home-toolbar {
   display: grid;
-  gap: 12px;
-  margin-bottom: 16px;
+  grid-template-areas:
+    "search"
+    "actions";
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .home-actions {
+  grid-area: actions;
   display: grid;
   grid-template-columns: 1fr;
   gap: 8px;
@@ -1283,16 +1480,69 @@ export default defineComponent({
 
 .dashboard-action-btn {
   width: 100%;
+  min-height: 36px;
+  background: #fff !important;
+  color: #546e7a !important;
+  border: 1px solid #cfd8dc;
+  box-shadow: none;
 }
 
 .home-search {
+  grid-area: search;
   gap: 8px;
+}
+
+.search-input {
+  box-shadow: none;
 }
 
 /* En pantallas grandes, ocultamos la fila inferior */
 @media (min-width: 600px) {
   .session-dots {
     max-width: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  .theme-green {
+    background: linear-gradient(145deg, #e8f6ee 0%, #ffffff 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+  .theme-red {
+    background: linear-gradient(145deg, #fbecee 0%, #ffffff 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+  .theme-purple {
+    background: linear-gradient(145deg, #f4eef8 0%, #ffffff 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+  .theme-orange {
+    background: linear-gradient(145deg, #f8f0e6 0%, #ffffff 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+  .theme-gold {
+    background: linear-gradient(145deg, #f8f3e4 0%, #ffffff 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+  .theme-blue {
+    background: linear-gradient(145deg, #eaf4fb 0%, #ffffff 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+  .theme-brown {
+    background: linear-gradient(145deg, #f3eeec 0%, #ffffff 100%);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+
+  .modern-card::before {
+    height: 22%;
+  }
+
+  .filter-btn {
+    box-shadow: none;
+  }
+
+  .home-records-row {
+    margin-bottom: 8px;
   }
 }
 
@@ -1462,49 +1712,82 @@ export default defineComponent({
   }
 }
 
-/* ===== Escritorio: layout compacto, sin estirar el diseño móvil ===== */
+/* ===== Escritorio: cabecera limpia y compacta ===== */
 @media (min-width: 1024px) {
   .home-page {
-    padding: 20px 24px 24px !important;
+    padding: 16px 24px 24px !important;
+  }
+
+  .home-top {
+    padding: 10px 14px 12px;
+    margin-bottom: 12px;
+    border: 1px solid #eceff1;
+    border-radius: 14px;
+    background: #fff;
   }
 
   .home-profile {
     grid-template-columns: auto auto 1fr auto;
     grid-template-areas: "user session . logout";
-    gap: 0 16px;
+    gap: 0 12px;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #f0f2f4;
+  }
+
+  .logout-btn {
+    background: transparent;
+    color: #78909c;
+    font-weight: 600;
   }
 
   .home-toolbar {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 12px 16px;
-    margin-bottom: 12px;
+    gap: 8px 12px;
+    margin-bottom: 10px;
   }
 
   .home-title {
+    display: block;
     margin-right: auto;
-    font-size: 1.45rem;
+    color: #455a64;
+    font-size: 1.15rem;
     line-height: 1.2;
   }
 
   .home-search {
-    flex: 1 1 280px;
-    max-width: 420px;
-    min-width: 240px;
+    flex: 1 1 240px;
+    max-width: 360px;
+    min-width: 200px;
+  }
+
+  .home-search .search-input {
+    box-shadow: none;
   }
 
   .home-actions {
     display: flex;
     flex: 0 0 auto;
-    gap: 8px;
+    gap: 6px;
   }
 
   .dashboard-action-btn {
     width: auto;
-    min-width: 168px;
-    height: 40px;
-    padding: 0 18px;
+    min-width: 0;
+    height: 34px;
+    padding: 0 12px;
+    background: #fff !important;
+    color: #546e7a !important;
+    border: 1px solid #cfd8dc;
+    box-shadow: none;
+  }
+
+  .records-badge {
+    background: #eceff1;
+    color: #607d8b;
+    box-shadow: none;
   }
 
   .home-records-row {
@@ -1517,6 +1800,16 @@ export default defineComponent({
 
   .filter-btn {
     flex-shrink: 0;
+    box-shadow: none;
+  }
+
+  :global(.body--dark) .home-top {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: #1e1e1e;
+  }
+
+  :global(.body--dark) .home-profile {
+    border-bottom-color: rgba(255, 255, 255, 0.08);
   }
 }
 </style>

@@ -8,7 +8,7 @@ const invokeManageAuthUser = async (payload) => {
     managerUsuario: authStore.user?.Usuario || null
   }
 
-  if (authStore.authMode !== 'supabase') {
+  if (authStore.authMode !== 'supabase' && authStore.authMode !== 'google') {
     body.managerPassword = payload.managerPassword
   }
 

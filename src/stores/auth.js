@@ -4,6 +4,11 @@ import { useCasasStore } from './casas'
 
 export const USER_MANAGERS = ['Esteban B', 'JosephR', 'Ramiro Q']
 
+export const LOGIN_METHODS = {
+  password: 'password',
+  google: 'google'
+}
+
 const LEGACY_SESSION_DAYS = 6
 const SUPABASE_SESSION_HOURS = 8
 const USER_STORAGE_KEY = 'user'
@@ -11,7 +16,11 @@ const EXPIRY_STORAGE_KEY = 'sessionExpiry'
 const AUTH_MODE_KEY = 'authMode'
 const SESSION_STARTED_KEY = 'sessionStartedAt'
 
-const PROFILE_COLUMNS = 'id, Usuario, Rol, email, auth_user_id, totp_enrolled'
+const PROFILE_COLUMNS = 'id, Usuario, Rol, metodo_login, email, auth_user_id, totp_enrolled'
+
+export function normalizeEmail (value) {
+  return String(value || '').trim().toLowerCase()
+}
 
 const toProfile = (row) => {
   if (!row || typeof row !== 'object') return null
@@ -20,6 +29,7 @@ const toProfile = (row) => {
     id: row.id,
     Usuario: row.Usuario,
     Rol: row.Rol,
+    metodo_login: row.metodo_login || LOGIN_METHODS.password,
     email: row.email || null,
     auth_user_id: row.auth_user_id || null,
     totp_enrolled: Boolean(row.totp_enrolled)
@@ -34,11 +44,21 @@ const readDate = (value) => {
 
 const loadStoredAuthMode = () => {
   const mode = localStorage.getItem(AUTH_MODE_KEY)
-  return mode === 'supabase' || mode === 'legacy' ? mode : null
+  return mode === 'supabase' || mode === 'legacy' || mode === 'google' ? mode : null
+}
+
+const usesSupabaseSession = (mode = loadStoredAuthMode()) => {
+  return mode === 'supabase' || mode === 'google'
+}
+
+const isGoogleProvider = (authUser) => {
+  const provider = authUser?.app_metadata?.provider
+  const identities = authUser?.identities || []
+  return provider === 'google' || identities.some((identity) => identity.provider === 'google')
 }
 
 const loadStoredUser = () => {
-  if (loadStoredAuthMode() === 'supabase') {
+  if (usesSupabaseSession()) {
     return null
   }
 
@@ -59,7 +79,7 @@ const loadStoredUser = () => {
 }
 
 const loadStoredExpiry = () => {
-  if (loadStoredAuthMode() === 'supabase') {
+  if (usesSupabaseSession()) {
     return null
   }
 
@@ -115,7 +135,8 @@ export const useAuthStore = defineStore('auth', {
     canView: (state) => Boolean(state.user),
     isSuperAdmin: (state) => state.user?.Rol === 'SuperAdmin',
     canManageUsers: (state) => USER_MANAGERS.includes(state.user?.Usuario),
-    usesAuthenticator: (state) => state.authMode === 'supabase'
+    usesAuthenticator: (state) => state.authMode === 'supabase',
+    usesGoogle: (state) => state.authMode === 'google'
   },
 
   actions: {
@@ -177,7 +198,7 @@ export const useAuthStore = defineStore('auth', {
 
     async fetchProfileForAuthUser(authUser) {
       const authUserId = authUser?.id
-      const email = authUser?.email?.trim().toLowerCase()
+      const email = normalizeEmail(authUser?.email)
 
       if (authUserId) {
         const byId = await supabase
@@ -201,6 +222,21 @@ export const useAuthStore = defineStore('auth', {
       }
 
       return { profile: null, error: null }
+    },
+
+    async fetchGoogleProfile(authUser) {
+      const email = normalizeEmail(authUser?.email)
+      if (!email) {
+        return { profile: null, error: null }
+      }
+
+      const { data: rows, error } = await supabase
+        .from('Usuarios')
+        .select(PROFILE_COLUMNS)
+        .eq('metodo_login', LOGIN_METHODS.google)
+
+      const match = (rows || []).find((row) => normalizeEmail(row.email) === email)
+      return { profile: toProfile(match), error }
     },
 
     async markTotpEnrolled(profile) {
@@ -230,10 +266,28 @@ export const useAuthStore = defineStore('auth', {
       return { success: true, userId: enrolledProfile.id }
     },
 
+    async completeGoogleSession(profile, authUser) {
+      const email = normalizeEmail(authUser?.email || profile.email)
+      let nextProfile = toProfile(profile)
+
+      if (authUser?.id && nextProfile.auth_user_id !== authUser.id) {
+        await supabase
+          .from('Usuarios')
+          .update({ auth_user_id: authUser.id, email })
+          .eq('id', nextProfile.id)
+        nextProfile = { ...nextProfile, auth_user_id: authUser.id, email }
+      }
+
+      this.persistLocalSession(nextProfile, this.buildExpiry('google'), 'google')
+      this.clearMfaState()
+      return { success: true, userId: nextProfile.id }
+    },
+
     async rejectUnauthorizedAuthSession(message) {
-      this.error = message
       this.clearMfaState()
       await supabase.auth.signOut({ scope: 'local' }).catch(() => null)
+      this.clearLocalSession()
+      this.error = message
       return { success: false, message }
     },
 
@@ -309,6 +363,20 @@ export const useAuthStore = defineStore('auth', {
         const session = sessionData?.session
 
         if (session?.user) {
+          if (isGoogleProvider(session.user)) {
+            const { profile, error } = await this.fetchGoogleProfile(session.user)
+            if (error || !profile) {
+              return this.rejectUnauthorizedAuthSession(
+                'Este correo de Google no está autorizado. Pide al administrador que lo asigne.'
+              )
+            }
+            if (profile.Rol === 'inactivo') {
+              return this.rejectUnauthorizedAuthSession('Usuario inactivo. Contacte al administrador.')
+            }
+            await this.completeGoogleSession(profile, session.user)
+            return true
+          }
+
           const { profile, error } = await this.fetchProfileForAuthUser(session.user)
           if (error || !profile || profile.Rol === 'inactivo') {
             await supabase.auth.signOut({ scope: 'local' }).catch(() => null)
@@ -332,7 +400,7 @@ export const useAuthStore = defineStore('auth', {
           }
         }
 
-        if (this.authMode === 'supabase') {
+        if (usesSupabaseSession(this.authMode)) {
           this.clearLocalSession()
           return false
         }
@@ -378,6 +446,11 @@ export const useAuthStore = defineStore('auth', {
           return { success: false, message: this.error }
         }
 
+        if (data.metodo_login === LOGIN_METHODS.google) {
+          this.error = 'Este usuario entra con Google. Usa el botón de Google.'
+          return { success: false, message: this.error, useGoogle: true }
+        }
+
         if (data.totp_enrolled) {
           this.error = 'Tu cuenta ya usa Google Authenticator. Entra con el botón Authenticator.'
           return { success: false, message: this.error, useAuthenticator: true }
@@ -389,6 +462,36 @@ export const useAuthStore = defineStore('auth', {
       } catch (err) {
         this.error = 'Ocurrió un error inesperado'
         console.error('Login error:', err)
+        return { success: false, message: this.error }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async loginWithGoogle () {
+      this.loading = true
+      this.error = null
+      try {
+        const redirectTo = `${window.location.origin}/`
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo,
+            queryParams: {
+              prompt: 'select_account'
+            }
+          }
+        })
+
+        if (error) {
+          this.error = error.message || 'No se pudo abrir Google'
+          return { success: false, message: this.error }
+        }
+
+        return { success: true, redirected: true }
+      } catch (err) {
+        this.error = 'Ocurrió un error inesperado'
+        console.error('Google login error:', err)
         return { success: false, message: this.error }
       } finally {
         this.loading = false
@@ -419,6 +522,10 @@ export const useAuthStore = defineStore('auth', {
 
         if (profile.Rol === 'inactivo') {
           return this.rejectUnauthorizedAuthSession('Usuario inactivo. Contacte al administrador.')
+        }
+
+        if (profile.metodo_login === LOGIN_METHODS.google) {
+          return this.rejectUnauthorizedAuthSession('Esta cuenta entra con Google. Usa el botón de Google.')
         }
 
         if (!profile.auth_user_id) {
@@ -505,7 +612,7 @@ export const useAuthStore = defineStore('auth', {
 
     async logout() {
       const casasStore = useCasasStore()
-      const wasSupabase = this.authMode === 'supabase'
+      const wasSupabase = usesSupabaseSession(this.authMode)
 
       this.clearLocalSession()
 

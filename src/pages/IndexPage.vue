@@ -9,6 +9,29 @@
           <div class="text-grey-7">Acceso exclusivo a revisiones</div>
         </div>
 
+        <div v-if="loginError" class="text-negative text-center text-caption q-mb-md">
+          {{ loginError }}
+        </div>
+
+        <q-btn
+          type="button"
+          class="google-login-btn full-width"
+          unelevated
+          no-caps
+          :loading="loginLoading"
+          :disable="loginLoading"
+          @click="handleGoogleLogin"
+        >
+          <qn-google-mark class="q-mr-sm" />
+          <span>Continuar con Google</span>
+        </q-btn>
+
+        <div class="login-divider row items-center q-my-md">
+          <div class="col login-divider__line" />
+          <div class="q-px-sm text-caption text-grey-6">o con usuario</div>
+          <div class="col login-divider__line" />
+        </div>
+
         <q-form @submit="handleLogin" class="q-gutter-md">
           <q-input
             v-model="loginData.username"
@@ -44,10 +67,6 @@
               />
             </template>
           </q-input>
-
-          <div v-if="loginError" class="text-negative text-center text-caption q-mt-sm">
-            {{ loginError }}
-          </div>
 
           <div class="q-pt-md q-gutter-sm">
             <q-btn
@@ -790,6 +809,7 @@ import { date, useQuasar } from 'quasar'
 import { useRouter, useRoute } from 'vue-router'
 import { supabase } from '../supabase'
 import AuthenticatorLoginDialog from '../components/auth/AuthenticatorLoginDialog.vue'
+import QnGoogleMark from '../components/QnGoogleMark.vue'
 
 // ===== Helpers para los avisos de operaciones_memo =====
 const MEMO_MONTHS = {
@@ -860,7 +880,8 @@ function memoTxt (v) {
 export default defineComponent({
   name: 'IndexPage',
   components: {
-    AuthenticatorLoginDialog
+    AuthenticatorLoginDialog,
+    QnGoogleMark
   },
   setup () {
     const store = useCasasStore()
@@ -1324,6 +1345,10 @@ export default defineComponent({
       }
     }
 
+    const handleGoogleLogin = async () => {
+      await authStore.loginWithGoogle()
+    }
+
     const openAuthenticatorLogin = () => {
       showLoginModal.value = false
       showAuthenticatorModal.value = true
@@ -1459,6 +1484,8 @@ export default defineComponent({
     onMounted(async () => {
       if (authStore.mfa.step && !isLoggedIn.value) {
         showAuthenticatorModal.value = true
+      } else if (authStore.error && !isLoggedIn.value) {
+        showLoginModal.value = true
       }
       if (isLoggedIn.value) {
         if (store.allCasas.length === 0) {
@@ -1629,6 +1656,7 @@ export default defineComponent({
       usesAuthenticator,
       sessionRemainingLabel,
       handleLogin,
+      handleGoogleLogin,
       handleLogout,
       openAuthenticatorLogin,
       switchToAuthenticatorLogin,
@@ -1656,6 +1684,24 @@ export default defineComponent({
 </script>
 
 <style scoped>
+.google-login-btn {
+  background: #fff !important;
+  color: #3c4043 !important;
+  border: 1px solid #dadce0;
+  border-radius: 999px;
+  height: 44px;
+  font-weight: 600;
+}
+
+.google-login-btn:hover {
+  background: #f8f9fa !important;
+}
+
+.login-divider__line {
+  height: 1px;
+  background: #e0e0e0;
+}
+
 /* ===== Resumen de check-in / check-out ===== */
 .home-page {
   padding: 12px !important;

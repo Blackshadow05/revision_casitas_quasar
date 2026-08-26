@@ -22,7 +22,7 @@
             </q-item-section>
             <q-item-section>
               <q-item-label class="text-weight-medium">Administrar Usuarios</q-item-label>
-              <q-item-label caption>Ver contraseñas, roles y crear usuarios</q-item-label>
+              <q-item-label caption>Roles, contraseñas y Google Authenticator</q-item-label>
             </q-item-section>
             <q-item-section side>
               <q-icon name="chevron_right" color="grey-4" size="18px" />

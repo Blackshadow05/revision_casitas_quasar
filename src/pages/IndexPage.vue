@@ -67,10 +67,24 @@
               flat
               @click="showLoginModal = false"
             />
+            <q-btn
+              label="Usar Google Authenticator"
+              color="primary"
+              class="full-width rounded-btn"
+              size="md"
+              flat
+              icon="security"
+              @click="switchToAuthenticatorLogin"
+            />
           </div>
         </q-form>
       </q-card>
     </q-dialog>
+
+    <authenticator-login-dialog
+      v-model="showAuthenticatorModal"
+      @success="handleAuthenticatorSuccess"
+    />
 
     <!-- Login Button (Only visible if not logged in) -->
     <div v-if="!isLoggedIn" class="flex flex-center q-pa-xl column">
@@ -85,6 +99,17 @@
         padding="12px 48px"
         rounded
         @click="showLoginModal = true"
+      />
+      <q-btn
+        label="Tengo Authenticator"
+        icon="security"
+        color="primary"
+        outline
+        size="lg"
+        padding="12px 48px"
+        rounded
+        class="q-mt-md"
+        @click="openAuthenticatorLogin"
       />
     </div>
 
@@ -103,7 +128,11 @@
           </div>
         </div>
         <div class="home-profile__session row items-center">
-          <div v-if="daysRemaining > 0" class="session-dots row items-center">
+          <div v-if="usesAuthenticator && sessionRemainingLabel" class="session-dots row items-center">
+            <q-icon name="schedule" size="14px" color="grey-6" class="q-mr-xs" />
+            <span class="q-mr-xs text-caption text-grey-6">Sesión {{ sessionRemainingLabel }}</span>
+          </div>
+          <div v-else-if="daysRemaining > 0" class="session-dots row items-center">
             <q-icon name="history" size="14px" color="grey-6" class="q-mr-xs" />
             <span class="q-mr-xs text-caption text-grey-6">Sesión</span>
             <div class="row q-gutter-x-xs">
@@ -760,6 +789,7 @@ import { useAuthStore } from '../stores/auth'
 import { date, useQuasar } from 'quasar'
 import { useRouter, useRoute } from 'vue-router'
 import { supabase } from '../supabase'
+import AuthenticatorLoginDialog from '../components/auth/AuthenticatorLoginDialog.vue'
 
 // ===== Helpers para los avisos de operaciones_memo =====
 const MEMO_MONTHS = {
@@ -829,6 +859,9 @@ function memoTxt (v) {
 
 export default defineComponent({
   name: 'IndexPage',
+  components: {
+    AuthenticatorLoginDialog
+  },
   setup () {
     const store = useCasasStore()
     const authStore = useAuthStore()
@@ -1169,6 +1202,7 @@ export default defineComponent({
     const showFilterModal = ref(false)
     const showLoginModal = ref(false)
     const showLoginPassword = ref(false)
+    const showAuthenticatorModal = ref(false)
 
     // Opciones de filtro
     const filterOptions = [
@@ -1272,9 +1306,15 @@ export default defineComponent({
       username: '',
       password: ''
     })
+    const usesAuthenticator = computed(() => authStore.usesAuthenticator)
+    const sessionRemainingLabel = computed(() => authStore.sessionRemainingLabel)
 
     const handleLogin = async () => {
       const result = await authStore.login(loginData.username, loginData.password)
+      if (result.useAuthenticator) {
+        switchToAuthenticatorLogin()
+        return
+      }
       if (result.success) {
         showLoginModal.value = false
         loginData.username = ''
@@ -1282,6 +1322,25 @@ export default defineComponent({
         await loadData()
         await cargarMemos()
       }
+    }
+
+    const openAuthenticatorLogin = () => {
+      showLoginModal.value = false
+      showAuthenticatorModal.value = true
+    }
+
+    const switchToAuthenticatorLogin = () => {
+      showLoginModal.value = false
+      showAuthenticatorModal.value = true
+    }
+
+    const handleAuthenticatorSuccess = async () => {
+      showAuthenticatorModal.value = false
+      showLoginModal.value = false
+      loginData.username = ''
+      loginData.password = ''
+      await loadData()
+      await cargarMemos()
     }
 
     const handleLogout = async () => {
@@ -1398,6 +1457,9 @@ export default defineComponent({
     })
 
     onMounted(async () => {
+      if (authStore.mfa.step && !isLoggedIn.value) {
+        showAuthenticatorModal.value = true
+      }
       if (isLoggedIn.value) {
         if (store.allCasas.length === 0) {
           await initData()
@@ -1557,14 +1619,20 @@ export default defineComponent({
       clearFiltersFromBadge,
       showLoginModal,
       showLoginPassword,
+      showAuthenticatorModal,
       loginData,
       loginLoading,
       loginError,
       isLoggedIn,
       currentUser,
       daysRemaining,
+      usesAuthenticator,
+      sessionRemainingLabel,
       handleLogin,
       handleLogout,
+      openAuthenticatorLogin,
+      switchToAuthenticatorLogin,
+      handleAuthenticatorSuccess,
       firstSyncPending,
       syncError,
       syncTitle,

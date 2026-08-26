@@ -50,6 +50,17 @@
               <q-tooltip>{{ isPasswordVisible(user.id) ? 'Ocultar contraseña' : 'Ver contraseña' }}</q-tooltip>
             </q-btn>
           </q-item-label>
+          <q-item-label caption class="q-mt-sm">
+            <q-chip
+              dense
+              size="sm"
+              :color="getAuthStatus(user).color"
+              text-color="white"
+            >
+              {{ getAuthStatus(user).label }}
+            </q-chip>
+            <span v-if="user.email" class="q-ml-sm">{{ user.email }}</span>
+          </q-item-label>
         </q-item-section>
         <q-item-section side>
           <div class="row q-gutter-xs">
@@ -62,6 +73,16 @@
               @click="openEditDialog(user)"
             >
               <q-tooltip>Editar contraseña y rol</q-tooltip>
+            </q-btn>
+            <q-btn
+              flat
+              round
+              dense
+              icon="security"
+              color="teal"
+              @click="openAuthDialog(user)"
+            >
+              <q-tooltip>Google Authenticator</q-tooltip>
             </q-btn>
             <q-btn
               v-if="canDeleteUsers"
@@ -130,6 +151,19 @@
           </q-td>
         </template>
 
+        <template v-slot:body-cell-auth="props">
+          <q-td :props="props">
+            <div class="column">
+              <q-chip dense size="sm" :color="getAuthStatus(props.row).color" text-color="white">
+                {{ getAuthStatus(props.row).label }}
+              </q-chip>
+              <div v-if="props.row.email" class="text-caption text-grey-7 q-mt-xs">
+                {{ props.row.email }}
+              </div>
+            </div>
+          </q-td>
+        </template>
+
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
             <div class="row q-gutter-xs justify-center">
@@ -142,6 +176,16 @@
                 @click="openEditDialog(props.row)"
               >
                 <q-tooltip>Editar contraseña y rol</q-tooltip>
+              </q-btn>
+              <q-btn
+                flat
+                round
+                dense
+                icon="security"
+                color="teal"
+                @click="openAuthDialog(props.row)"
+              >
+                <q-tooltip>Google Authenticator</q-tooltip>
               </q-btn>
               <q-btn
                 v-if="canDeleteUsers"
@@ -274,6 +318,85 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
+
+    <q-dialog v-model="showAuthDialog">
+      <q-card style="min-width: 360px">
+        <q-card-section>
+          <div class="text-h6">Google Authenticator</div>
+          <div class="text-caption">Usuario: {{ authForm.usuario }}</div>
+        </q-card-section>
+
+        <q-card-section>
+          <q-banner v-if="authForm.totp_enrolled" rounded class="bg-teal-1 text-teal-10 q-mb-md">
+            Esta cuenta ya tiene Authenticator activo. El login de usuario y contraseña queda bloqueado.
+          </q-banner>
+          <q-banner v-else-if="authForm.auth_user_id" rounded class="bg-orange-1 text-orange-10 q-mb-md">
+            La cuenta de Auth está creada. Falta que la persona escanee el QR en su primer acceso.
+          </q-banner>
+          <q-banner v-else rounded class="bg-grey-2 text-grey-8 q-mb-md">
+            Mientras no actives Authenticator, esta persona sigue usando el login actual.
+          </q-banner>
+
+          <q-input
+            v-model="authForm.email"
+            label="Correo"
+            filled
+            class="q-mb-md"
+            type="email"
+          />
+          <q-input
+            v-model="authForm.authPassword"
+            label="Contraseña de Auth"
+            filled
+            class="q-mb-md"
+            :type="showAuthPassword ? 'text' : 'password'"
+            hint="Mínimo 6 caracteres. Es independiente de la contraseña actual."
+          >
+            <template v-slot:append>
+              <q-icon
+                :name="showAuthPassword ? 'visibility' : 'visibility_off'"
+                class="cursor-pointer"
+                @click="showAuthPassword = !showAuthPassword"
+              />
+            </template>
+          </q-input>
+          <q-input
+            v-if="needsManagerPassword"
+            v-model="authForm.managerPassword"
+            label="Tu contraseña de administrador"
+            filled
+            :type="showManagerPassword ? 'text' : 'password'"
+            hint="Confirma que eres tú para crear la cuenta en Auth"
+          >
+            <template v-slot:append>
+              <q-icon
+                :name="showManagerPassword ? 'visibility' : 'visibility_off'"
+                class="cursor-pointer"
+                @click="showManagerPassword = !showManagerPassword"
+              />
+            </template>
+          </q-input>
+        </q-card-section>
+
+        <q-card-actions align="right">
+          <q-btn flat label="Cerrar" v-close-popup />
+          <q-btn
+            v-if="authForm.auth_user_id"
+            flat
+            color="orange"
+            label="Resetear Authenticator"
+            :loading="authLoading"
+            @click="resetUserAuthenticator"
+          />
+          <q-btn
+            color="teal"
+            :label="authForm.auth_user_id ? 'Actualizar Auth' : 'Activar Authenticator'"
+            :loading="authLoading"
+            @click="inviteUserAuthenticator"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -283,6 +406,7 @@ import { notify } from '../utils/notify'
 import { useRouter } from "vue-router";
 import { supabase } from "../supabase";
 import { useAuthStore } from "../stores/auth";
+import { inviteAuthenticatorUser, resetAuthenticatorFactor } from "../services/manageAuthUser";
 
 export default defineComponent({
   name: "AdminUsersPage",
@@ -295,7 +419,11 @@ export default defineComponent({
     const showAddDialog = ref(false);
     const showEditDialog = ref(false);
     const showDeleteDialog = ref(false);
+    const showAuthDialog = ref(false);
     const showPassword = ref(false);
+    const showAuthPassword = ref(false);
+    const showManagerPassword = ref(false);
+    const authLoading = ref(false);
     const visiblePasswords = ref({});
 
     const newUser = ref({
@@ -306,6 +434,14 @@ export default defineComponent({
 
     const editingUser = ref(null);
     const userToDelete = ref(null);
+    const authForm = ref({
+      usuario: "",
+      email: "",
+      authPassword: "",
+      managerPassword: "",
+      auth_user_id: null,
+      totp_enrolled: false,
+    });
 
     const rolOptions = ["SuperAdmin", "admin", "user", "inactivo"];
 
@@ -338,6 +474,12 @@ export default defineComponent({
         align: "left",
       },
       {
+        name: "auth",
+        label: "Authenticator",
+        field: "email",
+        align: "left",
+      },
+      {
         name: "actions",
         label: "Acciones",
         field: "actions",
@@ -349,6 +491,7 @@ export default defineComponent({
     const currentUser = computed(() => authStore.user);
     const canManageUsers = computed(() => authStore.canManageUsers);
     const canDeleteUsers = computed(() => currentUser.value?.Usuario === "Esteban B");
+    const needsManagerPassword = computed(() => authStore.authMode !== "supabase");
 
     const isPasswordVisible = (userId) => Boolean(visiblePasswords.value[userId]);
 
@@ -364,7 +507,7 @@ export default defineComponent({
       try {
         const { data, error } = await supabase
           .from("Usuarios")
-          .select("id, Usuario, Rol, password_hash")
+          .select("id, Usuario, Rol, password_hash, email, auth_user_id, totp_enrolled")
           .order("Usuario", { ascending: true });
 
         if (error) throw error;
@@ -512,6 +655,102 @@ export default defineComponent({
       }
     };
 
+    const getAuthStatus = (user) => {
+      if (user?.totp_enrolled) {
+        return { label: "Authenticator activo", color: "teal" };
+      }
+      if (user?.auth_user_id) {
+        return { label: "QR pendiente", color: "orange" };
+      }
+      return { label: "Login actual", color: "grey" };
+    };
+
+    const openAuthDialog = (user) => {
+      showAuthPassword.value = false;
+      showManagerPassword.value = false;
+      authForm.value = {
+        usuario: user.Usuario,
+        email: user.email || "",
+        authPassword: "",
+        managerPassword: "",
+        auth_user_id: user.auth_user_id || null,
+        totp_enrolled: Boolean(user.totp_enrolled),
+      };
+      showAuthDialog.value = true;
+    };
+
+    const inviteUserAuthenticator = async () => {
+      if (!authForm.value.email || !authForm.value.authPassword) {
+        notify({
+          color: "warning",
+          message: "El correo y la contraseña de Auth son obligatorios",
+        });
+        return;
+      }
+
+      if (needsManagerPassword.value && !authForm.value.managerPassword) {
+        notify({
+          color: "warning",
+          message: "Confirma tu contraseña de administrador",
+        });
+        return;
+      }
+
+      authLoading.value = true;
+      try {
+        const result = await inviteAuthenticatorUser({
+          usuario: authForm.value.usuario,
+          email: authForm.value.email,
+          authPassword: authForm.value.authPassword,
+          managerPassword: authForm.value.managerPassword,
+        });
+        notify({
+          color: "positive",
+          message: result.message || "Authenticator activado",
+        });
+        showAuthDialog.value = false;
+        loadUsers();
+      } catch (error) {
+        notify({
+          color: "negative",
+          message: error.message || "No se pudo activar Authenticator",
+        });
+      } finally {
+        authLoading.value = false;
+      }
+    };
+
+    const resetUserAuthenticator = async () => {
+      if (needsManagerPassword.value && !authForm.value.managerPassword) {
+        notify({
+          color: "warning",
+          message: "Confirma tu contraseña de administrador",
+        });
+        return;
+      }
+
+      authLoading.value = true;
+      try {
+        const result = await resetAuthenticatorFactor({
+          usuario: authForm.value.usuario,
+          managerPassword: authForm.value.managerPassword,
+        });
+        notify({
+          color: "positive",
+          message: result.message || "Authenticator restablecido",
+        });
+        showAuthDialog.value = false;
+        loadUsers();
+      } catch (error) {
+        notify({
+          color: "negative",
+          message: error.message || "No se pudo restablecer Authenticator",
+        });
+      } finally {
+        authLoading.value = false;
+      }
+    };
+
     const goBack = () => {
       router.back();
     };
@@ -545,23 +784,33 @@ export default defineComponent({
       showAddDialog,
       showEditDialog,
       showDeleteDialog,
+      showAuthDialog,
       showPassword,
+      showAuthPassword,
+      showManagerPassword,
+      authLoading,
       newUser,
       editingUser,
       userToDelete,
+      authForm,
       rolOptions,
       columns,
       canDeleteUsers,
+      needsManagerPassword,
       isPasswordVisible,
       togglePassword,
       addUser,
       openAddDialog,
       openEditDialog,
+      openAuthDialog,
       updateUser,
       confirmDelete,
       deleteUser,
+      inviteUserAuthenticator,
+      resetUserAuthenticator,
       goBack,
       getRolColor,
+      getAuthStatus,
     };
   },
 });

@@ -36,7 +36,6 @@ const routes = [
         meta: { requiresAuth: true }
       },
       { path: 'dashboard-horario', component: () => import('pages/DashboardHorarioPage.vue') },
-      { path: 'operacion-diaria', component: () => import('pages/OperacionDiariaPage.vue') },
       { path: 'puesto-01', component: () => import('pages/Puesto01Page.vue') },
       { path: 'snippets', component: () => import('pages/SnippetsPage.vue') },
       { path: 'seguridad', component: () => import('pages/SecurityMenuPage.vue') },

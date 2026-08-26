@@ -178,154 +178,6 @@
           <span>Cerrar sesión</span>
         </q-btn>
       </div>
-
-      <div class="home-dashboard">
-      <!-- Resumen de check-in, check-out y ocupación del día -->
-      <section
-        class="daily-operations-mobile"
-        aria-labelledby="daily-operations-title"
-      >
-        <div class="daily-operations-mobile__header row items-center no-wrap q-mb-sm">
-          <div class="daily-operations-mobile__title row items-center no-wrap">
-            <q-icon name="event_note" color="primary" size="19px" class="q-mr-xs" />
-            <span id="daily-operations-title" class="text-subtitle2 text-weight-bold">Movimientos</span>
-          </div>
-          <q-space />
-          <q-btn-toggle
-            v-model="operationDay"
-            :options="[
-              { label: 'Hoy', value: 'today' },
-              { label: 'Mañana', value: 'tomorrow' }
-            ]"
-            color="grey-2"
-            text-color="grey-8"
-            toggle-color="primary"
-            toggle-text-color="white"
-            dense
-            no-caps
-            rounded
-            unelevated
-            class="daily-operations-mobile__day-toggle"
-            aria-label="Elegir día de movimientos"
-          />
-        </div>
-
-        <div class="daily-operations-mobile__grid">
-          <article
-            v-for="grupo in operacionesHoy"
-            :key="grupo.key"
-            class="daily-operation-card"
-            :class="`daily-operation-card--${grupo.key}`"
-            role="button"
-            tabindex="0"
-            :aria-label="`Ver detalle de ${grupo.label}`"
-            @click="openOperationModal(grupo.key)"
-            @keyup.enter="openOperationModal(grupo.key)"
-          >
-            <div class="row items-center no-wrap q-mb-sm">
-              <q-icon :name="grupo.icon" :color="grupo.color" size="18px" class="q-mr-xs" />
-              <span class="daily-operation-card__label">{{ grupo.label }}</span>
-              <q-space />
-              <q-badge :color="grupo.color" rounded :label="grupo.casitas.length" />
-            </div>
-
-            <div v-if="grupo.casitas.length" class="daily-operation-card__numbers">
-              <span
-                v-for="casita in grupo.casitas.slice(0, 8)"
-                :key="casita"
-                class="daily-operation-number"
-              >
-                {{ casita }}
-              </span>
-
-              <q-slide-transition v-if="grupo.casitas.length > 8">
-                <div
-                  v-show="operationExpanded[grupo.key]"
-                  class="daily-operation-card__numbers daily-operation-card__numbers--extra"
-                >
-                  <span
-                    v-for="casita in grupo.casitas.slice(8)"
-                    :key="casita"
-                    class="daily-operation-number"
-                  >
-                    {{ casita }}
-                  </span>
-                </div>
-              </q-slide-transition>
-            </div>
-            <div v-else class="daily-operation-card__empty">—</div>
-
-            <q-btn
-              v-if="grupo.casitas.length > 8"
-              flat
-              dense
-              no-caps
-              size="sm"
-              color="grey-7"
-              class="daily-operation-card__expand full-width q-mt-xs"
-              :icon-right="operationExpanded[grupo.key] ? 'expand_less' : 'expand_more'"
-              :label="operationExpanded[grupo.key]
-                ? 'Ver menos'
-                : `+${grupo.casitas.length - 8} más`"
-              :aria-expanded="operationExpanded[grupo.key] ? 'true' : 'false'"
-              @click.stop="operationExpanded[grupo.key] = !operationExpanded[grupo.key]"
-            />
-          </article>
-
-          <article
-            class="daily-operation-card daily-operation-card--ocupacion"
-            aria-label="Ver detalle de ocupación del día"
-            role="button"
-            tabindex="0"
-            @click="openOperationModal('ocupacion')"
-            @keyup.enter="openOperationModal('ocupacion')"
-          >
-            <div class="daily-operation-card__head row items-center no-wrap">
-              <q-icon name="hotel" color="indigo-6" size="18px" class="q-mr-xs" />
-              <span class="daily-operation-card__label">Ocupación</span>
-              <q-space />
-              <span class="ocupacion-count">{{ ocupacionCount }}</span>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <!-- ==================== AVISOS DE OPERACIÓN ==================== -->
-      <div v-if="avisos.length" class="avisos-wrapper">
-        <div class="avisos-header row items-center justify-between no-wrap q-mb-xs">
-          <div class="row items-center no-wrap">
-            <q-icon name="notifications_active" size="20px" color="orange-9" class="q-mr-xs" />
-            <span class="text-weight-bold text-orange-9">{{ avisosLabel }}</span>
-          </div>
-          <q-btn
-            flat
-            dense
-            no-caps
-            size="sm"
-            color="orange-9"
-            :icon="avisosOcultos ? 'visibility' : 'visibility_off'"
-            :label="avisosOcultos ? 'Mostrar' : 'Ocultar'"
-            @click="avisosOcultos = !avisosOcultos"
-          />
-        </div>
-        <transition-group v-show="!avisosOcultos" name="aviso-fade" tag="div" class="avisos-list">
-          <q-banner
-            v-for="a in avisos"
-            :key="a.key"
-            rounded
-            dense
-            class="aviso-banner q-mb-sm"
-            :class="a.cssClass"
-          >
-            <template v-slot:avatar>
-              <q-icon :name="a.icon" />
-            </template>
-            <div class="text-weight-bold">{{ a.text }}</div>
-            <div class="text-caption aviso-restante">{{ a.restante }}</div>
-          </q-banner>
-        </transition-group>
-      </div>
-      </div>
       </div>
 
       <div class="home-toolbar">
@@ -341,16 +193,6 @@
             rounded
             class="dashboard-action-btn"
             @click="goToDashboardHorario"
-          />
-          <q-btn
-            color="teal-7"
-            icon="today"
-            label="Operación Diaria"
-            no-caps
-            unelevated
-            rounded
-            class="dashboard-action-btn"
-            @click="goToOperacionDiaria"
           />
         </div>
 
@@ -632,70 +474,6 @@
       </div>
     </div>
 
-    <q-dialog v-model="showOperationModal" backdrop-filter="blur(4px)">
-      <q-card class="operation-modal">
-        <q-card-section class="row items-center no-wrap q-pb-sm">
-          <q-icon :name="operationModalMeta.icon" :color="operationModalMeta.color" size="22px" class="q-mr-sm" />
-          <div>
-            <div class="text-subtitle1 text-weight-bold">{{ operationModalMeta.title }}</div>
-            <div class="text-caption text-grey-6">{{ operationModalDayLabel }} · {{ operationModalCount }} {{ operationModalCount === 1 ? 'casita' : 'casitas' }}</div>
-          </div>
-          <q-space />
-          <q-btn icon="close" flat round dense v-close-popup aria-label="Cerrar" />
-        </q-card-section>
-
-        <q-separator />
-
-        <q-card-section class="operation-modal__body q-pt-sm">
-          <div v-if="operationModalKey === 'ocupacion'">
-            <div v-if="!operationModalZonas.length" class="text-grey-6 text-center q-pa-md">
-              {{ operationModalMeta.empty }}
-            </div>
-            <div v-else>
-              <div
-                v-for="zona in operationModalZonas"
-                :key="zona.nombre"
-                class="operation-modal__zona"
-              >
-                <div class="row items-center justify-between q-mb-xs">
-                  <span class="text-weight-medium text-grey-8">{{ zona.nombre }}</span>
-                  <span class="text-caption text-grey-6">{{ zona.numeros.length }}</span>
-                </div>
-                <div class="daily-operation-card__numbers">
-                  <span
-                    v-for="n in zona.numeros"
-                    :key="zona.nombre + '-' + n"
-                    class="daily-operation-number"
-                  >
-                    {{ n }}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div v-else>
-            <div v-if="!operationModalItems.length" class="text-grey-6 text-center q-pa-md">
-              {{ operationModalMeta.empty }}
-            </div>
-            <div v-else>
-              <div
-                v-for="(item, idx) in operationModalItems"
-                :key="item.casita + '-' + item.hora + '-' + idx"
-                class="operation-modal__item"
-              >
-                <div class="operation-modal__casita">{{ item.casita }}</div>
-                <div class="operation-modal__meta">
-                  <span>{{ operationModalKey === 'checkin' ? 'ETA' : 'ETD' }} {{ item.hora }}</span>
-                  <span v-if="item.method !== '—'"> · {{ item.method }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </q-card-section>
-      </q-card>
-    </q-dialog>
-
     <!-- Filter Modal -->
     <q-dialog v-model="showFilterModal" persistent backdrop-filter="blur(4px)">
       <q-card style="width: 90%; max-width: 400px; border-radius: 20px;">
@@ -821,76 +599,9 @@ import { useCasasStore } from '../stores/casas'
 import { useAuthStore } from '../stores/auth'
 import { date, useQuasar } from 'quasar'
 import { useRouter, useRoute } from 'vue-router'
-import { supabase } from '../supabase'
 import AuthenticatorLoginDialog from '../components/auth/AuthenticatorLoginDialog.vue'
 import QnGoogleMark from '../components/QnGoogleMark.vue'
 import { isStandaloneDisplay, openBlankExternalTab, openInExternalBrowser } from '../utils/openExternalBrowser'
-
-// ===== Helpers para los avisos de operaciones_memo =====
-const MEMO_MONTHS = {
-  january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
-  july: 7, august: 8, september: 9, october: 10, november: 11, december: 12
-}
-
-const OCUPACION_ZONAS = [
-  { nombre: 'Zona A', min: 1, max: 6 },
-  { nombre: 'Zona B', min: 7, max: 14 },
-  { nombre: 'Zona C', min: 15, max: 22 },
-  { nombre: 'Zona D', min: 23, max: 31 },
-  { nombre: 'Zona E', min: 32, max: 40 },
-  { nombre: 'Zona F', min: 41, max: 50 }
-]
-
-// Normaliza texto: minúsculas, sin apóstrofes, espacios colapsados.
-function memoNorm (v) {
-  return String(v == null ? '' : v)
-    .toLowerCase()
-    .replace(/[''´`]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-// Extrae { month, day } de un texto como "Thursday, June 04th".
-function memoParseFecha (str) {
-  const s = String(str == null ? '' : str).toLowerCase()
-  let month = null
-  for (const name in MEMO_MONTHS) {
-    if (s.includes(name)) { month = MEMO_MONTHS[name]; break }
-  }
-  const m = s.match(/\d+/)
-  const day = m ? parseInt(m[0], 10) : null
-  return { month, day }
-}
-
-// Parsea horas tipo "11:30hrs", "2:00 PM", "14:00" -> { h, min }
-function memoParseHora (raw) {
-  const s = String(raw == null ? '' : raw).toLowerCase().trim()
-  if (!s) return null
-  const m = s.match(/(\d{1,2}):(\d{2})/)
-  if (!m) return null
-  let h = parseInt(m[1], 10)
-  const min = parseInt(m[2], 10)
-  const isPM = /p\.?\s?m/.test(s)
-  const isAM = /a\.?\s?m/.test(s)
-  if (isPM && h < 12) h += 12
-  if (isAM && h === 12) h = 0
-  if (h > 23 || min > 59) return null
-  return { h, min }
-}
-
-// Convierte una hora del registro en un Date de hoy (base = fecha/hora del dispositivo).
-function memoHoraToToday (raw, base) {
-  const t = memoParseHora(raw)
-  if (!t) return null
-  const d = new Date(base)
-  d.setHours(t.h, t.min, 0, 0)
-  return d
-}
-
-function memoTxt (v) {
-  const s = v == null ? '' : String(v).trim()
-  return s === '' ? '—' : s
-}
 
 export default defineComponent({
   name: 'IndexPage',
@@ -916,287 +627,6 @@ export default defineComponent({
     const scrollToTop = () => {
       scrollAppToTop({ smooth: true })
     }
-
-    // ===== Avisos de operación (tabla operaciones_memo) =====
-    // Muestra mensajes cuando faltan <= 40 min para la hora del registro y se
-    // mantienen anclados hasta que esa hora llega (luego desaparecen).
-    const VENTANA_AVISO_MIN = 40
-    const AVISOS_OCULTOS_KEY = 'index_avisos_ocultos'
-    const memoRows = ref([])
-    const now = ref(new Date())
-    // Estado oculto/visible persistido durante la sesión.
-    const avisosOcultos = ref(sessionStorage.getItem(AVISOS_OCULTOS_KEY) === '1')
-    watch(avisosOcultos, (val) => {
-      sessionStorage.setItem(AVISOS_OCULTOS_KEY, val ? '1' : '0')
-    })
-    let avisoNowTimer = null
-    let avisoMemoTimer = null
-
-    const cargarMemos = async () => {
-      try {
-        const { data, error } = await supabase.from('operaciones_memo').select('*')
-        if (error) throw error
-        memoRows.value = data || []
-      } catch (e) {
-        // No bloqueamos la pantalla principal si fallan los avisos.
-        console.error('Error al cargar operaciones_memo:', e)
-      }
-    }
-
-    const avisos = computed(() => {
-      const ahora = now.value
-      const hoyMonth = ahora.getMonth() + 1
-      const hoyDay = ahora.getDate()
-      const out = []
-
-      // Estructuras para agrupar por hora
-      const arrivalsMap = {}
-      const departuresMap = {}
-
-      memoRows.value.forEach((r, idx) => {
-        const f = memoParseFecha(r.fecha)
-        if (f.month !== hoyMonth || f.day !== hoyDay) return
-        const tipo = memoNorm(r.tipo)
-
-        // Valida si la hora cae dentro de la ventana [ahora, ahora + 40min].
-        const evaluarHora = (rawHora) => {
-          const target = memoHoraToToday(rawHora, ahora)
-          if (!target) return null
-          const diff = Math.round((target.getTime() - ahora.getTime()) / 60000)
-          if (diff < 0 || diff > VENTANA_AVISO_MIN) return null
-          return { diff, orden: target.getTime() }
-        }
-
-        if (tipo === 'tour') {
-          const resSalida = evaluarHora(r.hora_salida)
-          if (resSalida) {
-            out.push({
-              text: `A las ${memoTxt(r.hora_salida)} sale el tour ${memoTxt(r.detalle_tour)}`,
-              icon: 'directions_bus', cssClass: 'aviso--salida',
-              diff: resSalida.diff, key: idx + '-tour-salida', orden: resSalida.orden
-            })
-          }
-          const resLlegada = evaluarHora(r.hora_llegada)
-          if (resLlegada) {
-            out.push({
-              text: `A las ${memoTxt(r.hora_llegada)} regresa el tour ${memoTxt(r.detalle_tour)}`,
-              icon: 'keyboard_return', cssClass: 'aviso--regreso',
-              diff: resLlegada.diff, key: idx + '-tour-regreso', orden: resLlegada.orden
-            })
-          }
-        } else if (tipo.includes('arrival')) {
-          const rawHora = r.hora_llegada_real
-          const res = evaluarHora(rawHora)
-          if (res) {
-            const horaKey = memoTxt(rawHora)
-            if (!arrivalsMap[horaKey]) {
-              arrivalsMap[horaKey] = {
-                rawHora,
-                casitas: [],
-                diff: res.diff,
-                orden: res.orden,
-                keys: []
-              }
-            }
-            const casitaTxt = memoTxt(r.casita)
-            if (!arrivalsMap[horaKey].casitas.includes(casitaTxt)) {
-              arrivalsMap[horaKey].casitas.push(casitaTxt)
-            }
-            arrivalsMap[horaKey].keys.push(idx)
-          }
-        } else if (tipo.includes('departure')) {
-          const rawHora = r.hora_salida_real
-          const res = evaluarHora(rawHora)
-          if (res) {
-            const horaKey = memoTxt(rawHora)
-            if (!departuresMap[horaKey]) {
-              departuresMap[horaKey] = {
-                rawHora,
-                casitas: [],
-                diff: res.diff,
-                orden: res.orden,
-                keys: []
-              }
-            }
-            const casitaTxt = memoTxt(r.casita)
-            if (!departuresMap[horaKey].casitas.includes(casitaTxt)) {
-              departuresMap[horaKey].casitas.push(casitaTxt)
-            }
-            departuresMap[horaKey].keys.push(idx)
-          }
-        }
-      })
-
-      // Agregar las llegadas agrupadas al arreglo de salida
-      Object.values(arrivalsMap).forEach(grupo => {
-        out.push({
-          text: `A las ${memoTxt(grupo.rawHora)} llega check in ${grupo.casitas.join(', ')}`,
-          icon: 'login', cssClass: 'aviso--checkin',
-          diff: grupo.diff, key: grupo.keys.join('-') + '-arrival', orden: grupo.orden
-        })
-      })
-
-      // Agregar las salidas agrupadas al arreglo de salida
-      Object.values(departuresMap).forEach(grupo => {
-        out.push({
-          text: `A las ${memoTxt(grupo.rawHora)} sale check out ${grupo.casitas.join(', ')}`,
-          icon: 'logout', cssClass: 'aviso--checkout',
-          diff: grupo.diff, key: grupo.keys.join('-') + '-departure', orden: grupo.orden
-        })
-      })
-
-      out.sort((a, b) => a.orden - b.orden)
-      return out.map((a) => ({
-        ...a,
-        restante: a.diff <= 0 ? '¡Es ahora!' : `Faltan ${a.diff} min`
-      }))
-    })
-
-    const avisosLabel = computed(() => {
-      const n = avisos.value.length
-      return `Hay ${n} ${n === 1 ? 'notificación' : 'notificaciones'}`
-    })
-
-    const operationDay = ref('today')
-    const operationExpanded = reactive({ checkin: false, checkout: false })
-
-    const coincideTipoOperacion = (row, tipoOperacion) => {
-      const tipo = memoNorm(row.tipo)
-      if (tipoOperacion === 'in house') {
-        return tipo.includes('in house') || tipo.includes('in-house') || tipo.includes('inhouse')
-      }
-      return tipo.includes(tipoOperacion)
-    }
-
-    const casitasDeOperacionSeleccionada = (tipoOperacion) => {
-      const fechaSeleccionada = new Date(now.value)
-      if (operationDay.value === 'tomorrow') {
-        fechaSeleccionada.setDate(fechaSeleccionada.getDate() + 1)
-      }
-      const month = fechaSeleccionada.getMonth() + 1
-      const day = fechaSeleccionada.getDate()
-      const casitas = memoRows.value
-        .filter((row) => {
-          const fecha = memoParseFecha(row.fecha)
-          return fecha.month === month && fecha.day === day && coincideTipoOperacion(row, tipoOperacion)
-        })
-        .map((row) => String(row.casita == null ? '' : row.casita).match(/\d+/)?.[0] || '')
-        .filter(Boolean)
-
-      return [...new Set(casitas)].sort((a, b) => Number(a) - Number(b))
-    }
-
-    const ocupacionCount = computed(() => casitasDeOperacionSeleccionada('in house').length)
-
-    const operacionesHoy = computed(() => [
-      {
-        key: 'checkin',
-        label: 'Check-in',
-        icon: 'login',
-        color: 'green-7',
-        casitas: casitasDeOperacionSeleccionada('arrival')
-      },
-      {
-        key: 'checkout',
-        label: 'Check-out',
-        icon: 'logout',
-        color: 'red-6',
-        casitas: casitasDeOperacionSeleccionada('departure')
-      }
-    ])
-
-    const operationModalKey = ref(null)
-    const showOperationModal = computed({
-      get: () => operationModalKey.value != null,
-      set: (open) => {
-        if (!open) operationModalKey.value = null
-      }
-    })
-
-    const filasDeOperacionSeleccionada = (tipoOperacion) => {
-      const fechaSeleccionada = new Date(now.value)
-      if (operationDay.value === 'tomorrow') {
-        fechaSeleccionada.setDate(fechaSeleccionada.getDate() + 1)
-      }
-      const month = fechaSeleccionada.getMonth() + 1
-      const day = fechaSeleccionada.getDate()
-      return memoRows.value
-        .filter((row) => {
-          const fecha = memoParseFecha(row.fecha)
-          return fecha.month === month && fecha.day === day && coincideTipoOperacion(row, tipoOperacion)
-        })
-        .slice()
-        .sort((a, b) => {
-          const na = Number(String(a.casita ?? '').match(/\d+/)?.[0] || 0)
-          const nb = Number(String(b.casita ?? '').match(/\d+/)?.[0] || 0)
-          return na - nb
-        })
-    }
-
-    const openOperationModal = (key) => {
-      operationModalKey.value = key
-    }
-
-    const operationModalMeta = computed(() => {
-      const map = {
-        checkin: { title: 'Check-in', icon: 'login', color: 'green-7', empty: 'No hay check-in para este día' },
-        checkout: { title: 'Check-out', icon: 'logout', color: 'red-6', empty: 'No hay check-out para este día' },
-        ocupacion: { title: 'Ocupación', icon: 'hotel', color: 'indigo-6', empty: 'No hay ocupación para este día' }
-      }
-      return map[operationModalKey.value] || map.checkin
-    })
-
-    const operationModalDayLabel = computed(() => (
-      operationDay.value === 'tomorrow' ? 'Mañana' : 'Hoy'
-    ))
-
-    const operationModalItems = computed(() => {
-      if (operationModalKey.value === 'checkin') {
-        return filasDeOperacionSeleccionada('arrival').map((row) => ({
-          casita: memoTxt(row.casita),
-          method: memoTxt(row.method),
-          hora: memoTxt(row.eta || row.hora_llegada_real)
-        }))
-      }
-      if (operationModalKey.value === 'checkout') {
-        return filasDeOperacionSeleccionada('departure').map((row) => ({
-          casita: memoTxt(row.casita),
-          method: memoTxt(row.method),
-          hora: memoTxt(row.etd || row.hora_salida_real)
-        }))
-      }
-      return []
-    })
-
-    const operationModalZonas = computed(() => {
-      if (operationModalKey.value !== 'ocupacion') return []
-      const numeros = casitasDeOperacionSeleccionada('in house')
-        .map((n) => Number(n))
-        .filter((n) => !Number.isNaN(n))
-      const unique = [...new Set(numeros)].sort((a, b) => a - b)
-      const zonas = OCUPACION_ZONAS
-        .map((zona) => ({
-          nombre: zona.nombre,
-          numeros: unique.filter((n) => n >= zona.min && n <= zona.max)
-        }))
-        .filter((zona) => zona.numeros.length)
-      const cubiertos = new Set(zonas.flatMap((zona) => zona.numeros))
-      const otras = unique.filter((n) => !cubiertos.has(n))
-      if (otras.length) zonas.push({ nombre: 'Otras', numeros: otras })
-      return zonas
-    })
-
-    const operationModalCount = computed(() => {
-      if (operationModalKey.value === 'ocupacion') {
-        return casitasDeOperacionSeleccionada('in house').length
-      }
-      return operationModalItems.value.length
-    })
-
-    watch(operationDay, () => {
-      operationExpanded.checkin = false
-      operationExpanded.checkout = false
-    })
 
     // Desktop table columns
     const tableColumns = [
@@ -1358,7 +788,6 @@ export default defineComponent({
         loginData.username = ''
         loginData.password = ''
         await loadData()
-        await cargarMemos()
       }
     }
 
@@ -1388,14 +817,12 @@ export default defineComponent({
       loginData.username = ''
       loginData.password = ''
       await loadData()
-      await cargarMemos()
     }
 
     const handleLogout = async () => {
       await authStore.logout()
       loginData.username = ''
       loginData.password = ''
-      memoRows.value = []
       showLoginModal.value = true
     }
     
@@ -1475,7 +902,6 @@ export default defineComponent({
       showLoginModal.value = false
       authStore.googleLoginPending = false
       await loadData()
-      await cargarMemos()
     })
 
     const onLoad = async (_, done) => {
@@ -1508,8 +934,6 @@ export default defineComponent({
 
     onUnmounted(() => {
       clearInterval(checkSessionInterval)
-      if (avisoNowTimer) clearInterval(avisoNowTimer)
-      if (avisoMemoTimer) clearInterval(avisoMemoTimer)
       window.removeEventListener('resize', updateTableHeight)
     })
 
@@ -1529,21 +953,14 @@ export default defineComponent({
         if (store.allCasas.length === 0) {
           await initData()
         }
-        await cargarMemos()
       }
-      // Reloj para recalcular la ventana de 40 min.
-      avisoNowTimer = setInterval(() => { now.value = new Date() }, 30000)
-      // Refresca los datos de operaciones_memo cada 5 min.
-      avisoMemoTimer = setInterval(() => {
-        if (isLoggedIn.value) cargarMemos()
-      }, 5 * 60 * 1000)
 
       await nextTick()
       updateTableHeight()
       window.addEventListener('resize', updateTableHeight)
     })
 
-    watch([avisos, visibleRecordsCount, isLoggedIn], () => {
+    watch([visibleRecordsCount, isLoggedIn], () => {
       nextTick(updateTableHeight)
     })
 
@@ -1567,10 +984,6 @@ export default defineComponent({
 
     const goToDashboardHorario = () => {
       router.push('/dashboard-horario')
-    }
-
-    const goToOperacionDiaria = () => {
-      router.push('/operacion-diaria')
     }
 
     const goToDetails = (casa) => {
@@ -1640,21 +1053,6 @@ export default defineComponent({
     return {
       store,
       search,
-      avisos,
-      avisosLabel,
-      avisosOcultos,
-      operacionesHoy,
-      ocupacionCount,
-      operationDay,
-      operationExpanded,
-      showOperationModal,
-      operationModalKey,
-      operationModalMeta,
-      operationModalDayLabel,
-      operationModalItems,
-      operationModalZonas,
-      operationModalCount,
-      openOperationModal,
       casas,
       desktopCasas,
       canAdd,
@@ -1673,7 +1071,6 @@ export default defineComponent({
       getActionIcon,
       getCardNoteText,
       goToDashboardHorario,
-      goToOperacionDiaria,
       goToDetails,
       showFilterModal,
       applyFilters,
@@ -1755,247 +1152,14 @@ export default defineComponent({
 }
 
 .home-profile {
-  padding-bottom: 8px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid #f0f2f4;
-}
-
-.daily-operations-mobile {
-  padding: 0;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.daily-operations-mobile__title {
-  color: #546e7a;
-}
-
-.daily-operations-mobile__day-toggle {
-  flex: 0 0 auto;
-  border: 1px solid #eceff1;
-  font-size: 0.72rem;
-}
-
-.daily-operations-mobile__grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-  align-items: start;
-}
-
-.daily-operation-card {
-  min-width: 0;
-  padding: 8px;
-  border: 1px solid #eceff1;
-  border-radius: 10px;
-  background: #fafbfc;
-  cursor: pointer;
-}
-
-.daily-operation-card:focus-visible {
-  outline: 2px solid #90caf9;
-  outline-offset: 2px;
-}
-
-.daily-operation-card--checkin {
-  border-left: 3px solid #66bb6a;
-  background: #fafbfc;
-}
-
-.daily-operation-card--checkout {
-  border-left: 3px solid #ef9a9a;
-  background: #fafbfc;
-}
-
-.daily-operation-card--ocupacion {
-  grid-column: auto;
-  border-left: 3px solid #90caf9;
-  background: #fafbfc;
-}
-
-.ocupacion-count {
-  color: #546e7a;
-  font-size: 1.05rem;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.daily-operation-card__label {
-  overflow: hidden;
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: #607d8b;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.daily-operation-card__numbers {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.daily-operation-card__numbers--extra {
-  width: 100%;
-  padding-top: 4px;
-}
-
-.daily-operation-number {
-  display: inline-flex;
-  min-width: 26px;
-  min-height: 22px;
-  align-items: center;
-  justify-content: center;
-  padding: 2px 5px;
-  border: 1px solid #eceff1;
-  border-radius: 7px;
-  background: #fff;
-  color: #37474f;
-  font-size: 0.74rem;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.daily-operation-card__empty {
-  padding: 2px 0;
-  color: #b0bec5;
-  font-size: 0.95rem;
-  text-align: center;
-}
-
-.daily-operation-card__expand {
-  min-height: 26px;
-  font-size: 0.7rem;
-}
-
-.operation-modal {
-  width: min(92vw, 480px);
-  border-radius: 16px;
-}
-
-.operation-modal__body {
-  max-height: min(70vh, 520px);
-  overflow-y: auto;
-}
-
-.operation-modal__item {
-  padding: 10px 0;
-  border-bottom: 1px solid #f0f2f4;
-}
-
-.operation-modal__item:last-child {
+  padding-bottom: 0;
+  margin-bottom: 0;
   border-bottom: none;
 }
 
-.operation-modal__casita {
-  color: #37474f;
-  font-size: 1.05rem;
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.operation-modal__meta {
-  margin-top: 2px;
-  color: #78909c;
-  font-size: 0.78rem;
-}
-
-.operation-modal__zona {
-  padding: 8px 0 12px;
-}
-
-.operation-modal__zona + .operation-modal__zona {
-  border-top: 1px solid #f0f2f4;
-}
-
-:global(.body--dark) .home-top,
-:global(.body--dark) .daily-operations-mobile {
+:global(.body--dark) .home-top {
   border-color: rgba(255, 255, 255, 0.08);
   background: #1e1e1e;
-}
-
-:global(.body--dark) .daily-operations-mobile__title,
-:global(.body--dark) .daily-operation-card__label,
-:global(.body--dark) .daily-operation-number {
-  color: #eceff1;
-}
-
-:global(.body--dark) .daily-operation-card--checkin,
-:global(.body--dark) .daily-operation-card--checkout,
-:global(.body--dark) .daily-operation-card--ocupacion {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-:global(.body--dark) .ocupacion-count {
-  color: #cfd8dc;
-}
-
-:global(.body--dark) .daily-operation-number {
-  border-color: rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.07);
-}
-
-/* ===== Avisos de operación ===== */
-.avisos-wrapper {
-  margin-top: 8px;
-}
-
-.avisos-header {
-  background: transparent;
-  border-radius: 0;
-  padding: 0 0 4px;
-}
-
-.avisos-header :deep(.text-orange-9),
-.avisos-header :deep(.q-icon) {
-  color: #607d8b !important;
-}
-
-.aviso-banner {
-  border-radius: 10px;
-  box-shadow: none;
-}
-
-.aviso-restante {
-  opacity: 0.85;
-}
-
-.aviso--salida,
-.aviso--regreso,
-.aviso--checkin,
-.aviso--checkout {
-  border: 1px solid #eceff1;
-  background: #fafbfc !important;
-  color: #455a64 !important;
-}
-
-.aviso--salida,
-.aviso--regreso {
-  border-left: 3px solid #90caf9;
-}
-
-.aviso--checkin {
-  border-left: 3px solid #66bb6a;
-}
-
-.aviso--checkout {
-  border-left: 3px solid #ef9a9a;
-}
-
-.aviso-banner :deep(.q-icon) {
-  color: #78909c !important;
-}
-
-.aviso-fade-enter-active,
-.aviso-fade-leave-active {
-  transition: opacity 0.4s ease, transform 0.4s ease;
-}
-.aviso-fade-enter-from,
-.aviso-fade-leave-to {
-  opacity: 0;
-  transform: translateY(-8px);
 }
 
 .records-badge {
@@ -2310,7 +1474,7 @@ export default defineComponent({
 .home-actions {
   grid-area: actions;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 8px;
 }
 
@@ -2340,10 +1504,6 @@ export default defineComponent({
 }
 
 @media (max-width: 1023px) {
-  .daily-operation-card .q-mb-sm {
-    margin-bottom: 4px !important;
-  }
-
   .theme-green {
     background: linear-gradient(145deg, #e8f6ee 0%, #ffffff 100%);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
@@ -2581,164 +1741,6 @@ export default defineComponent({
     font-weight: 600;
   }
 
-  .home-dashboard {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-
-  .daily-operations-mobile {
-    flex: 1 1 auto;
-    max-width: none;
-    padding: 0;
-    border: none;
-    border-radius: 0;
-    background: transparent;
-    box-shadow: none;
-  }
-
-  .daily-operations-mobile__header {
-    margin-bottom: 6px !important;
-  }
-
-  .daily-operations-mobile__grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .daily-operation-card,
-  .daily-operation-card--checkin,
-  .daily-operation-card--checkout,
-  .daily-operation-card--ocupacion {
-    display: flex;
-    flex: 0 1 auto;
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px 8px;
-    min-height: 0;
-    padding: 5px 10px;
-    border: 1px solid #eceff1;
-    border-radius: 10px;
-    background: #fafbfc;
-  }
-
-  .daily-operation-card--checkin {
-    border-left: 3px solid #66bb6a;
-  }
-
-  .daily-operation-card--checkout {
-    border-left: 3px solid #ef9a9a;
-  }
-
-  .daily-operation-card--ocupacion {
-    grid-column: auto;
-    border-left: 3px solid #90caf9;
-  }
-
-  .daily-operation-card .q-mb-sm,
-  .daily-operation-card__head {
-    margin-bottom: 0 !important;
-  }
-
-  .daily-operation-card__label {
-    font-size: 0.72rem;
-    color: #607d8b;
-    font-weight: 600;
-  }
-
-  .daily-operation-card__numbers {
-    gap: 4px;
-  }
-
-  .daily-operation-number {
-    min-width: 24px;
-    min-height: 20px;
-    padding: 1px 5px;
-    border-radius: 6px;
-    background: #fff;
-    font-size: 0.72rem;
-  }
-
-  .daily-operation-card__empty {
-    padding: 0;
-    font-size: 0.85rem;
-  }
-
-  .ocupacion-count {
-    font-size: 0.95rem;
-    color: #546e7a;
-  }
-
-  .avisos-wrapper {
-    display: flex;
-    flex: 1 1 280px;
-    max-width: 380px;
-    max-height: 72px;
-    flex-direction: column;
-    padding: 0;
-    overflow: hidden;
-    border: none;
-    border-radius: 0;
-    background: transparent;
-    box-shadow: none;
-  }
-
-  .avisos-header {
-    background: transparent;
-    padding: 0 0 4px;
-  }
-
-  .avisos-list {
-    min-height: 0;
-    overflow-y: auto;
-  }
-
-  .aviso-banner,
-  .aviso--salida,
-  .aviso--regreso,
-  .aviso--checkin,
-  .aviso--checkout {
-    margin-bottom: 0;
-    padding: 6px 8px;
-    border: 1px solid #eceff1;
-    border-radius: 8px;
-    background: #fafbfc !important;
-    color: #455a64 !important;
-    box-shadow: none;
-  }
-
-  .aviso--checkin {
-    border-left: 3px solid #66bb6a;
-  }
-
-  .aviso--checkout {
-    border-left: 3px solid #ef9a9a;
-  }
-
-  .aviso--salida,
-  .aviso--regreso {
-    border-left: 3px solid #90caf9;
-  }
-
-  .aviso-banner :deep(.q-icon) {
-    color: #78909c !important;
-  }
-
-  .aviso-banner :deep(.q-banner__content) {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    column-gap: 8px;
-    font-size: 0.75rem;
-  }
-
-  .aviso-restante {
-    color: #90a4ae;
-    font-size: 0.7rem;
-  }
-
   .home-toolbar {
     display: flex;
     flex-wrap: wrap;
@@ -2808,13 +1810,6 @@ export default defineComponent({
 
   :global(.body--dark) .home-profile {
     border-bottom-color: rgba(255, 255, 255, 0.08);
-  }
-
-  :global(.body--dark) .daily-operation-card,
-  :global(.body--dark) .aviso-banner {
-    border-color: rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.04) !important;
-    color: #eceff1 !important;
   }
 }
 </style>

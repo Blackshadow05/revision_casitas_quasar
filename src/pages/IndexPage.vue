@@ -25,6 +25,9 @@
           <qn-google-mark class="q-mr-sm" />
           <span>Continuar con Google</span>
         </q-btn>
+        <div v-if="googleLoginPending" class="text-caption text-grey-7 text-center q-mt-sm">
+          Se abrió Google en el navegador. Cuando termines, vuelve a esta app.
+        </div>
 
         <div class="login-divider row items-center q-my-md">
           <div class="col login-divider__line" />
@@ -104,6 +107,17 @@
       v-model="showAuthenticatorModal"
       @success="handleAuthenticatorSuccess"
     />
+
+    <q-banner
+      v-if="showGoogleReturnHint"
+      class="bg-positive text-white q-mb-md"
+      rounded
+    >
+      Sesión iniciada. Ya puedes cerrar esta pestaña y volver a la app instalada.
+      <template v-slot:action>
+        <q-btn flat label="Ocultar" color="white" @click="showGoogleReturnHint = false" />
+      </template>
+    </q-banner>
 
     <!-- Login Button (Only visible if not logged in) -->
     <div v-if="!isLoggedIn" class="flex flex-center q-pa-xl column">
@@ -810,6 +824,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { supabase } from '../supabase'
 import AuthenticatorLoginDialog from '../components/auth/AuthenticatorLoginDialog.vue'
 import QnGoogleMark from '../components/QnGoogleMark.vue'
+import { isStandaloneDisplay, openBlankExternalTab, openInExternalBrowser } from '../utils/openExternalBrowser'
 
 // ===== Helpers para los avisos de operaciones_memo =====
 const MEMO_MONTHS = {
@@ -1224,6 +1239,7 @@ export default defineComponent({
     const showLoginModal = ref(false)
     const showLoginPassword = ref(false)
     const showAuthenticatorModal = ref(false)
+    const showGoogleReturnHint = ref(false)
 
     // Opciones de filtro
     const filterOptions = [
@@ -1318,6 +1334,7 @@ export default defineComponent({
     }
     const loginLoading = computed(() => authStore.loading)
     const loginError = computed(() => authStore.error)
+    const googleLoginPending = computed(() => authStore.googleLoginPending)
     const isLoggedIn = computed(() => authStore.isLoggedIn)
     const currentUser = computed(() => authStore.user)
     const daysRemaining = computed(() => authStore.daysRemaining)
@@ -1346,7 +1363,13 @@ export default defineComponent({
     }
 
     const handleGoogleLogin = async () => {
-      await authStore.loginWithGoogle()
+      const tab = openBlankExternalTab()
+      const result = await authStore.loginWithGoogle()
+      if (!result.url) {
+        if (tab && !tab.closed) tab.close()
+        return
+      }
+      openInExternalBrowser(result.url, tab)
     }
 
     const openAuthenticatorLogin = () => {
@@ -1446,6 +1469,15 @@ export default defineComponent({
       await store.fetchCasas()
     }
 
+    watch(isLoggedIn, async (logged) => {
+      if (!logged) return
+      if (!authStore.googleLoginPending && route.query.google_return !== '1') return
+      showLoginModal.value = false
+      authStore.googleLoginPending = false
+      await loadData()
+      await cargarMemos()
+    })
+
     const onLoad = async (_, done) => {
       if (store.loading || casas.value.length === 0) {
         done()
@@ -1482,9 +1514,15 @@ export default defineComponent({
     })
 
     onMounted(async () => {
+      if (route.query.google_return === '1') {
+        if (isLoggedIn.value && !isStandaloneDisplay()) {
+          showGoogleReturnHint.value = true
+        }
+        router.replace({ path: '/', query: {} }).catch(() => null)
+      }
       if (authStore.mfa.step && !isLoggedIn.value) {
         showAuthenticatorModal.value = true
-      } else if (authStore.error && !isLoggedIn.value) {
+      } else if ((authStore.error || authStore.googleLoginPending) && !isLoggedIn.value) {
         showLoginModal.value = true
       }
       if (isLoggedIn.value) {
@@ -1647,9 +1685,11 @@ export default defineComponent({
       showLoginModal,
       showLoginPassword,
       showAuthenticatorModal,
+      showGoogleReturnHint,
       loginData,
       loginLoading,
       loginError,
+      googleLoginPending,
       isLoggedIn,
       currentUser,
       daysRemaining,

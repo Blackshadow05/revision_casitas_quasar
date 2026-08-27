@@ -787,7 +787,7 @@ export default defineComponent({
     const googleLoginPending = computed(() => authStore.googleLoginPending)
     const isLoggedIn = computed(() => authStore.isLoggedIn)
     const canRetryAuthenticatorSetup = computed(() => {
-      return /already exists|friendly name|quedó a medias|generar un QR nuevo/i.test(String(loginError.value || ''))
+      return /already exists|friendly name|quedó a medias/i.test(String(loginError.value || ''))
     })
     const currentUser = computed(() => authStore.user)
     const daysRemaining = computed(() => authStore.daysRemaining)

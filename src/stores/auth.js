@@ -43,6 +43,26 @@ const readDate = (value) => {
   return Number.isNaN(date.getTime()) ? null : date
 }
 
+const normalizeTotpSecret = (value) => {
+  const secret = String(value || '').replace(/\s+/g, '').toUpperCase()
+  return secret || null
+}
+
+const totpSecretFromEnroll = (totp) => {
+  const fromField = normalizeTotpSecret(totp?.secret)
+  if (fromField) return fromField
+
+  const uri = String(totp?.uri || '')
+  if (!uri) return null
+
+  try {
+    return normalizeTotpSecret(new URL(uri).searchParams.get('secret'))
+  } catch {
+    const match = uri.match(/[?&]secret=([^&]+)/i)
+    return match ? normalizeTotpSecret(decodeURIComponent(match[1])) : null
+  }
+}
+
 const loadStoredAuthMode = () => {
   const mode = localStorage.getItem(AUTH_MODE_KEY)
   return mode === 'supabase' || mode === 'legacy' || mode === 'google' ? mode : null
@@ -414,7 +434,7 @@ export const useAuthStore = defineStore('auth', {
         step: 'enroll',
         factorId: data.id,
         qrCode: data.totp?.qr_code || null,
-        secret: data.totp?.secret || null
+        secret: totpSecretFromEnroll(data.totp)
       }
 
       return { success: false, needsEnroll: true }

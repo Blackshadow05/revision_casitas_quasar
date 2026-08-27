@@ -74,7 +74,7 @@
 
       <div v-else-if="step === 'enroll'">
         <p class="auth-sheet__copy">
-          Abre Google Authenticator, pulsa agregar y escanea este QR. Si no puedes escanear, escribe la clave.
+          Abre Google Authenticator, pulsa agregar y escanea este QR. Si no puedes escanear, copia la clave completa.
         </p>
 
         <img
@@ -86,7 +86,17 @@
 
         <div v-if="authStore.mfa.secret" class="auth-sheet__secret">
           <div class="auth-sheet__secret-label">Clave manual</div>
-          <div class="auth-sheet__secret-value">{{ authStore.mfa.secret }}</div>
+          <div class="auth-sheet__secret-box">
+            <p class="auth-sheet__secret-value">{{ formattedSecret }}</p>
+            <q-btn
+              unelevated
+              no-caps
+              class="auth-sheet__secret-copy"
+              :icon="secretCopied ? 'check' : 'content_copy'"
+              :label="secretCopied ? 'Clave copiada' : 'Copiar clave'"
+              @click="copySecret"
+            />
+          </div>
         </div>
 
         <div class="auth-sheet__field">
@@ -157,8 +167,44 @@
 </template>
 
 <script>
-import { computed, defineComponent, ref, watch } from 'vue'
+import { computed, defineComponent, onUnmounted, ref, watch } from 'vue'
+import { copyToClipboard } from 'quasar'
 import { useAuthStore } from '../../stores/auth'
+import { notify } from '../../utils/notify'
+
+const formatTotpSecret = (secret) => String(secret || '').replace(/\s+/g, '').replace(/(.{4})/g, '$1 ').trim()
+
+async function copyText (value) {
+  const text = String(value || '')
+  if (!text) return false
+
+  try {
+    await copyToClipboard(text)
+    return true
+  } catch {
+    const input = document.createElement('textarea')
+    input.value = text
+    input.setAttribute('readonly', '')
+    input.style.position = 'fixed'
+    input.style.top = '0'
+    input.style.left = '0'
+    input.style.opacity = '0'
+    document.body.appendChild(input)
+    input.focus()
+    input.select()
+    input.setSelectionRange(0, text.length)
+
+    let copied = false
+    try {
+      copied = document.execCommand('copy')
+    } catch {
+      copied = false
+    }
+
+    document.body.removeChild(input)
+    return copied
+  }
+}
 
 export default defineComponent({
   name: 'AuthenticatorLoginDialog',
@@ -175,6 +221,10 @@ export default defineComponent({
     const password = ref('')
     const otpCode = ref('')
     const showPassword = ref(false)
+    const secretCopied = ref(false)
+    let copiedTimer = null
+
+    const formattedSecret = computed(() => formatTotpSecret(authStore.mfa.secret))
 
     const step = computed(() => authStore.mfa.step || 'credentials')
     const headerTitle = computed(() => {
@@ -193,6 +243,29 @@ export default defineComponent({
       password.value = ''
       otpCode.value = ''
       showPassword.value = false
+      secretCopied.value = false
+      if (copiedTimer) {
+        clearTimeout(copiedTimer)
+        copiedTimer = null
+      }
+    }
+
+    const copySecret = async () => {
+      const secret = String(authStore.mfa.secret || '').replace(/\s+/g, '')
+      const copied = await copyText(secret)
+
+      if (!copied) {
+        notify({ type: 'negative', message: 'No se pudo copiar la clave. Selecciónala y cópiala a mano.' })
+        return
+      }
+
+      secretCopied.value = true
+      notify({ type: 'positive', message: 'Clave copiada completa', icon: 'content_copy', timeout: 1800 })
+      if (copiedTimer) clearTimeout(copiedTimer)
+      copiedTimer = setTimeout(() => {
+        secretCopied.value = false
+        copiedTimer = null
+      }, 2000)
     }
 
     watch(() => props.modelValue, (open) => {
@@ -238,18 +311,25 @@ export default defineComponent({
       close()
     }
 
+    onUnmounted(() => {
+      if (copiedTimer) clearTimeout(copiedTimer)
+    })
+
     return {
       authStore,
       email,
       password,
       otpCode,
       showPassword,
+      secretCopied,
+      formattedSecret,
       step,
       headerTitle,
       headerSubtitle,
       onDialogToggle,
       submitCredentials,
       submitCode,
+      copySecret,
       cancel
     }
   }

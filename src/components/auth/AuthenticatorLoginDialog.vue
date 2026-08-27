@@ -74,7 +74,7 @@
 
       <div v-else-if="step === 'enroll'">
         <p class="auth-sheet__copy">
-          Abre Google Authenticator, pulsa agregar y escanea este QR. Si no puedes escanear, copia la clave completa.
+          Abre Google Authenticator, pulsa agregar y escanea este QR. Si no puedes escanear, copia la clave completa. Si el código quedó a medias, genera uno nuevo.
         </p>
 
         <img
@@ -126,6 +126,15 @@
           :loading="authStore.loading"
           @click="submitCode"
         />
+
+        <button
+          type="button"
+          class="auth-sheet__alt"
+          :disabled="authStore.loading"
+          @click="regenerateQr"
+        >
+          Generar nuevo QR
+        </button>
       </div>
 
       <div v-else-if="step === 'challenge'">
@@ -305,6 +314,19 @@ export default defineComponent({
       }
     }
 
+    const regenerateQr = async () => {
+      otpCode.value = ''
+      secretCopied.value = false
+      const result = await authStore.regenerateTotpEnrollment()
+      if (result.needsEnroll) {
+        notify({ type: 'positive', message: 'QR nuevo listo. Escanéalo o copia la clave.', timeout: 2200 })
+        return
+      }
+      if (result.message) {
+        notify({ type: 'negative', message: result.message })
+      }
+    }
+
     const cancel = async () => {
       await authStore.cancelAuthenticatorLogin()
       resetForm()
@@ -330,6 +352,7 @@ export default defineComponent({
       submitCredentials,
       submitCode,
       copySecret,
+      regenerateQr,
       cancel
     }
   }

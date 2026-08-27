@@ -26,6 +26,15 @@
         <div v-if="loginError" class="auth-sheet__alert" role="alert">
           {{ loginError }}
         </div>
+        <button
+          v-if="canRetryAuthenticatorSetup"
+          type="button"
+          class="auth-sheet__alt auth-sheet__alt--alert"
+          :disabled="loginLoading"
+          @click="retryAuthenticatorSetup"
+        >
+          Generar un QR nuevo
+        </button>
 
         <q-btn
           type="button"
@@ -777,6 +786,9 @@ export default defineComponent({
     const loginError = computed(() => authStore.error)
     const googleLoginPending = computed(() => authStore.googleLoginPending)
     const isLoggedIn = computed(() => authStore.isLoggedIn)
+    const canRetryAuthenticatorSetup = computed(() => {
+      return /already exists|friendly name|quedó a medias|generar un QR nuevo/i.test(String(loginError.value || ''))
+    })
     const currentUser = computed(() => authStore.user)
     const daysRemaining = computed(() => authStore.daysRemaining)
     const canAdd = computed(() => authStore.canAdd)
@@ -820,6 +832,21 @@ export default defineComponent({
     const switchToAuthenticatorLogin = () => {
       showLoginModal.value = false
       showAuthenticatorModal.value = true
+    }
+
+    const retryAuthenticatorSetup = async () => {
+      const result = await authStore.retryPendingAuthenticatorSetup()
+      if (result.needsEnroll || result.needsChallenge) {
+        showLoginModal.value = false
+        showAuthenticatorModal.value = true
+        return
+      }
+      if (result.needsLogin) {
+        notify({
+          type: 'warning',
+          message: result.message || 'Vuelve a entrar para generar un QR nuevo.'
+        })
+      }
     }
 
     const handleAuthenticatorSuccess = async () => {
@@ -1138,6 +1165,7 @@ export default defineComponent({
       loginData,
       loginLoading,
       loginError,
+      canRetryAuthenticatorSetup,
       googleLoginPending,
       isLoggedIn,
       currentUser,
@@ -1149,6 +1177,7 @@ export default defineComponent({
       handleLogout,
       openAuthenticatorLogin,
       switchToAuthenticatorLogin,
+      retryAuthenticatorSetup,
       handleAuthenticatorSuccess,
       firstSyncPending,
       syncError,

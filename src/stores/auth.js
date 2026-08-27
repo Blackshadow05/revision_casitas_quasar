@@ -63,6 +63,24 @@ const totpSecretFromEnroll = (totp) => {
   }
 }
 
+const DEFAULT_TOTP_NAME = 'Google Authenticator'
+const DUPLICATE_FACTOR_RE = /friendly name|already exists|already been enrolled/i
+
+const totpFactorsFromList = (factorsData) => {
+  const fromAll = (factorsData?.all || []).filter((factor) => factor?.factor_type === 'totp')
+  if (fromAll.length) return fromAll
+  return factorsData?.totp || []
+}
+
+const isDuplicateTotpNameError = (error) => DUPLICATE_FACTOR_RE.test(String(error?.message || ''))
+
+const mapMfaEnrollError = (error) => {
+  if (isDuplicateTotpNameError(error)) {
+    return 'Este Authenticator quedó a medias. Genera un QR nuevo o pide a un administrador que lo resetee en Usuarios.'
+  }
+  return error?.message || 'No se pudo generar el código de Authenticator'
+}
+
 const loadStoredAuthMode = () => {
   const mode = localStorage.getItem(AUTH_MODE_KEY)
   return mode === 'supabase' || mode === 'legacy' || mode === 'google' ? mode : null
@@ -393,14 +411,42 @@ export const useAuthStore = defineStore('auth', {
       return this.prepareMfaChallengeOrEnroll()
     },
 
+    async listTotpFactors() {
+      const { data, error } = await supabase.auth.mfa.listFactors()
+      if (error) return { factors: [], error }
+      return { factors: totpFactorsFromList(data), error: null }
+    },
+
+    async removeUnverifiedTotpFactors(extraFactorId = null) {
+      const { factors, error } = await this.listTotpFactors()
+      if (error) return { factors: [], error }
+
+      const pendingIds = new Set(
+        factors
+          .filter((factor) => factor?.id && factor.status !== 'verified')
+          .map((factor) => factor.id)
+      )
+      if (extraFactorId) pendingIds.add(extraFactorId)
+
+      let firstError = null
+      for (const factorId of pendingIds) {
+        const result = await supabase.auth.mfa.unenroll({ factorId })
+        if (result.error && !firstError) firstError = result.error
+      }
+
+      return { factors, error: firstError }
+    },
+
     async prepareMfaChallengeOrEnroll() {
-      const { data: factorsData, error: factorsError } = await supabase.auth.mfa.listFactors()
+      this.error = null
+
+      const { factors, error: factorsError } = await this.listTotpFactors()
       if (factorsError) {
         this.error = factorsError.message || 'No se pudieron leer los factores MFA'
         return { success: false, message: this.error }
       }
 
-      const verified = (factorsData?.totp || []).find((factor) => factor.status === 'verified')
+      const verified = factors.find((factor) => factor.status === 'verified')
       if (verified) {
         this.mfa = {
           step: 'challenge',
@@ -411,22 +457,38 @@ export const useAuthStore = defineStore('auth', {
         return { success: false, needsChallenge: true }
       }
 
-      const unverified = (factorsData?.totp || []).filter((factor) => factor.status === 'unverified')
-      for (const factor of unverified) {
-        await supabase.auth.mfa.unenroll({ factorId: factor.id }).catch(() => null)
-      }
-
+      await this.removeUnverifiedTotpFactors()
       return this.startTotpEnrollment()
     },
 
-    async startTotpEnrollment() {
-      const { data, error } = await supabase.auth.mfa.enroll({
+    async enrollTotpFactor(friendlyName) {
+      return supabase.auth.mfa.enroll({
         factorType: 'totp',
-        friendlyName: 'Google Authenticator'
+        friendlyName
       })
+    },
+
+    async startTotpEnrollment() {
+      this.error = null
+
+      let { data, error } = await this.enrollTotpFactor(DEFAULT_TOTP_NAME)
+
+      if (error && isDuplicateTotpNameError(error)) {
+        await this.removeUnverifiedTotpFactors()
+        const retry = await this.enrollTotpFactor(DEFAULT_TOTP_NAME)
+        data = retry.data
+        error = retry.error
+      }
+
+      if (error && isDuplicateTotpNameError(error)) {
+        const uniqueName = `${DEFAULT_TOTP_NAME} ${Date.now()}`
+        const unique = await this.enrollTotpFactor(uniqueName)
+        data = unique.data
+        error = unique.error
+      }
 
       if (error) {
-        this.error = error.message || 'No se pudo generar el código de Authenticator'
+        this.error = mapMfaEnrollError(error)
         return { success: false, message: this.error }
       }
 
@@ -438,6 +500,32 @@ export const useAuthStore = defineStore('auth', {
       }
 
       return { success: false, needsEnroll: true }
+    },
+
+    async regenerateTotpEnrollment() {
+      this.loading = true
+      this.error = null
+      try {
+        await this.removeUnverifiedTotpFactors(this.mfa.factorId)
+        return this.startTotpEnrollment()
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async retryPendingAuthenticatorSetup() {
+      this.loading = true
+      this.error = null
+      try {
+        const { data } = await supabase.auth.getSession()
+        if (!data?.session?.user) {
+          this.error = 'Vuelve a entrar con Google o con Authenticator para generar un QR nuevo.'
+          return { success: false, message: this.error, needsLogin: true }
+        }
+        return this.prepareMfaChallengeOrEnroll()
+      } finally {
+        this.loading = false
+      }
     },
 
     async restoreSession() {

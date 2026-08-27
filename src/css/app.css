@@ -427,6 +427,11 @@ body.mobile-app-shell .q-layout.app-shell .q-page-container {
   outline: none;
 }
 
+.auth-sheet__alt--alert {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
 .auth-sheet__alt:disabled,
 .auth-sheet__close:disabled {
   opacity: 0.45;
@@ -477,9 +482,10 @@ body.mobile-app-shell .q-layout.app-shell .q-page-container {
   margin: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 13px;
-  line-height: 1.45;
-  letter-spacing: 0.08em;
-  word-break: break-all;
+  line-height: 1.55;
+  letter-spacing: 0.02em;
+  overflow-wrap: break-word;
+  word-break: normal;
   user-select: all;
   -webkit-user-select: all;
   color: #1d1d1f;

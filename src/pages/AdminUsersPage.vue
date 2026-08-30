@@ -401,12 +401,7 @@
                 <q-icon name="lock" color="primary" />
               </template>
               <template v-slot:append>
-                <q-icon
-                  :name="showPassword ? 'visibility' : 'visibility_off'"
-                  class="cursor-pointer"
-                  color="grey-7"
-                  @click="showPassword = !showPassword"
-                />
+                <password-visibility-toggle v-model="showPassword" />
               </template>
             </q-input>
             <q-select
@@ -577,12 +572,7 @@
                 <q-icon name="lock" color="primary" />
               </template>
               <template v-slot:append>
-                <q-icon
-                  :name="showPassword ? 'visibility' : 'visibility_off'"
-                  class="cursor-pointer"
-                  color="grey-7"
-                  @click="showPassword = !showPassword"
-                />
+                <password-visibility-toggle v-model="showPassword" />
               </template>
             </q-input>
           </div>
@@ -632,12 +622,7 @@
                     <q-icon name="vpn_key" color="primary" />
                   </template>
                   <template v-slot:append>
-                    <q-icon
-                      :name="showAuthPassword ? 'visibility' : 'visibility_off'"
-                      class="cursor-pointer"
-                      color="grey-7"
-                      @click="showAuthPassword = !showAuthPassword"
-                    />
+                    <password-visibility-toggle v-model="showAuthPassword" />
                   </template>
                 </q-input>
                 <p v-if="!isAuthGoogle" class="auth-field-hint">
@@ -658,12 +643,7 @@
                     <q-icon name="admin_panel_settings" color="primary" />
                   </template>
                   <template v-slot:append>
-                    <q-icon
-                      :name="showManagerPassword ? 'visibility' : 'visibility_off'"
-                      class="cursor-pointer"
-                      color="grey-7"
-                      @click="showManagerPassword = !showManagerPassword"
-                    />
+                    <password-visibility-toggle v-model="showManagerPassword" />
                   </template>
                 </q-input>
               </div>
@@ -725,10 +705,11 @@ import { useAuthStore, LOGIN_METHODS, normalizeEmail } from "../stores/auth";
 import { inviteAuthenticatorUser, resetAuthenticatorFactor } from "../services/manageAuthUser";
 import { formatLoginDateTime } from "../utils/loginLogs";
 import QnGoogleMark from "../components/QnGoogleMark.vue";
+import PasswordVisibilityToggle from "../components/auth/PasswordVisibilityToggle.vue";
 
 export default defineComponent({
   name: "AdminUsersPage",
-  components: { QnGoogleMark },
+  components: { QnGoogleMark, PasswordVisibilityToggle },
   setup() {
     const router = useRouter();
     const authStore = useAuthStore();

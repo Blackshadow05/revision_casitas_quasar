@@ -193,21 +193,51 @@ export default defineComponent({
 
       if (!mobile) {
         document.documentElement.style.removeProperty("--app-shell-height");
+        document.documentElement.style.removeProperty("--app-visual-offset");
+        document.documentElement.style.removeProperty("--app-keyboard-inset");
+        document.documentElement.classList.remove("auth-keyboard-open");
         return;
       }
 
       let height = window.innerHeight;
+      let offset = 0;
+      let keyboardInset = 0;
       const vv = window.visualViewport;
+      const editing = isEditableFocused();
       // Solo encoger al visualViewport con un input activo (teclado).
       // Si usáramos visualViewport siempre, bugs de iOS dejarían el menú a media pantalla.
-      if (vv && isEditableFocused()) {
+      if (vv && editing) {
         height = vv.height;
+        offset = vv.offsetTop || 0;
+        keyboardInset = Math.max(0, window.innerHeight - vv.height - offset);
       }
       document.documentElement.style.setProperty("--app-shell-height", `${Math.round(height)}px`);
+      document.documentElement.style.setProperty("--app-visual-offset", `${Math.round(offset)}px`);
+      document.documentElement.style.setProperty("--app-keyboard-inset", `${Math.round(keyboardInset)}px`);
+      document.documentElement.classList.toggle(
+        "auth-keyboard-open",
+        editing && Boolean(document.activeElement?.closest?.(".auth-sheet"))
+      );
 
       if (document.scrollingElement && document.scrollingElement.scrollTop !== 0) {
         document.scrollingElement.scrollTop = 0;
       }
+    };
+
+    let revealTimer = null;
+    const revealAuthInput = (target) => {
+      if (!target?.closest?.(".auth-sheet")) return;
+      if (revealTimer) window.clearTimeout(revealTimer);
+      revealTimer = window.setTimeout(() => {
+        revealTimer = null;
+        if (document.activeElement !== target) return;
+        target.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+      }, 320);
+    };
+
+    const onFocusIn = (event) => {
+      syncMobileShell();
+      revealAuthInput(event.target);
     };
     let stopHomeUpdates = null;
     const detachHomeUpdates = () => {
@@ -275,7 +305,7 @@ export default defineComponent({
       syncMobileShell();
       window.addEventListener("resize", syncMobileShell);
       window.addEventListener("orientationchange", syncMobileShell);
-      window.addEventListener("focusin", syncMobileShell);
+      window.addEventListener("focusin", onFocusIn);
       window.addEventListener("focusout", syncMobileShell);
       if (window.visualViewport) {
         window.visualViewport.addEventListener("resize", syncMobileShell);
@@ -285,17 +315,21 @@ export default defineComponent({
 
     onUnmounted(() => {
       detachHomeUpdates();
+      if (revealTimer) window.clearTimeout(revealTimer);
       window.removeEventListener("resize", syncMobileShell);
       window.removeEventListener("orientationchange", syncMobileShell);
-      window.removeEventListener("focusin", syncMobileShell);
+      window.removeEventListener("focusin", onFocusIn);
       window.removeEventListener("focusout", syncMobileShell);
       if (window.visualViewport) {
         window.visualViewport.removeEventListener("resize", syncMobileShell);
         window.visualViewport.removeEventListener("scroll", syncMobileShell);
       }
       document.documentElement.classList.remove("mobile-app-shell");
+      document.documentElement.classList.remove("auth-keyboard-open");
       document.body.classList.remove("mobile-app-shell");
       document.documentElement.style.removeProperty("--app-shell-height");
+      document.documentElement.style.removeProperty("--app-visual-offset");
+      document.documentElement.style.removeProperty("--app-keyboard-inset");
     });
 
     const goToHome = () => {

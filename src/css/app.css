@@ -184,12 +184,49 @@ body.mobile-app-shell .q-layout.app-shell .q-page-container {
   background: rgba(15, 17, 21, 0.5);
 }
 
+/*
+ * En móvil el teclado de iOS se superpone al layout viewport: el diálogo
+ * de Quasar sigue centrado en toda la pantalla y el campo queda tapado.
+ * Lo anclamos arriba y lo limitamos al visual viewport (--app-shell-height),
+ * que se encoge cuando hay un input activo, para que el teclado empuje el modal.
+ */
+html.mobile-app-shell .q-dialog.auth-dialog .q-dialog__inner {
+  justify-content: center;
+  align-items: flex-start !important;
+  box-sizing: border-box;
+  top: var(--app-visual-offset, 0px) !important;
+  right: 0;
+  bottom: var(--app-keyboard-inset, 0px) !important;
+  left: 0;
+  height: auto;
+  max-height: none;
+  padding-top: max(12px, env(safe-area-inset-top, 0px));
+  padding-bottom: 12px;
+}
+
+html.mobile-app-shell .q-dialog.auth-dialog .q-card.auth-sheet {
+  max-height: calc(var(--app-shell-height, 100dvh) - 24px - env(safe-area-inset-top, 0px));
+}
+
+html.mobile-app-shell.auth-keyboard-open .auth-sheet__mark {
+  display: none;
+}
+
+html.mobile-app-shell.auth-keyboard-open .auth-sheet__header {
+  margin-bottom: 12px;
+}
+
+html.mobile-app-shell.auth-keyboard-open .q-card.auth-sheet {
+  padding-top: 18px;
+}
+
 .q-card.auth-sheet {
   position: relative;
   width: min(392px, calc(100vw - 28px));
   max-height: min(90vh, 760px);
   padding: 28px 24px 20px;
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
   border-radius: 28px;
   background:
     radial-gradient(1200px 240px at 50% -80px, rgba(0, 113, 227, 0.08), transparent 58%),
@@ -360,6 +397,8 @@ body.mobile-app-shell .q-layout.app-shell .q-page-container {
   border-radius: 14px;
   background: #f5f5f7;
   border: 1px solid transparent;
+  scroll-margin-top: 12px;
+  scroll-margin-bottom: 20px;
   transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
@@ -382,8 +421,150 @@ body.mobile-app-shell .q-layout.app-shell .q-page-container {
   color: #0071e3;
 }
 
-.auth-sheet__eye {
+/* Botón para mostrar/ocultar contraseña: área táctil amplia para móvil
+   y sin robar el foco del campo (el teclado no se cierra al tocarlo). */
+.password-eye-toggle {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
   color: #86868b;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.password-eye-toggle:hover,
+.password-eye-toggle:focus-visible {
+  background: rgba(0, 113, 227, 0.09);
+  color: #0071e3;
+  outline: none;
+}
+
+.password-eye-toggle:active {
+  background: rgba(0, 113, 227, 0.16);
+}
+
+.auth-sheet__field .password-eye-toggle {
+  width: 40px;
+  height: 40px;
+  margin-right: -2px;
+}
+
+/* Cronómetro TOTP: anillo que se vacía con los 30s de vida del código. */
+.totp-timer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 0 0 16px;
+  color: #0071e3;
+}
+
+.totp-timer__ring {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  flex: none;
+}
+
+.totp-timer__ring--renewed {
+  animation: totp-renew 0.7s ease-out;
+}
+
+@keyframes totp-renew {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+.totp-timer__ring svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.totp-timer__track {
+  fill: none;
+  stroke: #e8e8ed;
+  stroke-width: 5;
+}
+
+.totp-timer__progress {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 5;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.2s linear, stroke 0.3s ease;
+}
+
+.totp-timer__seconds {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 19px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #1d1d1f;
+}
+
+.totp-timer__label {
+  margin: 0;
+  max-width: 150px;
+  font-size: 12.5px;
+  line-height: 1.35;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #6e6e73;
+  text-align: left;
+}
+
+.totp-timer--warn {
+  color: #ff9500;
+}
+
+.totp-timer--danger {
+  color: #ff3b30;
+}
+
+.totp-timer--danger .totp-timer__seconds {
+  color: #ff3b30;
+  animation: totp-blink 1s ease-in-out infinite;
+}
+
+.totp-timer--danger .totp-timer__label {
+  color: #ff3b30;
+}
+
+@keyframes totp-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .totp-timer__ring--renewed,
+  .totp-timer--danger .totp-timer__seconds {
+    animation: none;
+  }
+}
+
+/* Código de verificación: siempre visible, con dígitos grandes y
+   espaciados para poder leerlo mientras se escribe en el móvil. */
+.auth-sheet__code .q-field__native {
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  color: #1d1d1f;
+  caret-color: #0071e3;
 }
 
 .auth-sheet__submit {

@@ -95,6 +95,8 @@
           </div>
         </div>
 
+        <totp-countdown />
+
         <div class="auth-sheet__field">
           <q-input
             v-model="otpCode"
@@ -137,8 +139,10 @@
 
       <div v-else-if="step === 'challenge'">
         <p class="auth-sheet__copy">
-          Abre Google Authenticator e ingresa el código de 6 dígitos. Vence en 30 segundos.
+          Abre Google Authenticator e ingresa el código de 6 dígitos.
         </p>
+
+        <totp-countdown />
 
         <div class="auth-sheet__field">
           <q-input
@@ -181,6 +185,7 @@ import { copyToClipboard } from 'quasar'
 import { useAuthStore } from '../../stores/auth'
 import { notify } from '../../utils/notify'
 import PasswordVisibilityToggle from './PasswordVisibilityToggle.vue'
+import TotpCountdown from './TotpCountdown.vue'
 
 const formatTotpSecret = (secret) => String(secret || '').replace(/\s+/g, '').replace(/(.{4})/g, '$1 ').trim()
 
@@ -218,7 +223,7 @@ async function copyText (value) {
 
 export default defineComponent({
   name: 'AuthenticatorLoginDialog',
-  components: { PasswordVisibilityToggle },
+  components: { PasswordVisibilityToggle, TotpCountdown },
   props: {
     modelValue: {
       type: Boolean,

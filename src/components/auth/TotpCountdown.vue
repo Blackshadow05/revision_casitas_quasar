@@ -36,9 +36,9 @@
 <script>
 import { computed, defineComponent, onMounted, onUnmounted, ref } from 'vue'
 
-// Ventana de 60s alineada al reloj (epoch), como en Google Authenticator.
-const TOTP_PERIOD_MS = 60000
-const WARN_SECONDS = 30
+// Ventana de 30s alineada al reloj (epoch), como en Google Authenticator.
+const TOTP_PERIOD_MS = 30000
+const WARN_SECONDS = 25
 const DANGER_SECONDS = 20
 const CIRCUMFERENCE = 2 * Math.PI * 31
 

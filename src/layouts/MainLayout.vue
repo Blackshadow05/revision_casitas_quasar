@@ -194,12 +194,14 @@ export default defineComponent({
       if (!mobile) {
         document.documentElement.style.removeProperty("--app-shell-height");
         document.documentElement.style.removeProperty("--app-visual-offset");
+        document.documentElement.style.removeProperty("--app-keyboard-inset");
         document.documentElement.classList.remove("auth-keyboard-open");
         return;
       }
 
       let height = window.innerHeight;
       let offset = 0;
+      let keyboardInset = 0;
       const vv = window.visualViewport;
       const editing = isEditableFocused();
       // Solo encoger al visualViewport con un input activo (teclado).
@@ -207,9 +209,11 @@ export default defineComponent({
       if (vv && editing) {
         height = vv.height;
         offset = vv.offsetTop || 0;
+        keyboardInset = Math.max(0, window.innerHeight - vv.height - offset);
       }
       document.documentElement.style.setProperty("--app-shell-height", `${Math.round(height)}px`);
       document.documentElement.style.setProperty("--app-visual-offset", `${Math.round(offset)}px`);
+      document.documentElement.style.setProperty("--app-keyboard-inset", `${Math.round(keyboardInset)}px`);
       document.documentElement.classList.toggle(
         "auth-keyboard-open",
         editing && Boolean(document.activeElement?.closest?.(".auth-sheet"))
@@ -325,6 +329,7 @@ export default defineComponent({
       document.body.classList.remove("mobile-app-shell");
       document.documentElement.style.removeProperty("--app-shell-height");
       document.documentElement.style.removeProperty("--app-visual-offset");
+      document.documentElement.style.removeProperty("--app-keyboard-inset");
     });
 
     const goToHome = () => {

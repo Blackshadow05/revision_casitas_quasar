@@ -382,8 +382,51 @@ body.mobile-app-shell .q-layout.app-shell .q-page-container {
   color: #0071e3;
 }
 
-.auth-sheet__eye {
+/* Botón para mostrar/ocultar contraseña: área táctil amplia para móvil
+   y sin robar el foco del campo (el teclado no se cierra al tocarlo). */
+.password-eye-toggle {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
   color: #86868b;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+
+.password-eye-toggle:hover,
+.password-eye-toggle:focus-visible {
+  background: rgba(0, 113, 227, 0.09);
+  color: #0071e3;
+  outline: none;
+}
+
+.password-eye-toggle:active {
+  background: rgba(0, 113, 227, 0.16);
+}
+
+.auth-sheet__field .password-eye-toggle {
+  width: 40px;
+  height: 40px;
+  margin-right: -2px;
+}
+
+/* Código de verificación: siempre visible, con dígitos grandes y
+   espaciados para poder leerlo mientras se escribe en el móvil. */
+.auth-sheet__code .q-field__native {
+  font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  color: #1d1d1f;
+  caret-color: #0071e3;
 }
 
 .auth-sheet__submit {

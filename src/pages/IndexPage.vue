@@ -80,11 +80,7 @@
               :rules="[val => !!val || 'La contraseña es requerida']"
             >
               <template v-slot:append>
-                <q-icon
-                  :name="showLoginPassword ? 'visibility' : 'visibility_off'"
-                  class="cursor-pointer auth-sheet__eye"
-                  @click="showLoginPassword = !showLoginPassword"
-                />
+                <password-visibility-toggle v-model="showLoginPassword" />
               </template>
             </q-input>
           </div>
@@ -615,6 +611,7 @@ import { useAuthStore } from '../stores/auth'
 import { date, useQuasar } from 'quasar'
 import { useRouter, useRoute } from 'vue-router'
 import AuthenticatorLoginDialog from '../components/auth/AuthenticatorLoginDialog.vue'
+import PasswordVisibilityToggle from '../components/auth/PasswordVisibilityToggle.vue'
 import QnGoogleMark from '../components/QnGoogleMark.vue'
 import { isStandaloneDisplay, openBlankExternalTab, openInExternalBrowser } from '../utils/openExternalBrowser'
 
@@ -622,6 +619,7 @@ export default defineComponent({
   name: 'IndexPage',
   components: {
     AuthenticatorLoginDialog,
+    PasswordVisibilityToggle,
     QnGoogleMark
   },
   setup () {

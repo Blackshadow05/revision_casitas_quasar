@@ -49,11 +49,7 @@
             :rules="[val => !!val || 'La contraseña es requerida']"
           >
             <template v-slot:append>
-              <q-icon
-                :name="showPassword ? 'visibility' : 'visibility_off'"
-                class="cursor-pointer auth-sheet__eye"
-                @click="showPassword = !showPassword"
-              />
+              <password-visibility-toggle v-model="showPassword" />
             </template>
           </q-input>
         </div>
@@ -103,6 +99,8 @@
           <q-input
             v-model="otpCode"
             label="Código de 6 dígitos"
+            type="text"
+            class="auth-sheet__code"
             borderless
             dense
             hide-bottom-space
@@ -146,6 +144,8 @@
           <q-input
             v-model="otpCode"
             label="Código de Authenticator"
+            type="text"
+            class="auth-sheet__code"
             borderless
             dense
             hide-bottom-space
@@ -180,6 +180,7 @@ import { computed, defineComponent, onUnmounted, ref, watch } from 'vue'
 import { copyToClipboard } from 'quasar'
 import { useAuthStore } from '../../stores/auth'
 import { notify } from '../../utils/notify'
+import PasswordVisibilityToggle from './PasswordVisibilityToggle.vue'
 
 const formatTotpSecret = (secret) => String(secret || '').replace(/\s+/g, '').replace(/(.{4})/g, '$1 ').trim()
 
@@ -217,6 +218,7 @@ async function copyText (value) {
 
 export default defineComponent({
   name: 'AuthenticatorLoginDialog',
+  components: { PasswordVisibilityToggle },
   props: {
     modelValue: {
       type: Boolean,

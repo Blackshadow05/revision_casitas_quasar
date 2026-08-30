@@ -184,12 +184,49 @@ body.mobile-app-shell .q-layout.app-shell .q-page-container {
   background: rgba(15, 17, 21, 0.5);
 }
 
+/*
+ * En móvil el teclado de iOS se superpone al layout viewport: el diálogo
+ * de Quasar sigue centrado en toda la pantalla y el campo queda tapado.
+ * Lo anclamos arriba y lo limitamos al visual viewport (--app-shell-height),
+ * que se encoge cuando hay un input activo, para que el teclado empuje el modal.
+ */
+html.mobile-app-shell .q-dialog.auth-dialog .q-dialog__inner {
+  justify-content: flex-start !important;
+  align-items: center;
+  box-sizing: border-box;
+  top: var(--app-visual-offset, 0px);
+  right: 0;
+  bottom: auto;
+  left: 0;
+  height: var(--app-shell-height, 100dvh);
+  max-height: var(--app-shell-height, 100dvh);
+  padding-top: max(12px, env(safe-area-inset-top, 0px));
+  padding-bottom: 12px;
+}
+
+html.mobile-app-shell .q-dialog.auth-dialog .q-card.auth-sheet {
+  max-height: calc(var(--app-shell-height, 100dvh) - 24px - env(safe-area-inset-top, 0px));
+}
+
+html.mobile-app-shell.auth-keyboard-open .auth-sheet__mark {
+  display: none;
+}
+
+html.mobile-app-shell.auth-keyboard-open .auth-sheet__header {
+  margin-bottom: 12px;
+}
+
+html.mobile-app-shell.auth-keyboard-open .q-card.auth-sheet {
+  padding-top: 18px;
+}
+
 .q-card.auth-sheet {
   position: relative;
   width: min(392px, calc(100vw - 28px));
   max-height: min(90vh, 760px);
   padding: 28px 24px 20px;
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
   border-radius: 28px;
   background:
     radial-gradient(1200px 240px at 50% -80px, rgba(0, 113, 227, 0.08), transparent 58%),
@@ -360,6 +397,8 @@ body.mobile-app-shell .q-layout.app-shell .q-page-container {
   border-radius: 14px;
   background: #f5f5f7;
   border: 1px solid transparent;
+  scroll-margin-top: 12px;
+  scroll-margin-bottom: 20px;
   transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
 

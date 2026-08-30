@@ -1,7 +1,7 @@
-import { boot } from 'quasar/wrappers'
+import { defineBoot } from '#q-app/wrappers'
 import { ensureHomeDatabase } from '../services/homeSync'
 
-export default boot(async () => {
+export default defineBoot(async () => {
   try {
     await ensureHomeDatabase()
   } catch (error) {

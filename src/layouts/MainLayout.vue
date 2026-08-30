@@ -57,7 +57,7 @@
 
         <q-btn v-if="authStore.isLoggedIn" flat round dense icon="menu" class="menu-button text-white" aria-label="Abrir navegación">
           <q-menu anchor="bottom right" self="top right" class="menu-dropdown">
-            <q-list style="min-width: 220px">
+            <q-list role="menu" style="min-width: 220px">
               <q-item clickable v-close-popup @click="goToHome">
                 <q-item-section avatar>
                   <q-icon name="home" color="primary" />
@@ -377,7 +377,7 @@ export default defineComponent({
   padding-right: env(safe-area-inset-right, 0px);
 }
 
-.custom-footer :deep(.q-tab--active .q-tab__icon) {
+.custom-footer .q-tab--active .q-tab__icon {
   background: #e1f5fe;
   padding: 8px 16px;
   border-radius: 15px;

@@ -1,6 +1,6 @@
-import { configure } from 'quasar/wrappers'
+import { defineConfig } from '#q-app/wrappers'
 
-export default configure((ctx) => {
+export default defineConfig((ctx) => {
   return {
     boot: [
       'auth',
@@ -16,8 +16,8 @@ export default configure((ctx) => {
     ],
     build: {
       target: {
-        browser: [ 'es2019', 'edge88', 'firefox78', 'chrome87', 'safari13.1' ],
-        node: 'node20'
+        browser: 'baseline-widely-available',
+        node: 'node22'
       },
       vueRouterMode: 'history',
       vitePlugins: [
@@ -43,52 +43,10 @@ export default configure((ctx) => {
       swFilename: 'sw.js',
       manifestFilename: 'manifest.json',
       useCredentialsForManifestTag: false,
-      manifest: {
-        name: 'Revisión Casitas',
-        short_name: 'Casitas',
-        description: 'Aplicación de revisión de casitas',
-        display: 'standalone',
-        orientation: 'portrait',
-        background_color: '#ffffff',
-        theme_color: '#1976D2',
-        icons: [
-          {
-            src: 'icons/icon-128x128.png',
-            sizes: '128x128',
-            type: 'image/png'
-          },
-          {
-            src: 'icons/icon-192x192.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: 'icons/icon-256x256.png',
-            sizes: '256x256',
-            type: 'image/png'
-          },
-          {
-            src: 'icons/icon-384x384.png',
-            sizes: '384x384',
-            type: 'image/png'
-          },
-          {
-            src: 'icons/icon-512x512.png',
-            sizes: '512x512',
-            type: 'image/png'
-          },
-          {
-            src: 'icons/icon-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'maskable'
-          }
-        ]
-      },
-      workboxOptions: {
-        skipWaiting: true,
-        clientsClaim: true,
-        runtimeCaching: [
+      extendGenerateSWOptions (config) {
+        config.skipWaiting = true
+        config.clientsClaim = true
+        config.runtimeCaching = [
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/auth\/.*/i,
             handler: 'NetworkOnly'

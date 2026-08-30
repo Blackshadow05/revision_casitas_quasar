@@ -1,4 +1,4 @@
-import { store } from 'quasar/wrappers'
+import { defineStore } from '#q-app/wrappers'
 import { createPinia } from 'pinia'
 
 /*
@@ -6,7 +6,7 @@ import { createPinia } from 'pinia'
  * update the types in the store/index.d.ts file.
  */
 
-export default store((/* { ssrContext } */) => {
+export default defineStore((/* { ssrContext } */) => {
   const pinia = createPinia()
 
   // You can add Pinia plugins here

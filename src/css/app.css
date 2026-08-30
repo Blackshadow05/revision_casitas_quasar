@@ -457,7 +457,7 @@ html.mobile-app-shell.auth-keyboard-open .q-card.auth-sheet {
   margin-right: -2px;
 }
 
-/* Cronómetro TOTP: anillo que se vacía con los 30s de vida del código. */
+/* Cronómetro TOTP: anillo que se vacía con los 60s de vida del código. */
 .totp-timer {
   display: flex;
   align-items: center;

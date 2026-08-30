@@ -2,12 +2,14 @@
   <div
     class="totp-timer"
     :class="{
-      'totp-timer--warn': seconds <= 10 && seconds > 5,
-      'totp-timer--danger': seconds <= 5
+      'totp-timer--warn': seconds <= WARN_SECONDS && seconds > DANGER_SECONDS,
+      'totp-timer--danger': seconds <= DANGER_SECONDS
     }"
     role="timer"
     aria-live="polite"
-    :aria-label="`El código vence en ${seconds} segundos`"
+    :aria-label="seconds <= DANGER_SECONDS
+      ? `El código vence en ${seconds} segundos. Mejor espera el nuevo.`
+      : `El código vence en ${seconds} segundos`"
   >
     <div class="totp-timer__ring" :class="{ 'totp-timer__ring--renewed': justRenewed }">
       <svg viewBox="0 0 72 72" aria-hidden="true">
@@ -24,7 +26,9 @@
       <span class="totp-timer__seconds">{{ seconds }}</span>
     </div>
     <p class="totp-timer__label">
-      {{ seconds > 5 ? 'segundos para usar este código' : 'por vencer, espera el nuevo' }}
+      {{ seconds > DANGER_SECONDS
+        ? 'segundos para usar este código'
+        : 'por vencer, mejor espera el nuevo' }}
     </p>
   </div>
 </template>
@@ -32,11 +36,12 @@
 <script>
 import { computed, defineComponent, onMounted, onUnmounted, ref } from 'vue'
 
-const TOTP_PERIOD_MS = 30000
+// Ventana de 60s alineada al reloj (epoch), como en Google Authenticator.
+const TOTP_PERIOD_MS = 60000
+const WARN_SECONDS = 30
+const DANGER_SECONDS = 20
 const CIRCUMFERENCE = 2 * Math.PI * 31
 
-// Los códigos TOTP rotan en ventanas fijas de 30s alineadas al reloj (epoch),
-// por eso el tiempo restante se calcula sin necesidad de conocer el código.
 export default defineComponent({
   name: 'TotpCountdown',
   setup () {
@@ -76,6 +81,8 @@ export default defineComponent({
 
     return {
       CIRCUMFERENCE,
+      WARN_SECONDS,
+      DANGER_SECONDS,
       seconds,
       dashOffset,
       justRenewed

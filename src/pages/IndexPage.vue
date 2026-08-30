@@ -57,7 +57,7 @@
           <span>o con usuario</span>
         </div>
 
-        <q-form class="auth-sheet__form" @submit="handleLogin">
+        <q-form ref="loginForm" class="auth-sheet__form" @submit="handleLogin">
           <div class="auth-sheet__field">
             <q-input
               v-model="loginData.username"
@@ -85,14 +85,20 @@
             </q-input>
           </div>
 
-          <q-btn
-            label="Ingresar"
-            type="submit"
-            class="auth-sheet__submit"
-            unelevated
-            no-caps
-            :loading="loginLoading"
-          />
+          <div
+            class="auth-sheet__submit-hit"
+            @mousedown.prevent
+            @touchstart.prevent="onLoginSubmitPointerDown"
+          >
+            <q-btn
+              label="Ingresar"
+              type="submit"
+              class="auth-sheet__submit"
+              unelevated
+              no-caps
+              :loading="loginLoading"
+            />
+          </div>
         </q-form>
 
         <button
@@ -614,6 +620,7 @@ import AuthenticatorLoginDialog from '../components/auth/AuthenticatorLoginDialo
 import PasswordVisibilityToggle from '../components/auth/PasswordVisibilityToggle.vue'
 import QnGoogleMark from '../components/QnGoogleMark.vue'
 import { isStandaloneDisplay, openBlankExternalTab, openInExternalBrowser } from '../utils/openExternalBrowser'
+import { onceAtATime, createKeyboardSafeFormSubmit } from '../utils/keyboardSafeSubmit'
 
 export default defineComponent({
   name: 'IndexPage',
@@ -686,6 +693,7 @@ export default defineComponent({
     const showFilterModal = ref(false)
     const showLoginModal = ref(false)
     const showLoginPassword = ref(false)
+    const loginForm = ref(null)
     const showAuthenticatorModal = ref(false)
     const showGoogleReturnHint = ref(false)
 
@@ -798,7 +806,8 @@ export default defineComponent({
     const usesHourlySession = computed(() => authStore.usesHourlySession)
     const sessionRemainingLabel = computed(() => authStore.sessionRemainingLabel)
 
-    const handleLogin = async () => {
+    const handleLogin = onceAtATime(async () => {
+      if (loginLoading.value) return
       const result = await authStore.login(loginData.username, loginData.password)
       if (result.useAuthenticator) {
         switchToAuthenticatorLogin()
@@ -810,7 +819,9 @@ export default defineComponent({
         loginData.password = ''
         await loadData()
       }
-    }
+    })
+
+    const onLoginSubmitPointerDown = createKeyboardSafeFormSubmit(loginForm)
 
     const handleGoogleLogin = async () => {
       const tab = openBlankExternalTab()
@@ -1158,6 +1169,7 @@ export default defineComponent({
       clearFiltersFromBadge,
       showLoginModal,
       showLoginPassword,
+      loginForm,
       showAuthenticatorModal,
       showGoogleReturnHint,
       loginData,
@@ -1171,6 +1183,7 @@ export default defineComponent({
       usesHourlySession,
       sessionRemainingLabel,
       handleLogin,
+      onLoginSubmitPointerDown,
       handleGoogleLogin,
       handleLogout,
       openAuthenticatorLogin,

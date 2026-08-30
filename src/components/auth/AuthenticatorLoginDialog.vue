@@ -23,7 +23,7 @@
         <p class="auth-sheet__lede">{{ headerSubtitle }}</p>
       </header>
 
-      <q-form v-if="step === 'credentials'" class="auth-sheet__form" @submit="submitCredentials">
+      <q-form v-if="step === 'credentials'" ref="credentialsForm" class="auth-sheet__form" @submit="submitCredentials">
         <div class="auth-sheet__field">
           <q-input
             v-model="email"
@@ -58,17 +58,23 @@
           {{ authStore.error }}
         </div>
 
-        <q-btn
-          label="Continuar"
-          type="submit"
-          class="auth-sheet__submit"
-          unelevated
-          no-caps
-          :loading="authStore.loading"
-        />
+        <div
+          class="auth-sheet__submit-hit"
+          @mousedown.prevent
+          @touchstart.prevent="onCredentialsPointerDown"
+        >
+          <q-btn
+            label="Continuar"
+            type="submit"
+            class="auth-sheet__submit"
+            unelevated
+            no-caps
+            :loading="authStore.loading"
+          />
+        </div>
       </q-form>
 
-      <div v-else-if="step === 'enroll'">
+      <q-form v-else-if="step === 'enroll'" ref="otpForm" class="auth-sheet__form" @submit="submitCode">
         <p class="auth-sheet__copy">
           Abre Google Authenticator, pulsa agregar y escanea este QR. Si no puedes escanear, copia la clave completa. Si el código quedó a medias, genera uno nuevo.
         </p>
@@ -110,7 +116,6 @@
             inputmode="numeric"
             autocomplete="one-time-code"
             :rules="[val => /^\d{6}$/.test(String(val || '')) || 'Ingresa el código de 6 dígitos']"
-            @keyup.enter="submitCode"
           />
         </div>
 
@@ -118,14 +123,20 @@
           {{ authStore.error }}
         </div>
 
-        <q-btn
-          label="Activar Authenticator"
-          class="auth-sheet__submit"
-          unelevated
-          no-caps
-          :loading="authStore.loading"
-          @click="submitCode"
-        />
+        <div
+          class="auth-sheet__submit-hit"
+          @mousedown.prevent
+          @touchstart.prevent="onOtpPointerDown"
+        >
+          <q-btn
+            label="Activar Authenticator"
+            type="submit"
+            class="auth-sheet__submit"
+            unelevated
+            no-caps
+            :loading="authStore.loading"
+          />
+        </div>
 
         <button
           type="button"
@@ -135,9 +146,9 @@
         >
           Generar nuevo QR
         </button>
-      </div>
+      </q-form>
 
-      <div v-else-if="step === 'challenge'">
+      <q-form v-else-if="step === 'challenge'" ref="otpForm" class="auth-sheet__form" @submit="submitCode">
         <p class="auth-sheet__copy">
           Abre Google Authenticator e ingresa el código de 6 dígitos.
         </p>
@@ -158,7 +169,6 @@
             autocomplete="one-time-code"
             autofocus
             :rules="[val => /^\d{6}$/.test(String(val || '')) || 'Ingresa el código de 6 dígitos']"
-            @keyup.enter="submitCode"
           />
         </div>
 
@@ -166,15 +176,21 @@
           {{ authStore.error }}
         </div>
 
-        <q-btn
-          label="Verificar"
-          class="auth-sheet__submit"
-          unelevated
-          no-caps
-          :loading="authStore.loading"
-          @click="submitCode"
-        />
-      </div>
+        <div
+          class="auth-sheet__submit-hit"
+          @mousedown.prevent
+          @touchstart.prevent="onOtpPointerDown"
+        >
+          <q-btn
+            label="Verificar"
+            type="submit"
+            class="auth-sheet__submit"
+            unelevated
+            no-caps
+            :loading="authStore.loading"
+          />
+        </div>
+      </q-form>
     </q-card>
   </q-dialog>
 </template>
@@ -184,6 +200,7 @@ import { computed, defineComponent, onUnmounted, ref, watch } from 'vue'
 import { copyToClipboard } from 'quasar'
 import { useAuthStore } from '../../stores/auth'
 import { notify } from '../../utils/notify'
+import { onceAtATime, createKeyboardSafeFormSubmit } from '../../utils/keyboardSafeSubmit'
 import PasswordVisibilityToggle from './PasswordVisibilityToggle.vue'
 import TotpCountdown from './TotpCountdown.vue'
 
@@ -238,6 +255,8 @@ export default defineComponent({
     const otpCode = ref('')
     const showPassword = ref(false)
     const secretCopied = ref(false)
+    const credentialsForm = ref(null)
+    const otpForm = ref(null)
     let copiedTimer = null
 
     const formattedSecret = computed(() => formatTotpSecret(authStore.mfa.secret))
@@ -303,23 +322,28 @@ export default defineComponent({
       emit('update:modelValue', open)
     }
 
-    const submitCredentials = async () => {
+    const submitCredentials = onceAtATime(async () => {
+      if (authStore.loading) return
       const result = await authStore.loginWithAuthenticator(email.value, password.value)
       if (result.success) {
         resetForm()
         close()
         emit('success')
       }
-    }
+    })
 
-    const submitCode = async () => {
+    const submitCode = onceAtATime(async () => {
+      if (authStore.loading) return
       const result = await authStore.verifyAuthenticatorCode(otpCode.value)
       if (result.success) {
         resetForm()
         close()
         emit('success')
       }
-    }
+    })
+
+    const onCredentialsPointerDown = createKeyboardSafeFormSubmit(credentialsForm)
+    const onOtpPointerDown = createKeyboardSafeFormSubmit(otpForm)
 
     const regenerateQr = async () => {
       otpCode.value = ''
@@ -351,6 +375,8 @@ export default defineComponent({
       otpCode,
       showPassword,
       secretCopied,
+      credentialsForm,
+      otpForm,
       formattedSecret,
       step,
       headerTitle,
@@ -358,6 +384,8 @@ export default defineComponent({
       onDialogToggle,
       submitCredentials,
       submitCode,
+      onCredentialsPointerDown,
+      onOtpPointerDown,
       copySecret,
       regenerateQr,
       cancel

@@ -1,400 +1,466 @@
 <template>
-  <q-page class="q-pa-md bg-grey-2">
-    <!-- Header -->
-    <div class="row items-center q-mb-lg">
-      <q-btn flat round icon="arrow_back" color="grey-8" @click="goBack" />
-      <div class="text-h5 q-ml-sm">Nueva Revisión</div>
-    </div>
-
-    <q-form @submit="onSubmit" class="q-gutter-y-lg">
-      <!-- Casita and Quien Revisa -->
-      <div class="row q-col-gutter-md">
-        <div class="col-12 col-sm-6" data-field="casita">
-          <div class="section-label q-mb-xs" :class="{ 'error-label': validationErrors.casita }">Casita <span class="required-asterisk">*</span></div>
-          <q-select
-            v-model="form.casita"
-            :options="casitaOptions"
-            outlined
-            dense
-            bg-color="white"
-            class="input-styled"
-            :class="{ 'error-field': validationErrors.casita }"
-            behavior="menu"
-          />
+  <q-page class="nr-page" @focusin="onPageFocusIn" @focusout="onPageFocusOut">
+    <header class="nr-header">
+      <div class="nr-header__row">
+        <button type="button" class="nr-back" aria-label="Volver al inicio" @click="goBack">
+          <q-icon name="arrow_back_ios_new" size="18px" />
+        </button>
+        <div class="nr-header__text">
+          <h1 class="nr-title">Nueva revisión</h1>
+          <p class="nr-subtitle">{{ headerSubtitle }}</p>
         </div>
-        <div class="col-12 col-sm-6" data-field="quien_revisa">
-          <div class="section-label q-mb-xs" :class="{ 'error-label': validationErrors.quien_revisa }">Quién Revisa <span class="required-asterisk">*</span></div>
-          <q-input
-            v-if="revisorFijo"
-            v-model="form.quien_revisa"
-            readonly
-            outlined
-            dense
-            bg-color="grey-3"
-            class="input-styled"
-          />
-          <q-select
-            v-else
-            v-model="form.quien_revisa"
-            :options="users"
-            emit-value
-            map-options
-            placeholder="Seleccionar revisor"
-            outlined
-            dense
-            bg-color="white"
-            class="input-styled"
-            :class="{ 'error-field': validationErrors.quien_revisa }"
-            behavior="menu"
-          />
-        </div>
-      </div>
-
-      <!-- Caja fuerte -->
-      <div class="section-container" :class="{ 'error-section': validationErrors.caja_fuerte }" data-field="caja_fuerte">
-        <div class="section-label q-mb-md" :class="{ 'error-label': validationErrors.caja_fuerte }">
-          <q-icon name="lock" color="grey-7" class="q-mr-sm" size="20px" />
-          Caja fuerte <span class="required-asterisk">*</span>
-        </div>
-        <div class="button-grid">
-          <q-btn
-            v-for="option in cajaFuerteOptions"
-            :key="option"
-            :label="option"
-            unelevated
-            class="custom-select-btn option-btn"
-            :class="{ selected: form.caja_fuerte === option }"
-            @click="form.caja_fuerte = option"
-          />
-        </div>
-      </div>
-
-      <!-- Movimiento de casita -->
-      <div v-if="form.caja_fuerte === 'Room Move'" class="section-container">
-        <div class="section-label q-mb-xs">Movimiento de casita</div>
-        <q-input
-          v-model="form.room_move"
-          placeholder="Ingrese detalle del movimiento"
-          outlined
-          dense
-          bg-color="white"
-          class="input-styled"
-        />
-      </div>
-
-      <!-- Puertas y ventanas -->
-      <div class="section-container" :class="{ 'error-section': validationErrors.puertas_ventanas }" data-field="puertas_ventanas">
-        <div class="section-label q-mb-xs" :class="{ 'error-label': validationErrors.puertas_ventanas }">
-          <q-icon name="meeting_room" color="grey-7" class="q-mr-sm" size="20px" />
-          Puertas y Ventanas <span class="required-asterisk">*</span>
-        </div>
-        <q-input
-          v-model="form.puertas_ventanas"
-          placeholder="Ingrese puertas y ventanas"
-          outlined
-          dense
-          bg-color="white"
-          class="input-styled"
-          :class="{ 'error-field': validationErrors.puertas_ventanas }"
-        />
-      </div>
-
-      <!-- Fecha Ingreso de la casita (solo Check in / Back to Back) -->
-      <div
-        v-if="needsFechaIngreso"
-        class="section-container"
-        :class="{ 'error-section': validationErrors.fecha_ingreso_casita }"
-        data-field="fecha_ingreso_casita"
-      >
-        <div class="section-label q-mb-md" :class="{ 'error-label': validationErrors.fecha_ingreso_casita }">
-          <q-icon name="event" color="grey-7" class="q-mr-sm" size="20px" />
-          Fecha Ingreso de la casita <span class="required-asterisk">*</span>
-        </div>
-        <div class="button-grid">
-          <q-btn
-            v-for="option in fechaIngresoCasitaOptions"
-            :key="option"
-            :label="option"
-            unelevated
-            class="custom-select-btn option-btn"
-            :class="{ selected: form.fecha_ingreso_casita_selection === option }"
-            @click="selectFechaIngresoCasita(option)"
-          />
-        </div>
-        <div v-if="form.fecha_ingreso_casita" class="q-mt-sm text-caption text-grey-7">
-          <q-icon name="calendar_today" size="14px" class="q-mr-xs" />
-          Fecha guardada: {{ form.fecha_ingreso_casita }}
-        </div>
-      </div>
-
-      <!-- Inventario -->
-      <template v-for="(block, index) in formSections" :key="index">
-        <div v-if="block.type === 'header'" class="category-header" :class="block.headerClass">
-          <q-icon :name="block.icon" />
-          <span class="category-title">{{ block.title }}</span>
-        </div>
-
         <div
-          v-else-if="block.type === 'section'"
-          class="section-container"
-          :class="{ 'error-section': validationErrors[block.field] }"
-          :data-field="block.field"
+          class="nr-progress-pill"
+          :class="{ 'nr-progress-pill--done': missingFieldsCount === 0 }"
+          aria-live="polite"
         >
-          <div class="section-label q-mb-md" :class="{ 'error-label': validationErrors[block.field] }">
-            <q-icon v-if="block.icon" :name="block.icon" color="grey-7" class="q-mr-sm" size="20px" />
-            {{ block.label }} <span class="required-asterisk">*</span>
-          </div>
-          <div class="button-grid">
-            <q-btn
-              v-for="option in block.options"
-              :key="option"
-              :label="option"
-              unelevated
-              class="custom-select-btn option-btn"
-              :style="block.minWidth ? { minWidth: block.minWidth } : null"
-              :class="{ selected: form[block.field] === option }"
-              @click="form[block.field] = option"
-            />
-          </div>
+          <q-icon :name="missingFieldsCount === 0 ? 'check_circle' : 'checklist'" size="15px" />
+          <span>{{ completedCount }}/{{ requiredCount }}</span>
         </div>
+      </div>
+      <div
+        class="nr-progress"
+        role="progressbar"
+        aria-label="Progreso del formulario"
+        :aria-valuenow="progressPct"
+        aria-valuemin="0"
+        aria-valuemax="100"
+      >
+        <div class="nr-progress__bar" :style="{ width: progressPct + '%' }" />
+      </div>
+    </header>
 
-        <div v-else class="row q-col-gutter-md" :class="{ 'error-row': rowHasError(block) }">
-          <div
-            v-for="item in block.fields"
-            :key="item.field"
-            class="col-12 col-sm-6"
-            :data-field="item.field"
-          >
-            <div class="section-label q-mb-md" :class="{ 'error-label': validationErrors[item.field] }">
-              {{ item.label }} <span class="required-asterisk">*</span>
+    <q-form class="nr-form" @submit="onSubmit">
+      <div class="nr-form__body">
+        <!-- Datos generales -->
+        <section class="nr-group">
+          <h2 class="nr-group__title">
+            <span class="nr-group__icon nr-group__icon--general"><q-icon name="home_work" size="16px" /></span>
+            Datos generales
+          </h2>
+
+          <div class="nr-panel">
+            <div class="nr-field" :class="fieldState('casita')" data-field="casita">
+              <div class="nr-field__label">
+                Casita <span class="nr-req" aria-hidden="true">*</span>
+                <q-icon v-if="isFieldFilled('casita')" name="check_circle" size="16px" class="nr-field__check" />
+              </div>
+              <q-select
+                v-model="form.casita"
+                :options="casitaOptions"
+                borderless
+                dense
+                class="nr-input"
+                :behavior="selectBehavior"
+                dropdown-icon="expand_more"
+                aria-label="Casita"
+              >
+                <template #prepend>
+                  <q-icon name="home" size="20px" />
+                </template>
+                <template #selected>
+                  <span v-if="form.casita">Casita {{ form.casita }}</span>
+                  <span v-else class="nr-placeholder">Selecciona 1 a 50</span>
+                </template>
+              </q-select>
+              <p v-if="validationErrors.casita" class="nr-hint nr-hint--error">Selecciona la casita</p>
             </div>
-            <div class="button-grid">
-              <q-btn
-                v-for="option in item.options"
-                :key="option"
-                :label="option"
-                unelevated
-                class="custom-select-btn option-btn"
-                :style="item.minWidth ? { minWidth: item.minWidth } : null"
-                :class="{ selected: form[item.field] === option }"
-                @click="form[item.field] = option"
+
+            <div class="nr-field" :class="fieldState('quien_revisa')" data-field="quien_revisa">
+              <div class="nr-field__label">
+                Quién revisa <span class="nr-req" aria-hidden="true">*</span>
+                <q-icon v-if="isFieldFilled('quien_revisa')" name="check_circle" size="16px" class="nr-field__check" />
+              </div>
+              <div v-if="revisorFijo" class="nr-static">
+                <q-icon name="person" size="20px" class="nr-static__icon" />
+                <span class="nr-static__text">{{ form.quien_revisa }}</span>
+                <q-icon name="lock" size="15px" class="nr-static__lock" />
+              </div>
+              <q-select
+                v-else
+                v-model="form.quien_revisa"
+                :options="users"
+                emit-value
+                map-options
+                borderless
+                dense
+                class="nr-input"
+                :behavior="selectBehavior"
+                dropdown-icon="expand_more"
+                aria-label="Quién revisa"
+              >
+                <template #prepend>
+                  <q-icon name="person" size="20px" />
+                </template>
+                <template #selected>
+                  <span v-if="form.quien_revisa">{{ form.quien_revisa }}</span>
+                  <span v-else class="nr-placeholder">Seleccionar revisor</span>
+                </template>
+              </q-select>
+              <p v-if="validationErrors.quien_revisa" class="nr-hint nr-hint--error">Selecciona el revisor</p>
+            </div>
+
+            <div class="nr-field" :class="fieldState('caja_fuerte')" data-field="caja_fuerte">
+              <div class="nr-field__label" id="nr-caja-label">
+                Caja fuerte <span class="nr-req" aria-hidden="true">*</span>
+                <q-icon v-if="isFieldFilled('caja_fuerte')" name="check_circle" size="16px" class="nr-field__check" />
+              </div>
+              <div class="nr-pills" role="radiogroup" aria-labelledby="nr-caja-label">
+                <button
+                  v-for="option in cajaFuerteOptions"
+                  :key="option"
+                  type="button"
+                  class="nr-pill"
+                  role="radio"
+                  :aria-checked="form.caja_fuerte === option"
+                  @click="form.caja_fuerte = option"
+                >
+                  {{ option }}
+                </button>
+              </div>
+              <p v-if="validationErrors.caja_fuerte" class="nr-hint nr-hint--error">Selecciona una opción</p>
+            </div>
+
+            <div v-if="form.caja_fuerte === 'Room Move'" class="nr-field nr-field--reveal">
+              <div class="nr-field__label">Movimiento de casita</div>
+              <q-input
+                v-model="form.room_move"
+                placeholder="Detalle del movimiento"
+                borderless
+                dense
+                class="nr-input"
+                inputmode="text"
+                autocomplete="off"
+                @focus="onPageFocusIn"
+                @blur="onPageFocusOut"
+              >
+                <template #prepend>
+                  <q-icon name="swap_horiz" size="20px" />
+                </template>
+              </q-input>
+            </div>
+
+            <div class="nr-field" :class="fieldState('puertas_ventanas')" data-field="puertas_ventanas">
+              <div class="nr-field__label">
+                Puertas y ventanas <span class="nr-req" aria-hidden="true">*</span>
+                <q-icon v-if="isFieldFilled('puertas_ventanas')" name="check_circle" size="16px" class="nr-field__check" />
+              </div>
+              <q-input
+                v-model="form.puertas_ventanas"
+                placeholder="Ej. todo cerrado, ventana norte abierta"
+                borderless
+                dense
+                class="nr-input"
+                inputmode="text"
+                autocomplete="off"
+                aria-label="Puertas y ventanas"
+                @focus="onPageFocusIn"
+                @blur="onPageFocusOut"
+              >
+                <template #prepend>
+                  <q-icon name="meeting_room" size="20px" />
+                </template>
+              </q-input>
+              <p v-if="validationErrors.puertas_ventanas" class="nr-hint nr-hint--error">Campo obligatorio</p>
+            </div>
+
+            <div
+              v-if="needsFechaIngreso"
+              class="nr-field nr-field--reveal"
+              :class="fieldState('fecha_ingreso_casita')"
+              data-field="fecha_ingreso_casita"
+            >
+              <div class="nr-field__label" id="nr-fecha-label">
+                Fecha de ingreso <span class="nr-req" aria-hidden="true">*</span>
+                <q-icon v-if="isFieldFilled('fecha_ingreso_casita')" name="check_circle" size="16px" class="nr-field__check" />
+              </div>
+              <div class="nr-pills" role="radiogroup" aria-labelledby="nr-fecha-label">
+                <button
+                  v-for="option in fechaIngresoCasitaOptions"
+                  :key="option"
+                  type="button"
+                  class="nr-pill"
+                  role="radio"
+                  :aria-checked="form.fecha_ingreso_casita_selection === option"
+                  @click="selectFechaIngresoCasita(option)"
+                >
+                  {{ option }}
+                </button>
+              </div>
+              <p v-if="form.fecha_ingreso_casita" class="nr-hint">
+                <q-icon name="event" size="14px" /> {{ form.fecha_ingreso_casita }}
+              </p>
+              <p v-else-if="validationErrors.fecha_ingreso_casita" class="nr-hint nr-hint--error">Selecciona una opción</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Inventario -->
+        <section v-for="group in inventoryGroups" :key="group.title" class="nr-group">
+          <h2 class="nr-group__title">
+            <span class="nr-group__icon" :class="'nr-group__icon--' + group.tone">
+              <q-icon :name="group.icon" size="16px" />
+            </span>
+            {{ group.title }}
+          </h2>
+
+          <div class="nr-panel nr-panel--grid">
+            <div
+              v-for="item in group.items"
+              :key="item.field"
+              class="nr-field"
+              :class="fieldState(item.field)"
+              :data-field="item.field"
+            >
+              <div class="nr-field__label" :id="'nr-label-' + item.field">
+                {{ item.label }} <span class="nr-req" aria-hidden="true">*</span>
+                <q-icon v-if="isFieldFilled(item.field)" name="check_circle" size="16px" class="nr-field__check" />
+              </div>
+              <div
+                class="nr-pills"
+                role="radiogroup"
+                :aria-labelledby="'nr-label-' + item.field"
+              >
+                <button
+                  v-for="option in item.options"
+                  :key="option"
+                  type="button"
+                  class="nr-pill"
+                  role="radio"
+                  :aria-checked="form[item.field] === option"
+                  @click="form[item.field] = option"
+                >
+                  {{ option }}
+                </button>
+              </div>
+              <p v-if="validationErrors[item.field]" class="nr-hint nr-hint--error">Selecciona una opción</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Evidencias -->
+        <section v-if="showEvidencias" class="nr-group">
+          <h2 class="nr-group__title">
+            <span class="nr-group__icon nr-group__icon--evidence"><q-icon name="photo_camera" size="16px" /></span>
+            Evidencia fotográfica
+            <span v-if="evidencia1Required" class="nr-tag">Evidencia 1 obligatoria</span>
+            <span v-else class="nr-tag nr-tag--muted">Opcional</span>
+          </h2>
+
+          <div class="nr-panel">
+            <div class="nr-evidence-grid">
+              <div
+                v-for="ev in visibleEvidencias"
+                :key="ev.field"
+                class="nr-evidence"
+                :data-field="ev.field"
+              >
+                <button
+                  v-if="!form[ev.field]"
+                  type="button"
+                  class="nr-evidence__add"
+                  :class="{ 'is-error': validationErrors[ev.field] }"
+                  :disabled="ev.disabled"
+                  @click="openPhotoSheet(ev.field)"
+                >
+                  <span class="nr-evidence__add-icon"><q-icon name="add_a_photo" size="22px" /></span>
+                  <span class="nr-evidence__add-text">{{ ev.label }}</span>
+                  <span class="nr-evidence__add-sub">{{ ev.required ? 'Obligatoria' : 'Opcional' }}</span>
+                </button>
+
+                <template v-else>
+                  <div class="nr-evidence__tile">
+                    <q-inner-loading :showing="compressing[ev.field]" class="nr-evidence__loading">
+                      <q-spinner size="28px" color="primary" />
+                    </q-inner-loading>
+                    <img
+                      :src="previewUrls[ev.field]"
+                      :alt="ev.label"
+                      class="nr-evidence__img"
+                      @click="openImageModal(previewUrls[ev.field])"
+                    />
+                    <span class="nr-evidence__badge">{{ ev.label }}</span>
+                    <button
+                      type="button"
+                      class="nr-evidence__delete"
+                      :aria-label="'Quitar ' + ev.label"
+                      @click="removePhoto(ev.field)"
+                    >
+                      <q-icon name="close" size="16px" />
+                    </button>
+                  </div>
+                  <p v-if="compressionInfo[ev.field]" class="nr-evidence__meta">
+                    {{ compressionInfo[ev.field].compressedSize }}
+                    <span class="nr-evidence__pct">−{{ compressionInfo[ev.field].reduction }}%</span>
+                  </p>
+                </template>
+
+                <q-file
+                  :ref="(el) => setFileRef(ev.field, el)"
+                  v-model="form[ev.field]"
+                  label=""
+                  accept="image/*"
+                  style="display: none;"
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Notas -->
+        <section class="nr-group">
+          <h2 class="nr-group__title">
+            <span class="nr-group__icon nr-group__icon--notes"><q-icon name="notes" size="16px" /></span>
+            Notas
+            <span class="nr-tag nr-tag--muted">Opcional</span>
+          </h2>
+          <div class="nr-panel">
+            <div class="nr-field" data-field="notas">
+              <q-input
+                v-model="form.notas"
+                type="textarea"
+                placeholder="Observaciones adicionales..."
+                borderless
+                autogrow
+                class="nr-input nr-input--textarea"
+                inputmode="text"
+                autocomplete="off"
+                aria-label="Notas y observaciones"
+                @focus="onPageFocusIn"
+                @blur="onPageFocusOut"
               />
             </div>
           </div>
-        </div>
-      </template>
+        </section>
+      </div>
 
-      <!-- Evidencias -->
-      <div v-if="showEvidencias">
-        <div class="category-header category-header--evidence">
-          <q-icon name="photo_camera" />
-          <span class="category-title">Evidencia Fotográfica</span>
-          <q-badge v-if="evidencia1Required" color="primary" class="q-ml-sm" style="font-size: 0.8rem;">Evidencia 1 obligatoria</q-badge>
-        </div>
-
-        <div class="row q-col-gutter-md">
-          <div
-            v-for="ev in visibleEvidencias"
-            :key="ev.field"
-            class="col-12 col-sm-4"
-            :data-field="ev.field"
-          >
-            <div class="section-label q-mb-xs" :class="{ 'error-label': validationErrors[ev.field] }">
-              {{ ev.label }} <span v-if="ev.required" class="required-asterisk">*</span>
+      <div class="nr-submit-bar">
+        <div class="nr-submit-status" :class="{ 'is-ready': missingFieldsCount === 0 }">
+          <q-icon :name="missingFieldsCount === 0 ? 'check_circle' : 'radio_button_unchecked'" size="18px" />
+          <div>
+            <div class="nr-submit-status__title">
+              {{ missingFieldsCount === 0 ? 'Todo listo' : `${missingFieldsCount} pendiente${missingFieldsCount > 1 ? 's' : ''}` }}
             </div>
-
-            <q-btn
-              v-if="!form[ev.field]"
-              label="Agregar Foto"
-              icon="add_a_photo"
-              unelevated
-              class="full-width photo-btn"
-              :class="{ 'error-photo': validationErrors[ev.field] }"
-              :disable="ev.disabled"
-              @click="openPhotoSheet(ev.field)"
-            />
-            <div v-else>
-              <div class="photo-preview-container">
-                <q-inner-loading :showing="compressing[ev.field]" class="photo-preview-loading">
-                  <q-spinner size="32px" color="primary" />
-                </q-inner-loading>
-                <img
-                  :src="previewUrls[ev.field]"
-                  class="photo-preview"
-                  @click="openImageModal(previewUrls[ev.field])"
-                />
-                <q-btn
-                  icon="delete"
-                  round
-                  size="sm"
-                  color="negative"
-                  class="delete-photo-btn"
-                  @click="removePhoto(ev.field)"
-                />
-              </div>
-              <div v-if="compressionInfo[ev.field]" class="compression-info">
-                <div class="compression-row">
-                  <span class="text-grey-7">-</span>
-                  <span class="text-negative">{{ compressionInfo[ev.field].originalSize }}</span>
-                  <q-icon name="arrow_forward" size="12px" color="grey-5" />
-                  <span class="text-positive">{{ compressionInfo[ev.field].compressedSize }}</span>
-                  <span class="text-primary">({{ compressionInfo[ev.field].reduction }}%)</span>
-                </div>
-                <div class="compression-row">
-                  <span class="text-grey-7">-</span>
-                  <span class="text-body2">{{ compressionInfo[ev.field].format }}</span>
-                  <span class="text-grey-5 q-ml-xs">{{ compressionInfo[ev.field].originalDimensions }} → {{ compressionInfo[ev.field].compressedDimensions }}</span>
-                </div>
-              </div>
+            <div class="nr-submit-status__caption">
+              {{ missingFieldsCount === 0 ? 'Puedes guardar' : 'Campos obligatorios' }}
             </div>
-
-            <q-file
-              :ref="(el) => setFileRef(ev.field, el)"
-              v-model="form[ev.field]"
-              label=""
-              outlined
-              dense
-              bg-color="white"
-              class="input-styled q-mt-xs"
-              accept="image/*"
-              style="display: none;"
-            />
           </div>
         </div>
-      </div>
-
-      <!-- Notas -->
-      <div class="section-container">
-        <div class="section-label q-mb-xs">Notas y observaciones adicionales</div>
-        <q-input
-          v-model="form.notas"
-          type="textarea"
-          placeholder="Escriba aquí sus observaciones..."
-          outlined
-          dense
-          bg-color="white"
-          class="input-styled"
-          rows="3"
-        />
-      </div>
-
-      <!-- Submit Button -->
-      <div class="q-mt-xl q-pb-xl">
         <q-btn
-          label="Guardar Revisión"
           type="submit"
-          class="full-width submit-btn"
+          class="nr-submit"
           unelevated
+          no-caps
+          label="Guardar"
+          icon-right="arrow_forward"
           :loading="loading"
         />
-        <div v-if="missingFieldsCount > 0" class="text-center q-mt-sm text-negative" style="font-size: 0.85rem;">
-          <q-icon name="info_outline" size="16px" class="q-mr-xs" />
-          {{ missingFieldsCount }} campo{{ missingFieldsCount > 1 ? 's' : '' }} obligatorio{{ missingFieldsCount > 1 ? 's' : '' }} pendiente{{ missingFieldsCount > 1 ? 's' : '' }}
-        </div>
       </div>
     </q-form>
 
-  <!-- Bottom Sheet for Photo Selection -->
-  <q-dialog v-model="photoSheetOpen" position="bottom">
-    <q-card class="photo-bottom-sheet">
-      <div class="photo-sheet-header">
-        <div class="photo-sheet-title">Agregar foto</div>
+    <!-- Bottom sheet: origen de la foto -->
+    <q-dialog v-model="photoSheetOpen" position="bottom">
+      <q-card class="photo-sheet">
+        <div class="photo-sheet__grabber" aria-hidden="true" />
+        <div class="photo-sheet__header">
+          <div class="photo-sheet__title">Agregar foto</div>
+          <button type="button" class="photo-sheet__close" aria-label="Cerrar" @click="photoSheetOpen = false">
+            <q-icon name="close" size="18px" />
+          </button>
+        </div>
+        <div class="photo-sheet__options">
+          <button type="button" class="photo-option" @click="selectPhotoSource('camera')">
+            <span class="photo-option__icon"><q-icon name="photo_camera" size="24px" /></span>
+            <span class="photo-option__label">Cámara</span>
+            <span class="photo-option__subtitle">Tomar foto ahora</span>
+          </button>
+          <button type="button" class="photo-option" @click="selectPhotoSource('gallery')">
+            <span class="photo-option__icon"><q-icon name="photo_library" size="24px" /></span>
+            <span class="photo-option__label">Galería</span>
+            <span class="photo-option__subtitle">Elegir una existente</span>
+          </button>
+        </div>
+      </q-card>
+    </q-dialog>
+
+    <!-- Visor de imagen -->
+    <q-dialog v-model="imageModalOpen" maximized>
+      <q-card class="image-modal-card">
         <q-btn
           icon="close"
           flat
           round
-          dense
-          class="photo-sheet-close"
-          aria-label="Cerrar"
-          @click="photoSheetOpen = false"
+          class="image-modal-close"
+          aria-label="Cerrar imagen"
+          @click="imageModalOpen = false"
         />
-      </div>
-      <q-card-section class="photo-options-container">
-        <div class="photo-option" @click="selectPhotoSource('camera')">
-          <q-icon name="photo_camera" size="28px" color="primary" />
-          <div class="photo-option-label">Cámara</div>
-          <div class="photo-option-subtitle">Tomar foto ahora</div>
-        </div>
-        <div class="photo-option" @click="selectPhotoSource('gallery')">
-          <q-icon name="photo_library" size="28px" color="primary" />
-          <div class="photo-option-label">Galería</div>
-          <div class="photo-option-subtitle">Elegir de la galería</div>
-        </div>
-      </q-card-section>
-    </q-card>
-  </q-dialog>
+        <q-card-section class="image-modal-content">
+          <img :src="modalImageUrl" alt="Evidencia ampliada" class="full-size-image" />
+        </q-card-section>
+      </q-card>
+    </q-dialog>
 
-  <!-- Image Viewer Modal -->
-  <q-dialog v-model="imageModalOpen" maximized>
-    <q-card class="image-modal-card">
-      <q-btn
-        icon="close"
-        flat
-        round
-        class="image-modal-close"
-        @click="imageModalOpen = false"
-      />
-      <q-card-section class="image-modal-content">
-        <img :src="modalImageUrl" class="full-size-image" />
-      </q-card-section>
-    </q-card>
-  </q-dialog>
-
-  <!-- Share Modal -->
-  <q-dialog v-model="showShareModal" persistent>
-    <q-card class="share-modal-card">
-      <q-card-section class="share-modal-header">
-        <div class="text-h6">Compartir Evidencias</div>
-        <q-btn icon="close" flat round dense @click="closeShareModal" />
-      </q-card-section>
-
-      <q-card-section class="q-pt-none">
-        <div class="text-body1 q-mb-md">
-          La revisión ha sido guardada. ¿Deseas compartir las imágenes de evidencia?
-        </div>
-
-        <div class="share-evidence-grid">
-          <div
-            v-for="(url, field) in shareEvidenciaUrls"
-            :key="field"
-            class="share-evidence-item"
-          >
-            <div class="share-evidence-label">{{ evidenciaLabels[field] }}</div>
-            <img :src="url" class="share-evidence-image" />
+    <!-- Compartir evidencias -->
+    <q-dialog v-model="showShareModal" persistent :position="$q.screen.lt.sm ? 'bottom' : 'standard'">
+      <q-card class="share-modal-card">
+        <div class="share-modal-header">
+          <div class="share-modal-title">
+            <q-icon name="check_circle" size="22px" class="share-modal-title__icon" />
+            <span>Revisión guardada</span>
           </div>
+          <q-btn icon="close" flat round dense aria-label="Cerrar" @click="closeShareModal" />
         </div>
-      </q-card-section>
 
-      <q-card-actions class="share-modal-actions" vertical>
-        <q-btn
-          v-if="shareSupported"
-          class="share-btn share-btn-native"
-          unelevated
-          label="Compartir imágenes"
-          icon="share"
-          @click="shareViaWebShare"
-        />
-        <q-btn
-          class="share-btn share-btn-cancel"
-          flat
-          label="Cerrar"
-          @click="closeShareModal"
-        />
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+        <q-card-section class="share-modal-body q-pt-none">
+          <p class="share-modal-copy">¿Deseas compartir las imágenes de evidencia?</p>
+
+          <div class="share-evidence-grid">
+            <div
+              v-for="item in shareItems"
+              :key="item.field"
+              class="share-evidence-item"
+            >
+              <img :src="item.url" :alt="item.label" class="share-evidence-image" />
+              <div class="share-evidence-label">{{ item.label }}</div>
+            </div>
+          </div>
+        </q-card-section>
+
+        <q-card-actions class="share-modal-actions" vertical>
+          <q-btn
+            class="share-btn share-btn-native"
+            unelevated
+            no-caps
+            label="Compartir imágenes"
+            icon="share"
+            :loading="sharing"
+            :disable="sharing || shareItems.length === 0"
+            @click="shareViaWebShare"
+          />
+          <q-btn
+            class="share-btn share-btn-cancel"
+            flat
+            no-caps
+            label="Cerrar"
+            @click="closeShareModal"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
 <script>
 import { defineComponent, ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useQuasar } from 'quasar'
 import { useCasasStore } from '../stores/casas'
 import { useAuthStore } from '../stores/auth'
 import { supabase } from '../supabase'
 import { CLOUDINARY_CONFIG } from '../cloudinary'
 import { playSound } from '../utils/sounds'
 import { notify } from '../utils/notify'
+import { isTextControl, scrollElementIntoAppView } from '../utils/appScroll'
 
 const STORAGE_KEY = 'new_revision_form'
 const STORAGE_INFO_KEY = 'new_revision_compression_info'
@@ -428,12 +494,12 @@ const MONTHS = {
 }
 
 const FORM_SECTIONS = [
-  { type: 'header', title: 'Electrónicos', icon: 'devices' },
-  { type: 'section', field: 'chromecast', label: 'Chromecast', options: ['0', '01', '02', '03', '04'], minWidth: '50px' },
+  { type: 'header', title: 'Electrónicos', icon: 'devices', tone: 'electronics' },
+  { type: 'section', field: 'chromecast', label: 'Chromecast', options: ['0', '01', '02', '03', '04'] },
   { type: 'section', field: 'speaker', label: 'Speaker', options: CANTIDAD_4 },
   { type: 'section', field: 'usb_speaker', label: 'USB Speaker', options: CANTIDAD_4 },
   { type: 'section', field: 'controles_tv', label: 'Controles TV', options: CANTIDAD_4 },
-  { type: 'header', title: 'Otros Artículos', icon: 'category', headerClass: 'category-header--otros' },
+  { type: 'header', title: 'Otros Artículos', icon: 'category', tone: 'otros' },
   { type: 'section', field: 'binoculares', label: 'Binoculares', icon: 'visibility', options: CANTIDAD_4 },
   {
     type: 'row',
@@ -445,7 +511,7 @@ const FORM_SECTIONS = [
     type: 'row',
     fields: [
       { field: 'secadora', label: 'Secadora', options: CANTIDAD_4 },
-      { field: 'accesorios_secadora', label: 'Accesorios Secadora', options: ['0', '01', '02', '03', '04', '05', '06', '07', '08'], minWidth: '45px' }
+      { field: 'accesorios_secadora', label: 'Accesorios Secadora', options: ['0', '01', '02', '03', '04', '05', '06', '07', '08'] }
     ]
   },
   {
@@ -477,6 +543,18 @@ const FORM_SECTIONS = [
     ]
   }
 ]
+
+// Agrupa los campos de inventario bajo su encabezado para renderizarlos
+// como un solo panel por categoría.
+const INVENTORY_GROUPS = FORM_SECTIONS.reduce((groups, block) => {
+  if (block.type === 'header') {
+    groups.push({ title: block.title, icon: block.icon, tone: block.tone || 'general', items: [] })
+    return groups
+  }
+  const items = block.type === 'section' ? [block] : block.fields
+  groups[groups.length - 1].items.push(...items)
+  return groups
+}, [])
 
 const OPTION_FIELDS = FORM_SECTIONS.flatMap((block) => {
   if (block.type === 'section') return [block.field]
@@ -520,6 +598,7 @@ export default defineComponent({
   name: 'NewRevisionPage',
   setup () {
     const router = useRouter()
+    const $q = useQuasar()
     const store = useCasasStore()
     const authStore = useAuthStore()
 
@@ -535,6 +614,7 @@ export default defineComponent({
     const showShareModal = ref(false)
     const shareEvidenciaUrls = ref({})
     const shareFiles = ref([])
+    const sharing = ref(false)
     const previewUrls = ref({ evidencia_01: '', evidencia_02: '', evidencia_03: '' })
     const compressing = ref({ evidencia_01: false, evidencia_02: false, evidencia_03: false })
     const compressionInfo = ref({ evidencia_01: null, evidencia_02: null, evidencia_03: null })
@@ -556,7 +636,20 @@ export default defineComponent({
     const fechaIngresoCasitaOptions = ['Check in de hoy', 'Check in de mañana', 'Ninguna']
 
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
-    const shareSupported = typeof navigator.share === 'function'
+
+    const shareItems = computed(() => {
+      return EVIDENCIA_FIELDS
+        .filter((field) => shareEvidenciaUrls.value[field])
+        .map((field) => ({
+          field,
+          url: shareEvidenciaUrls.value[field],
+          label: EVIDENCIA_LABELS[field]
+        }))
+    })
+
+    // En móvil el QSelect abre un diálogo a pantalla completa: más cómodo
+    // para elegir entre 50 casitas que un menú flotante dentro del scroll.
+    const selectBehavior = $q.platform.is.mobile ? 'dialog' : 'menu'
 
     const revisorFijo = computed(() => {
       return Boolean(authStore.isLoggedIn && authStore.user && authStore.user.Usuario)
@@ -620,6 +713,23 @@ export default defineComponent({
 
     const missingFieldsCount = computed(() => missingFields.value.length)
 
+    const requiredCount = computed(() => requiredFields.value.length)
+
+    const completedCount = computed(() => requiredCount.value - missingFieldsCount.value)
+
+    const progressPct = computed(() => {
+      if (requiredCount.value === 0) return 0
+      return Math.round((completedCount.value / requiredCount.value) * 100)
+    })
+
+    const headerSubtitle = computed(() => {
+      const parts = []
+      if (form.value.casita) parts.push(`Casita ${form.value.casita}`)
+      if (form.value.caja_fuerte) parts.push(form.value.caja_fuerte)
+      if (parts.length > 0) return parts.join(' · ')
+      return 'Completa los campos obligatorios'
+    })
+
     const validationErrors = computed(() => {
       if (formSubmitted.value !== true) return {}
       return missingFields.value.reduce((acc, field) => {
@@ -628,7 +738,10 @@ export default defineComponent({
       }, {})
     })
 
-    const rowHasError = (block) => block.fields.some((item) => validationErrors.value[item.field] === true)
+    const fieldState = (field) => ({
+      'nr-field--error': validationErrors.value[field] === true,
+      'nr-field--filled': isFieldFilled(field)
+    })
 
     const setFileRef = (field, el) => {
       if (el) fileRefs[field] = el
@@ -1175,6 +1288,70 @@ export default defineComponent({
       })
     }
 
+    // En el shell móvil el documento no hace scroll: el teclado tapa el input.
+    // No movemos el layout en el mismo instante del focus (iOS cierra el teclado).
+    // Esperamos al visualViewport y subimos el campo con scroll instantáneo.
+    const REVEAL_DELAYS = [80, 220, 420, 700]
+    let revealTimers = []
+
+    const clearRevealTimers = () => {
+      revealTimers.forEach((id) => window.clearTimeout(id))
+      revealTimers = []
+    }
+
+    const revealFocusedField = () => {
+      const el = document.activeElement
+      if (!isTextControl(el) || !el.closest?.('.nr-page')) return
+
+      const target = el.closest('.nr-field') || el
+      const header = document.querySelector('.nr-header')
+      const headerH = header ? Math.ceil(header.getBoundingClientRect().height) : 8
+      scrollElementIntoAppView(target, {
+        topGutter: headerH + 10,
+        bottomGutter: 20,
+        behavior: 'auto'
+      })
+    }
+
+    const scheduleRevealFocusedField = () => {
+      clearRevealTimers()
+      REVEAL_DELAYS.forEach((ms) => {
+        revealTimers.push(window.setTimeout(revealFocusedField, ms))
+      })
+    }
+
+    const setFieldEditing = (open) => {
+      document.documentElement.classList.toggle('nr-field-editing', open)
+    }
+
+    const onPageFocusIn = (event) => {
+      const el = event?.target || document.activeElement
+      if (!el || el === document.body) return
+      if (!el.closest?.('.nr-page')) return
+      if (!isTextControl(el) && !el.closest?.('.nr-input')) return
+      setFieldEditing(true)
+      scheduleRevealFocusedField()
+    }
+
+    const onPageFocusOut = () => {
+      window.setTimeout(() => {
+        if (isTextControl(document.activeElement) && document.activeElement.closest?.('.nr-page')) return
+        setFieldEditing(false)
+        clearRevealTimers()
+      }, 50)
+    }
+
+    let viewportRevealTimer = null
+    const onViewportChange = () => {
+      if (!isTextControl(document.activeElement)) return
+      if (!document.activeElement.closest?.('.nr-page')) return
+      if (viewportRevealTimer) window.clearTimeout(viewportRevealTimer)
+      viewportRevealTimer = window.setTimeout(() => {
+        viewportRevealTimer = null
+        revealFocusedField()
+      }, 50)
+    }
+
     const sincronizarMontaje = async () => {
       const partes = String(form.value.fecha_ingreso_casita).split('-')
       const diaRev = parseInt(partes[0], 10)
@@ -1321,13 +1498,14 @@ export default defineComponent({
         }
 
         shareFiles.value = EVIDENCIA_FIELDS
-          .filter((field) => form.value[field])
+          .filter((field) => form.value[field] instanceof Blob)
           .map((field) => ({ field, file: form.value[field] }))
 
         const baseUrl = `https://res.cloudinary.com/${CLOUDINARY_CONFIG.cloudName}/image/upload`
         const urls = {}
         EVIDENCIA_FIELDS.forEach((field) => {
-          if (evidenciaUrls[field]) urls[field] = `${baseUrl}/${evidenciaUrls[field]}`
+          if (previewUrls.value[field]) urls[field] = previewUrls.value[field]
+          else if (evidenciaUrls[field]) urls[field] = `${baseUrl}/${evidenciaUrls[field]}`
         })
         shareEvidenciaUrls.value = urls
 
@@ -1345,23 +1523,70 @@ export default defineComponent({
       }
     }
 
+    const toShareableFile = async (field, raw, url) => {
+      const name = `${EVIDENCIA_LABELS[field] || field}.jpg`
+      if (raw instanceof Blob) {
+        const type = raw.type && raw.type.startsWith('image/') ? raw.type : 'image/jpeg'
+        return new File([raw], name, { type, lastModified: Date.now() })
+      }
+      if (!url) return null
+      const response = await fetch(url)
+      if (!response.ok) throw new Error('No se pudo leer la imagen')
+      const blob = await response.blob()
+      const type = blob.type && blob.type.startsWith('image/') ? blob.type : 'image/jpeg'
+      return new File([blob], name, { type, lastModified: Date.now() })
+    }
+
     const shareViaWebShare = async () => {
-      const filesToShare = shareFiles.value.map((item) => item.file)
-      const canShareFiles = filesToShare.length > 0 &&
-        typeof navigator.canShare === 'function' &&
-        navigator.canShare({ files: filesToShare })
+      if (sharing.value) return
+      sharing.value = true
 
       try {
-        if (canShareFiles) {
-          await navigator.share({ files: filesToShare })
-        } else if (shareSupported) {
-          await navigator.share({
-            title: 'Evidencias de Revisión',
-            text: 'Aquí están las imágenes de evidencia'
-          })
-        } else {
-          notify({ type: 'warning', message: 'Compartir no está disponible en este dispositivo', position: 'top' })
+        const files = []
+        for (const item of shareFiles.value) {
+          const url = shareEvidenciaUrls.value[item.field]
+          const file = await toShareableFile(item.field, item.file, url)
+          if (file) files.push(file)
+        }
+
+        if (files.length === 0) {
+          for (const item of shareItems.value) {
+            const file = await toShareableFile(item.field, null, item.url)
+            if (file) files.push(file)
+          }
+        }
+
+        if (files.length === 0) {
+          notify({ type: 'warning', message: 'No hay imágenes para compartir', position: 'top' })
           return
+        }
+
+        const shareData = {
+          title: 'Evidencias de revisión',
+          text: 'Imágenes de evidencia',
+          files
+        }
+
+        if (typeof navigator.share !== 'function') {
+          notify({
+            type: 'warning',
+            message: 'Compartir no está disponible en este dispositivo',
+            caption: 'Usa el menú del sistema al abrir cada foto',
+            position: 'top'
+          })
+          return
+        }
+
+        const canShareFiles = typeof navigator.canShare !== 'function' || navigator.canShare({ files })
+        if (canShareFiles) {
+          await navigator.share(shareData)
+        } else if (navigator.canShare?.({ files: [files[0]] })) {
+          await navigator.share({ title: shareData.title, text: shareData.text, files: [files[0]] })
+        } else {
+          await navigator.share({
+            title: shareData.title,
+            text: `${shareData.text}\n${shareItems.value.map((item) => item.url).join('\n')}`
+          })
         }
         closeShareModal()
       } catch (e) {
@@ -1369,6 +1594,8 @@ export default defineComponent({
           console.warn('[NewRevisionPage] No se pudo compartir:', e)
           notify({ type: 'negative', message: 'No se pudo compartir', position: 'top' })
         }
+      } finally {
+        sharing.value = false
       }
     }
 
@@ -1452,10 +1679,27 @@ export default defineComponent({
 
     onMounted(() => {
       loadUsers()
+      document.addEventListener('focusin', onPageFocusIn, true)
+      document.addEventListener('focusout', onPageFocusOut, true)
+      window.addEventListener('resize', onViewportChange)
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', onViewportChange)
+        window.visualViewport.addEventListener('scroll', onViewportChange)
+      }
     })
 
     onUnmounted(() => {
       if (draftTimer) clearTimeout(draftTimer)
+      clearRevealTimers()
+      if (viewportRevealTimer) window.clearTimeout(viewportRevealTimer)
+      document.removeEventListener('focusin', onPageFocusIn, true)
+      document.removeEventListener('focusout', onPageFocusOut, true)
+      document.documentElement.classList.remove('nr-field-editing')
+      window.removeEventListener('resize', onViewportChange)
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', onViewportChange)
+        window.visualViewport.removeEventListener('scroll', onViewportChange)
+      }
       EVIDENCIA_FIELDS.forEach((field) => releasePreview(field))
 
       if (submitted.value !== true) {
@@ -1472,7 +1716,7 @@ export default defineComponent({
       casitaOptions,
       cajaFuerteOptions,
       fechaIngresoCasitaOptions,
-      formSections: FORM_SECTIONS,
+      inventoryGroups: INVENTORY_GROUPS,
       evidenciaLabels: EVIDENCIA_LABELS,
       needsFechaIngreso,
       showEvidencias,
@@ -1483,13 +1727,19 @@ export default defineComponent({
       compressionInfo,
       validationErrors,
       missingFieldsCount,
-      rowHasError,
+      requiredCount,
+      completedCount,
+      progressPct,
+      headerSubtitle,
+      selectBehavior,
+      isFieldFilled,
+      fieldState,
       photoSheetOpen,
       imageModalOpen,
       modalImageUrl,
       showShareModal,
-      shareEvidenciaUrls,
-      shareSupported,
+      shareItems,
+      sharing,
       setFileRef,
       selectFechaIngresoCasita,
       goBack,
@@ -1498,6 +1748,8 @@ export default defineComponent({
       openImageModal,
       removePhoto,
       onSubmit,
+      onPageFocusIn,
+      onPageFocusOut,
       shareViaWebShare,
       closeShareModal
     }
@@ -1506,435 +1758,847 @@ export default defineComponent({
 </script>
 
 <style scoped>
-.text-h5 {
-  font-size: 1.5rem;
-  font-weight: 700;
+/* Lenguaje visual plano (estilo Flutter / RN): sin bordes, jerarquía por
+   superficie, espacio y tipografía. */
+.nr-page {
+  --nr-bg: #f4f5f9;
+  --nr-surface: #ffffff;
+  --nr-track: #eef0f5;
+  --nr-track-hover: #e6e9f0;
+  --nr-text: #14171f;
+  --nr-text-2: #4b5160;
+  --nr-muted: #8a90a0;
+  --nr-blue: #0a7cff;
+  --nr-blue-soft: #e8f1ff;
+  --nr-red: #e5484d;
+  --nr-red-soft: #fdeeee;
+  --nr-green: #1fa463;
+  --nr-green-soft: #e6f6ee;
+  --nr-radius-xl: 22px;
+  --nr-radius: 14px;
+  --nr-radius-sm: 10px;
+  --nr-shadow: 0 1px 2px rgba(20, 23, 31, 0.04), 0 6px 20px -12px rgba(20, 23, 31, 0.12);
+
+  min-height: 100%;
+  padding: 0;
+  background: var(--nr-bg);
+  color: var(--nr-text);
 }
 
-.section-label {
-  font-weight: 600;
+/* Header */
+.nr-header {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  padding: 10px 16px 0;
+  background: rgba(244, 245, 249, 0.92);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+.nr-header__row {
   display: flex;
   align-items: center;
-  color: #1f2937;
-  font-size: 0.96rem;
-  letter-spacing: -0.01em;
+  gap: 12px;
+  min-height: 44px;
+  max-width: 820px;
+  margin: 0 auto;
 }
 
-.required-asterisk {
-  color: #ef5350;
-  margin-left: 4px;
-  font-weight: bold;
+.nr-header__text {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
-.section-container {
-  margin-bottom: 24px;
-  border-radius: 20px;
-  padding: 14px;
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(249, 251, 255, 0.88));
+.nr-back {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--nr-surface);
+  color: var(--nr-text);
+  box-shadow: var(--nr-shadow);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: transform 0.12s ease;
 }
 
-.category-header {
+.nr-back:active {
+  transform: scale(0.94);
+}
+
+.nr-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.nr-subtitle {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  color: var(--nr-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nr-progress-pill {
+  flex: none;
   display: inline-flex;
   align-items: center;
-  margin-top: 8px;
-  margin-bottom: 16px;
-  padding: 9px 14px;
-  border-radius: 14px;
-  border: 1px solid rgba(133, 173, 219, 0.28);
-  background: linear-gradient(120deg, rgba(223, 235, 249, 0.95), rgba(238, 246, 255, 0.95));
-  color: #0f4d92;
-}
-
-.category-header--otros {
-  background: #fff3e0;
-  color: #ef6c00;
-}
-
-.category-header--evidence {
-  background: #f1f8e9;
-  color: #33691e;
-}
-
-.category-title {
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--nr-blue-soft);
+  color: var(--nr-blue);
+  font-size: 0.78rem;
   font-weight: 700;
-  margin-left: 8px;
-  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-.button-grid {
+.nr-progress-pill--done {
+  background: var(--nr-green-soft);
+  color: var(--nr-green);
+}
+
+.nr-progress {
+  max-width: 820px;
+  height: 3px;
+  margin: 10px auto 0;
+  border-radius: 999px;
+  background: rgba(20, 23, 31, 0.06);
+  overflow: hidden;
+}
+
+.nr-progress__bar {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--nr-blue);
+  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Formulario */
+.nr-form {
+  max-width: 820px;
+  margin: 0 auto;
+}
+
+.nr-form__body {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 14px 16px 8px;
+}
+
+.nr-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nr-group__title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 4px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--nr-text);
+}
+
+.nr-group__icon {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: #fff;
+}
+
+.nr-group__icon--general { background: var(--nr-blue); }
+.nr-group__icon--electronics { background: #7c5cff; }
+.nr-group__icon--otros { background: #ff9331; }
+.nr-group__icon--evidence { background: var(--nr-green); }
+.nr-group__icon--notes { background: #64708a; }
+
+.nr-tag {
+  margin-left: auto;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--nr-blue-soft);
+  color: var(--nr-blue);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.nr-tag--muted {
+  background: var(--nr-track);
+  color: var(--nr-muted);
+}
+
+.nr-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 16px;
+  background: var(--nr-surface);
+  border-radius: var(--nr-radius-xl);
+  box-shadow: var(--nr-shadow);
+}
+
+.nr-panel--grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+}
+
+/* Campo */
+.nr-field {
+  scroll-margin-top: 90px;
+  scroll-margin-bottom: max(24px, var(--app-keyboard-inset, 0px));
+}
+
+.nr-field[data-field="notas"] {
+  scroll-margin-bottom: max(36vh, var(--app-keyboard-inset, 0px));
+}
+
+.nr-field--reveal {
+  animation: nr-rise 0.25s ease both;
+}
+
+.nr-field__label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 8px 2px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--nr-text-2);
+}
+
+.nr-req {
+  color: var(--nr-red);
+}
+
+.nr-field__check {
+  margin-left: auto;
+  color: var(--nr-green);
+  animation: nr-pop 0.25s ease;
+}
+
+.nr-field--error .nr-field__label {
+  color: var(--nr-red);
+}
+
+.nr-hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 6px 2px 0;
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: var(--nr-muted);
+}
+
+.nr-hint--error {
+  color: var(--nr-red);
+  font-weight: 600;
+}
+
+/* Píldoras (mismo diseño en todo el formulario) */
+.nr-pills {
   display: flex;
   flex-wrap: wrap;
+  gap: 10px;
+}
+
+.nr-pill {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--nr-track);
+  color: var(--nr-text-2);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+.nr-pill:active {
+  transform: scale(0.96);
+}
+
+.nr-pill[aria-checked="true"] {
+  background: var(--nr-blue);
+  color: #fff;
+}
+
+.nr-field--error .nr-pill:not([aria-checked="true"]) {
+  background: var(--nr-red-soft);
+}
+
+.nr-pill:focus-visible {
+  outline: 2px solid var(--nr-blue);
+  outline-offset: 2px;
+}
+
+/* Inputs Quasar sin borde, con superficie suave. 16px evita zoom en iOS.
+   display:flex en el <input> nativo impide escribir en Safari/iOS. */
+.nr-input :deep(.q-field__control) {
+  min-height: 46px;
+  padding: 0 12px;
+  border-radius: var(--nr-radius);
+  background: var(--nr-track);
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.nr-input :deep(.q-field__control:before),
+.nr-input :deep(.q-field__control:after) {
+  display: none;
+}
+
+.nr-input.q-field--focused :deep(.q-field__control) {
+  background: var(--nr-surface);
+  box-shadow: 0 0 0 2px rgba(10, 124, 255, 0.35);
+}
+
+.nr-input :deep(.q-field__native),
+.nr-input :deep(.q-field__input) {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--nr-text);
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.nr-input :deep(input.q-field__native) {
+  display: block;
+  width: 100%;
+  min-height: 46px;
+  line-height: 1.25;
+  padding: 11px 0;
+}
+
+.nr-input :deep(.q-field__native span) {
+  display: flex;
+  align-items: center;
+  min-height: 46px;
+}
+
+.nr-input :deep(.q-field__native::placeholder),
+.nr-input :deep(.q-field__input::placeholder),
+.nr-input .nr-placeholder {
+  color: var(--nr-muted);
+  font-weight: 500;
+  opacity: 1;
+}
+
+.nr-input :deep(.q-field__prepend),
+.nr-input :deep(.q-field__append) {
+  height: 46px;
+  color: var(--nr-muted);
+}
+
+.nr-input.q-field--focused :deep(.q-field__prepend) {
+  color: var(--nr-blue);
+}
+
+.nr-input--textarea :deep(.q-field__control) {
+  padding: 4px 12px;
+}
+
+.nr-input--textarea :deep(textarea.q-field__native) {
+  display: block;
+  width: 100%;
+  min-height: 92px;
+  line-height: 1.5;
+  padding: 10px 0;
+}
+
+.nr-field--error .nr-input :deep(.q-field__control) {
+  background: var(--nr-red-soft);
+}
+
+.nr-static {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 0 12px;
+  border-radius: var(--nr-radius);
+  background: var(--nr-track);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--nr-text);
+}
+
+.nr-static__icon {
+  color: var(--nr-muted);
+}
+
+.nr-static__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nr-static__lock {
+  color: #b7bcc8;
+}
+
+/* Evidencias */
+.nr-evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 12px;
 }
 
-.option-btn {
-  flex: 0 1 auto;
-  min-width: fit-content;
-  max-width: 100%;
-}
-
-.custom-select-btn {
-  border-radius: 14px !important;
-  border: 1px solid rgba(203, 213, 225, 0.95) !important;
-  background: linear-gradient(180deg, #ffffff, #f8fafc) !important;
-  color: #334155 !important;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08) !important;
-  text-transform: none !important;
-  font-weight: 600 !important;
-  padding: 8px 16px !important;
-  min-height: 44px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.custom-select-btn:hover {
-  border-color: #93b3d8 !important;
-  transform: translateY(-1px);
-}
-
-.custom-select-btn:active {
-  transform: scale(0.95);
-}
-
-.custom-select-btn.selected {
-  border-color: #1266d6 !important;
-  color: #0c4fb0 !important;
-  background: linear-gradient(180deg, #f2f7ff, #eaf2ff) !important;
-  box-shadow: 0 10px 24px rgba(18, 102, 214, 0.2) !important;
-}
-
-.input-styled :deep(.q-field__control) {
-  border-radius: 14px !important;
-  border: 1px solid rgba(203, 213, 225, 0.75);
-  background: linear-gradient(180deg, #ffffff, #fafcff) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 6px 14px rgba(15, 23, 42, 0.05) !important;
-}
-
-.input-styled :deep(.q-field__marginal) {
-  color: #757575;
-}
-
-.submit-btn {
-  color: white !important;
-  border-radius: 14px !important;
-  padding: 12px !important;
-  font-weight: 700 !important;
-  font-size: 1.1rem !important;
-  letter-spacing: 0.01em;
-  background: linear-gradient(135deg, #0a64d8 0%, #1380f5 100%) !important;
-  box-shadow: 0 14px 28px rgba(19, 128, 245, 0.35) !important;
-}
-
-.photo-btn {
-  color: #616161 !important;
-  border-radius: 14px !important;
-  border: 1px dashed rgba(146, 165, 191, 0.75) !important;
-  background: linear-gradient(180deg, #f9fbff, #f2f6fb) !important;
-  text-transform: none !important;
-  font-weight: 500 !important;
-  padding: 12px 16px !important;
-  min-height: 48px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.photo-btn:active {
-  transform: scale(0.95);
-}
-
-.photo-bottom-sheet {
+.nr-evidence__add {
   width: 100%;
-  background: white;
-  border-radius: 16px 16px 0 0;
-  overflow: hidden;
-}
-
-.photo-sheet-header {
+  aspect-ratio: 4 / 3;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px 2px;
-  background: white;
-}
-
-.photo-sheet-title {
-  font-weight: 700;
-  font-size: 1rem;
-  color: #1f2937;
-  letter-spacing: -0.01em;
-}
-
-.photo-sheet-close {
-  color: #6b7280;
-  min-width: 42px;
-  min-height: 42px;
-}
-
-.photo-options-container {
-  padding: 12px 16px 16px;
-  background: white;
-}
-
-.photo-option {
-  display: flex;
-  align-items: center;
-  padding: 16px;
-  margin-bottom: 8px;
-  border-radius: 12px;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px;
+  border: 0;
+  border-radius: var(--nr-radius);
+  background: var(--nr-track);
+  color: var(--nr-text-2);
+  font: inherit;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  background: #f8f9fa;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: background-color 0.15s ease, transform 0.12s ease;
 }
 
-.photo-option:hover {
-  background: #e3f2fd;
-  transform: translateY(-1px);
+.nr-evidence__add:active {
+  transform: scale(0.97);
 }
 
-.photo-option:active {
-  transform: scale(0.98);
+.nr-evidence__add:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
-.photo-option:last-child {
-  margin-bottom: 0;
+.nr-evidence__add.is-error {
+  background: var(--nr-red-soft);
+  color: var(--nr-red);
 }
 
-.photo-option-label {
+.nr-evidence__add-icon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 4px;
+  border-radius: 999px;
+  background: var(--nr-surface);
+  color: var(--nr-blue);
+  box-shadow: var(--nr-shadow);
+}
+
+.nr-evidence__add.is-error .nr-evidence__add-icon {
+  color: var(--nr-red);
+}
+
+.nr-evidence__add-text {
+  font-size: 0.86rem;
   font-weight: 600;
-  color: #424242;
-  margin-left: 16px;
-  font-size: 1rem;
 }
 
-.photo-option-subtitle {
-  font-size: 0.875rem;
-  color: #757575;
-  margin-left: 16px;
-  margin-top: 2px;
+.nr-evidence__add-sub {
+  font-size: 0.72rem;
+  color: var(--nr-muted);
 }
 
-.photo-preview-container {
+.nr-evidence__tile {
   position: relative;
-  width: 50%;
-  aspect-ratio: 5 / 3;
-  margin: 0 auto;
-  background: #f5f5f5;
-  border-radius: 12px;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--nr-radius);
   overflow: hidden;
-  border: 2px dashed #bdbdbd;
+  background: var(--nr-track);
+  animation: nr-rise 0.25s ease both;
 }
 
-.photo-preview {
-  position: absolute;
-  top: 0;
-  left: 0;
+.nr-evidence__img {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  cursor: pointer;
-  transition: transform 0.2s;
+  cursor: zoom-in;
 }
 
-.photo-preview:hover {
-  transform: scale(1.02);
-}
-
-.photo-preview-loading {
+.nr-evidence__loading {
   z-index: 2;
   background: rgba(255, 255, 255, 0.7);
 }
 
-.delete-photo-btn {
-  position: absolute !important;
-  top: 8px;
-  right: 8px;
+.nr-evidence__badge {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(20, 23, 31, 0.6);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 600;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.nr-evidence__delete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
   z-index: 3;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(20, 23, 31, 0.6);
+  color: #fff;
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
-.compression-info {
-  background: #f9fafb;
-  border-radius: 8px;
-  padding: 6px 10px;
-  margin-top: 8px;
-  font-size: 0.75rem;
-}
-
-.compression-row {
+.nr-evidence__meta {
   display: flex;
   align-items: center;
-  gap: 4px;
-  line-height: 1.4;
+  gap: 6px;
+  margin: 6px 2px 0;
+  font-size: 0.72rem;
+  color: var(--nr-muted);
 }
 
+.nr-evidence__pct {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--nr-green-soft);
+  color: var(--nr-green);
+  font-weight: 700;
+}
+
+/* Barra de guardar: al final del formulario, no flotante */
+.nr-submit-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 16px 20px;
+  padding: 14px 16px;
+  background: var(--nr-surface);
+  border-radius: var(--nr-radius-xl);
+  box-shadow: var(--nr-shadow);
+}
+
+.nr-submit-status {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nr-submit-status .q-icon {
+  flex: none;
+  color: #ffa726;
+}
+
+.nr-submit-status.is-ready .q-icon {
+  color: var(--nr-green);
+}
+
+.nr-submit-status__title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--nr-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.nr-submit-status.is-ready .nr-submit-status__title {
+  color: var(--nr-green);
+}
+
+.nr-submit-status__caption {
+  font-size: 0.72rem;
+  line-height: 1.2;
+  color: var(--nr-muted);
+}
+
+.nr-submit {
+  flex: none;
+  min-width: 132px;
+  height: 46px;
+  border-radius: 999px !important;
+  background: var(--nr-blue) !important;
+  color: #fff !important;
+  font-size: 0.95rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em;
+  box-shadow: 0 8px 20px -8px rgba(10, 124, 255, 0.6) !important;
+  touch-action: manipulation;
+}
+
+.nr-submit:active {
+  transform: translateY(1px) scale(0.985);
+}
+
+:global(html.nr-field-editing .nr-form__body),
+:global(html.app-keyboard-open .nr-form__body) {
+  padding-bottom: max(var(--app-keyboard-inset, 0px), 36vh);
+}
+
+/* Bottom sheet de foto */
+.photo-sheet {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  border-radius: 24px 24px 0 0;
+  background: #fff;
+  overflow: hidden;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.photo-sheet__grabber {
+  width: 38px;
+  height: 5px;
+  margin: 8px auto 0;
+  border-radius: 999px;
+  background: #d9dce3;
+}
+
+.photo-sheet__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px 4px 20px;
+}
+
+.photo-sheet__title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #14171f;
+}
+
+.photo-sheet__close {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: #eef0f5;
+  color: #64708a;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.photo-sheet__options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 8px 16px 16px;
+}
+
+.photo-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 18px 12px 16px;
+  border: 0;
+  border-radius: 18px;
+  background: #f4f5f9;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: background-color 0.15s ease, transform 0.12s ease;
+}
+
+.photo-option:active {
+  transform: scale(0.97);
+  background: #e9ecf3;
+}
+
+.photo-option__icon {
+  width: 50px;
+  height: 50px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 6px;
+  border-radius: 999px;
+  background: #fff;
+  color: #0a7cff;
+  box-shadow: 0 1px 2px rgba(20, 23, 31, 0.06);
+}
+
+.photo-option__label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #14171f;
+}
+
+.photo-option__subtitle {
+  font-size: 0.76rem;
+  color: #8a90a0;
+}
+
+/* Visor de imagen */
 .image-modal-card {
-  background: rgba(0, 0, 0, 0.95);
+  background: rgba(0, 0, 0, 0.96);
 }
 
 .image-modal-close {
   position: fixed;
-  top: 20px;
-  right: 20px;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  right: 12px;
   z-index: 9999;
-  background: white !important;
-  color: black !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  color: #14171f !important;
 }
 
 .image-modal-content {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh;
+  height: 100dvh;
   padding: 0;
 }
 
 .full-size-image {
   max-width: 100%;
-  max-height: 100vh;
+  max-height: 100dvh;
   object-fit: contain;
 }
 
-/* Share Modal */
+/* Modal compartir */
 .share-modal-card {
   width: 100%;
   max-width: 450px;
-  border-radius: 22px;
-  border: 1px solid rgba(216, 224, 234, 0.9);
-  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+  max-height: min(88dvh, 640px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 24px;
+  box-shadow: 0 20px 50px rgba(20, 23, 31, 0.2);
 }
 
 .share-modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid #e0e0e0;
+  flex: none;
+  padding: 16px 12px 8px 20px;
 }
 
-.share-modal-header .text-h6 {
-  font-weight: 600;
-  color: #424242;
+.share-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #14171f;
+}
+
+.share-modal-title__icon {
+  color: #1fa463;
+}
+
+.share-modal-copy {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+  color: #64708a;
+}
+
+.share-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .share-evidence-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin: 16px 0;
-}
-
-.share-evidence-item {
-  position: relative;
-}
-
-.share-evidence-label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #616161;
-  text-align: center;
-  margin-bottom: 4px;
+  gap: 10px;
 }
 
 .share-evidence-image {
+  display: block;
   width: 100%;
   aspect-ratio: 1;
   object-fit: cover;
-  border-radius: 8px;
-  border: 1px solid #e0e0e0;
-  cursor: pointer;
-  transition: transform 0.2s;
+  border-radius: 12px;
 }
 
-.share-evidence-image:hover {
-  transform: scale(1.02);
+.share-evidence-label {
+  margin-top: 6px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #8a90a0;
+  text-align: center;
 }
 
 .share-modal-actions {
-  padding: 8px 20px 20px;
+  flex: none;
+  padding: 8px 20px calc(16px + env(safe-area-inset-bottom, 0px));
 }
 
 .share-btn {
   width: 100%;
-  padding: 12px;
-  border-radius: 12px;
-  font-weight: 600;
-  text-transform: none;
-  margin-bottom: 8px;
-}
-
-.share-btn:last-child {
-  margin-bottom: 0;
+  min-height: 46px;
+  border-radius: 999px;
+  font-weight: 700;
 }
 
 .share-btn-native {
-  background: linear-gradient(135deg, #0f67db, #1f86f7) !important;
+  background: #0a7cff !important;
   color: #fff !important;
 }
 
-.share-btn-native:hover {
-  background: linear-gradient(135deg, #0f5ec9, #1a78dd) !important;
-}
-
 .share-btn-cancel {
-  color: #757575 !important;
-  margin-top: 8px;
+  margin-top: 6px;
+  color: #64708a !important;
 }
 
-.share-btn-cancel:hover {
-  background: #f5f5f5 !important;
-}
-
-/* Apple-inspired visual refresh */
-.bg-grey-2 {
-  background:
-    radial-gradient(1200px 600px at 12% -10%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 65%),
-    radial-gradient(1100px 500px at 88% 0%, rgba(222, 234, 248, 0.7), rgba(222, 234, 248, 0) 62%),
-    linear-gradient(180deg, #f4f7fb 0%, #edf2f7 100%);
-}
-
-.q-page > .row.items-center.q-mb-lg {
-  max-width: 1120px;
-  margin: 10px auto 22px !important;
-  padding: 10px 12px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.64);
-  backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.72);
-}
-
-.q-page > .row.items-center.q-mb-lg .text-h5 {
-  font-size: clamp(1.2rem, 2.3vw, 1.55rem);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: #1c1d1f !important;
-}
-
-.q-page > .q-form {
-  max-width: 1120px;
-  margin: 0 auto;
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.95);
-  box-shadow: 0 18px 60px rgba(16, 24, 40, 0.09);
-  border-radius: 30px;
-  padding: 20px clamp(12px, 3vw, 32px) 26px;
-  backdrop-filter: blur(22px);
-}
-
-.section-container,
-.row.q-col-gutter-md {
-  animation: rise-in 420ms ease both;
-}
-
-.section-container:nth-of-type(2n) {
-  animation-delay: 40ms;
-}
-
-.section-container:nth-of-type(3n) {
-  animation-delay: 80ms;
-}
-
-@keyframes rise-in {
+/* Animaciones */
+@keyframes nr-rise {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -1942,86 +2606,86 @@ export default defineComponent({
   }
 }
 
-/*
-  Los estados de error van al final a propósito: comparten especificidad con
-  las reglas base (.section-container, .input-styled) y solo ganan si se
-  declaran después.
-*/
-.error-label {
-  color: #d32f2f !important;
-}
-
-.error-section,
-.error-row {
-  background: rgba(211, 47, 47, 0.06) !important;
-  border-radius: 20px;
-  outline: 2px solid #d32f2f;
-  outline-offset: 4px;
-}
-
-.error-field :deep(.q-field__control) {
-  border: 2px solid #d32f2f !important;
-  box-shadow: 0 0 0 3px rgba(211, 47, 47, 0.2) !important;
-}
-
-.photo-btn.error-photo {
-  border: 2px solid #d32f2f !important;
-  background: rgba(211, 47, 47, 0.05) !important;
-}
-
-@media (max-width: 768px) {
-  .q-page > .q-form {
-    border-radius: 22px;
-    padding: 14px 10px 22px;
+@keyframes nr-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
   }
-
-  .q-page > .row.items-center.q-mb-lg {
-    margin-top: 2px !important;
-    border-radius: 14px;
-    padding: 8px;
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
-@media (max-width: 600px) {
-  .option-btn {
-    min-width: fit-content;
+@media (hover: hover) and (pointer: fine) {
+  .nr-pill:hover:not([aria-checked="true"]),
+  .nr-evidence__add:hover:not(:disabled) {
+    background: var(--nr-track-hover);
   }
 
-  .photo-options-container {
-    padding: 12px;
+  .photo-option:hover {
+    background: #e9ecf3;
+  }
+}
+
+/* Breakpoints */
+@media (min-width: 600px) {
+  .nr-panel--grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .nr-page {
+    padding-bottom: 32px;
   }
 
-  .photo-option {
-    padding: 12px;
+  .nr-header {
+    position: static;
+    background: transparent;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    padding-top: 18px;
   }
 
-  .image-modal-close {
-    top: 12px;
-    right: 12px;
+  .nr-title {
+    font-size: 1.4rem;
   }
 
-  .compression-info {
-    padding: 5px 8px;
-    font-size: 0.7rem;
+  .nr-submit-bar {
+    margin: 8px 16px 24px;
   }
 
-  .compression-row {
-    gap: 2px;
+  .nr-submit {
+    min-width: 200px;
+  }
+}
+
+@media (max-width: 380px) {
+  .nr-form__body {
+    padding: 12px 12px 8px;
   }
 
-  .share-evidence-grid {
-    gap: 8px;
+  .nr-panel {
+    padding: 14px;
   }
 
-  .share-modal-card {
-    margin: 16px;
+  .nr-submit {
+    min-width: 118px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .section-container,
-  .row.q-col-gutter-md {
+  .nr-field--reveal,
+  .nr-evidence__tile,
+  .nr-field__check {
     animation: none;
+  }
+
+  .nr-progress__bar,
+  .nr-pill {
+    transition: none;
   }
 }
 </style>

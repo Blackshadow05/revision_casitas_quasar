@@ -1,5 +1,5 @@
 <template>
-  <q-page class="home-page q-pa-md bg-grey-1">
+  <q-page class="home-page">
     <!-- Login Modal -->
     <q-dialog v-model="showLoginModal" persistent class="auth-dialog" backdrop-filter="blur(18px)">
       <q-card class="auth-sheet">
@@ -24,7 +24,8 @@
         </header>
 
         <div v-if="loginError" class="auth-sheet__alert" role="alert">
-          {{ loginError }}
+          <q-icon name="error_outline" size="18px" />
+          <span>{{ loginError }}</span>
         </div>
         <button
           v-if="canRetryAuthenticatorSetup"
@@ -33,6 +34,7 @@
           :disabled="loginLoading"
           @click="retryAuthenticatorSetup"
         >
+          <q-icon name="qr_code_2" size="16px" />
           Generar un QR nuevo
         </button>
 
@@ -64,9 +66,15 @@
               label="Usuario"
               borderless
               dense
+              hide-bottom-space
+              no-error-icon
               autocomplete="username"
               :rules="[val => !!val || 'El usuario es requerido']"
-            />
+            >
+              <template v-slot:prepend>
+                <q-icon name="person_outline" size="22px" />
+              </template>
+            </q-input>
           </div>
 
           <div class="auth-sheet__field">
@@ -76,9 +84,14 @@
               :type="showLoginPassword ? 'text' : 'password'"
               borderless
               dense
+              hide-bottom-space
+              no-error-icon
               autocomplete="current-password"
               :rules="[val => !!val || 'La contraseña es requerida']"
             >
+              <template v-slot:prepend>
+                <q-icon name="lock_outline" size="22px" />
+              </template>
               <template v-slot:append>
                 <password-visibility-toggle v-model="showLoginPassword" />
               </template>
@@ -92,6 +105,7 @@
           >
             <q-btn
               label="Ingresar"
+              icon-right="arrow_forward"
               type="submit"
               class="auth-sheet__submit"
               unelevated
@@ -107,6 +121,7 @@
           :disabled="loginLoading"
           @click="switchToAuthenticatorLogin"
         >
+          <q-icon name="verified_user" size="16px" />
           Usar Google Authenticator
         </button>
       </q-card>
@@ -159,88 +174,74 @@
     <div v-if="isLoggedIn">
       <q-scroll-observer :scroll-target="pageScrollTarget" @scroll="onScroll" />
 
-      <div class="home-top q-mb-md">
-      <!-- Top Bar / Profile Section -->
+      <!-- Cabecera compacta: usuario · sesión · salir -->
       <div class="home-profile">
-        <div class="home-profile__user row items-center">
-          <q-avatar size="36px" color="grey-3" text-color="grey-8" icon="person" class="q-mr-sm" />
-          <div>
-            <div class="home-profile__name">Bienvenido, {{ currentUser?.Usuario || 'Usuario' }}</div>
-            <div class="home-profile__role">{{ currentUser?.Rol || '' }}</div>
-          </div>
+        <q-avatar size="30px" color="grey-2" text-color="grey-8" icon="person" class="home-profile__avatar" />
+        <div class="home-profile__text">
+          <span class="home-profile__name ellipsis">{{ currentUser?.Usuario || 'Usuario' }}</span>
+          <span v-if="currentUser?.Rol" class="home-profile__role">· {{ currentUser.Rol }}</span>
         </div>
-        <div class="home-profile__session row items-center">
-          <div v-if="usesHourlySession && sessionRemainingLabel" class="session-dots row items-center">
-            <q-icon name="schedule" size="14px" color="grey-6" class="q-mr-xs" />
-            <span class="q-mr-xs text-caption text-grey-6">Sesión {{ sessionRemainingLabel }}</span>
-          </div>
-          <div v-else-if="daysRemaining > 0" class="session-dots row items-center">
-            <q-icon name="history" size="14px" color="grey-6" class="q-mr-xs" />
-            <span class="q-mr-xs text-caption text-grey-6">Sesión</span>
-            <div class="row q-gutter-x-xs">
-              <q-icon v-for="i in daysRemaining" :key="i" name="circle" size="8px" color="green-6" />
-            </div>
-          </div>
+
+        <div v-if="sessionRemainingLabel" class="session-pill" :title="`Sesión válida por ${sessionRemainingLabel}`">
+          <q-icon name="schedule" size="13px" />
+          <span>{{ sessionRemainingLabel }}</span>
         </div>
+
         <q-btn
-          unelevated
+          flat
+          round
           dense
-          no-caps
-          color="negative"
-          class="home-profile__logout logout-btn"
+          icon="logout"
+          color="grey-7"
+          class="home-profile__logout"
+          aria-label="Cerrar sesión"
           @click="handleLogout"
         >
-          <q-icon name="logout" size="14px" class="q-mr-xs" />
-          <span>Cerrar sesión</span>
+          <q-tooltip>Cerrar sesión</q-tooltip>
         </q-btn>
-      </div>
       </div>
 
       <div class="home-toolbar">
-        <div class="home-actions">
-          <q-btn
-            color="orange-8"
-            text-color="white"
-            icon="schedule"
-            label="Horario"
-            no-caps
-            unelevated
-            rounded
-            class="dashboard-action-btn"
-            @click="goToDashboardHorario"
-          />
-        </div>
+        <q-input
+          v-model="search"
+          placeholder="Buscar por casita, revisor o notas..."
+          outlined
+          dense
+          bg-color="white"
+          class="search-input"
+          clearable
+        >
+          <template v-slot:prepend>
+            <q-icon name="search" class="text-grey-5" />
+          </template>
+          <template v-slot:append>
+            <q-btn
+              round
+              flat
+              dense
+              icon="filter_list"
+              :color="store.activeFilter ? 'primary' : 'grey-7'"
+              class="search-filter-btn"
+              aria-label="Filtros"
+              @click.stop="showFilterModal = true"
+            >
+              <q-tooltip>Filtros</q-tooltip>
+            </q-btn>
+          </template>
+        </q-input>
 
-        <div class="home-search row items-center no-wrap">
-          <q-input
-            v-model="search"
-            placeholder="Buscar por casita, revisor o notas..."
-            outlined
-            rounded
-            dense
-            bg-color="white"
-            class="search-input col shadow-1"
-            clearable
-          >
-            <template v-slot:prepend>
-              <q-icon name="search" class="text-grey-5" />
-            </template>
-          </q-input>
-          <q-btn
-            round
-            flat
-            icon="filter_list"
-            color="primary"
-            class="filter-btn bg-white shadow-1"
-            @click="showFilterModal = true"
-          >
-            <q-tooltip>Filtros</q-tooltip>
-          </q-btn>
-        </div>
+        <q-btn
+          icon="schedule"
+          label="Horario"
+          no-caps
+          unelevated
+          class="dashboard-action-btn"
+          @click="goToDashboardHorario"
+        />
       </div>
 
       <!-- Active Filter Badge -->
-      <div v-if="store.activeFilter" class="row items-center q-mb-md justify-center">
+      <div v-if="store.activeFilter" class="active-filter-row">
         <div class="active-filter-badge">
           <q-icon name="filter_alt" size="16px" class="q-mr-xs" />
           <span>{{ store.activeFilter.label }}</span>
@@ -275,7 +276,7 @@
               class="q-mr-sm"
             />
             <div>
-              <div v-if="syncTitle" class="text-weight-bold text-grey-9">
+              <div v-if="syncTitle" class="text-weight-medium text-grey-9">
                 {{ syncTitle }}
               </div>
               <div class="text-caption text-grey-7">{{ syncStatusText }}</div>
@@ -286,9 +287,7 @@
       </div>
 
       <!-- Mostrando registros badge -->
-      <div v-if="visibleRecordsCount > 0" class="home-records-row flex justify-center q-mb-md">
-        <div class="records-badge">{{ recordsBadgeText }}</div>
-      </div>
+      <div v-if="visibleRecordsCount > 0" class="records-count">{{ recordsBadgeText }}</div>
 
       <div class="full-width">
         <!-- Initial Loading State -->
@@ -493,7 +492,7 @@
 
     <!-- Filter Modal -->
     <q-dialog v-model="showFilterModal" persistent backdrop-filter="blur(4px)">
-      <q-card style="width: 90%; max-width: 400px; border-radius: 20px;">
+      <q-card class="filter-dialog">
         <q-card-section class="row items-center q-pb-none">
           <div class="text-h6">Filtros</div>
           <q-space />
@@ -508,9 +507,8 @@
             type="date"
             label="Seleccionar fecha"
             outlined
-            rounded
             dense
-            class="q-mb-lg"
+            class="q-mb-lg filter-field"
           >
             <template v-slot:prepend>
               <q-icon name="calendar_today" />
@@ -523,8 +521,8 @@
             :options="filterOptions"
             label="Filtrar por"
             outlined
-            rounded
             dense
+            class="filter-field"
             emit-value
             map-options
           >
@@ -544,42 +542,44 @@
     <!-- Floating Search Bar (aparece al hacer scroll hacia abajo, solo móvil/tablet) -->
     <q-page-sticky position="top" :offset="[0, 8]">
       <transition name="float-search">
-        <div v-if="showFloatingSearch && isLoggedIn && !$q.screen.gt.md" class="floating-search-bar row items-center q-gutter-x-sm">
+        <div v-if="showFloatingSearch && isLoggedIn && !$q.screen.gt.md" class="floating-search-bar">
           <q-input
             v-model="search"
             placeholder="Buscar por casita, revisor o notas..."
             outlined
-            rounded
             dense
             bg-color="white"
-            class="col"
+            class="search-input"
             clearable
           >
             <template v-slot:prepend>
               <q-icon name="search" class="text-grey-5" />
             </template>
+            <template v-slot:append>
+              <q-btn
+                round
+                flat
+                dense
+                icon="filter_list"
+                :color="store.activeFilter ? 'primary' : 'grey-7'"
+                class="search-filter-btn"
+                aria-label="Filtros"
+                @click.stop="showFilterModal = true"
+              >
+                <q-tooltip>Filtros</q-tooltip>
+              </q-btn>
+            </template>
           </q-input>
-          <q-btn
-            round
-            flat
-            icon="filter_list"
-            color="primary"
-            class="bg-white floating-filter-btn"
-            @click="showFilterModal = true"
-          >
-            <q-tooltip>Filtros</q-tooltip>
-          </q-btn>
         </div>
       </transition>
     </q-page-sticky>
 
     <!-- Floating Action Button -->
-    <q-page-sticky position="bottom-right" :offset="[18, 18]">
+    <q-page-sticky position="bottom-right" :offset="[16, 16]">
       <q-btn
         v-if="isLoggedIn && canAdd"
         fab
         icon="add"
-        color="primary"
         class="fab-btn"
         aria-label="Nueva revisión"
         @click="addNew"
@@ -796,7 +796,6 @@ export default defineComponent({
       return /already exists|friendly name|quedó a medias/i.test(String(loginError.value || ''))
     })
     const currentUser = computed(() => authStore.user)
-    const daysRemaining = computed(() => authStore.daysRemaining)
     const canAdd = computed(() => authStore.canAdd)
 
     const loginData = reactive({
@@ -910,10 +909,10 @@ export default defineComponent({
       const matched = store.matchedCasas.length
 
       if (matched > shown) {
-        return `Mostrando ${shown} de ${matched} registros`
+        return `${shown} de ${matched} registros`
       }
 
-      return `Mostrando ${shown} registros`
+      return `${shown} ${shown === 1 ? 'registro' : 'registros'}`
     })
 
     const hasActiveQuery = computed(() => {
@@ -1179,7 +1178,6 @@ export default defineComponent({
       googleLoginPending,
       isLoggedIn,
       currentUser,
-      daysRemaining,
       usesHourlySession,
       sessionRemainingLabel,
       handleLogin,
@@ -1214,43 +1212,86 @@ export default defineComponent({
 
 <style scoped>
 .home-page {
-  padding: 12px !important;
-}
-
-.home-top {
-  padding: 10px 12px 12px;
-  border: 1px solid #eceff1;
-  border-radius: 14px;
-  background: #fff;
+  padding: 12px 16px 24px !important;
+  background: var(--app-bg);
 }
 
 .home-profile {
-  padding-bottom: 0;
-  margin-bottom: 0;
-  border-bottom: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  margin-bottom: 12px;
 }
 
-:global(.body--dark) .home-top {
-  border-color: rgba(255, 255, 255, 0.08);
-  background: #1e1e1e;
+.home-profile__avatar {
+  flex-shrink: 0;
 }
 
-.records-badge {
-  background: #eceff1;
-  color: #607d8b;
-  padding: 4px 12px;
-  border-radius: 20px;
+.home-profile__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.home-profile__name {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 0;
+}
+
+.home-profile__role {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 400;
+  flex-shrink: 0;
+}
+
+.session-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  background: #eeeff2;
+  color: var(--text-secondary);
   font-size: 11px;
   font-weight: 500;
-  box-shadow: none;
+  line-height: 1;
+}
+
+.home-profile__logout {
+  flex-shrink: 0;
+}
+
+:global(.body--dark) .home-profile__name {
+  color: #eceff1;
+}
+
+:global(.body--dark) .session-pill {
+  background: rgba(255, 255, 255, 0.08);
+  color: #b0bec5;
+}
+
+.records-count {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 400;
+  margin: 0 0 12px;
 }
 
 .sync-status-card {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.94) 0%, rgba(227, 242, 253, 0.98) 100%);
-  border: 1px solid rgba(25, 118, 210, 0.12);
-  border-radius: 18px;
-  padding: 14px 16px;
-  box-shadow: 0 8px 18px rgba(25, 118, 210, 0.08);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 12px 16px;
 }
 
 .modern-card {
@@ -1405,167 +1446,6 @@ export default defineComponent({
   margin-bottom: 6px;
 }
 
-.fab-btn {
-  background-color: #4CAF50 !important;
-  color: white;
-  box-shadow: 0 8px 20px rgba(76, 175, 80, 0.4);
-  z-index: 1000 !important;
-}
-
-.search-input {
-  border-radius: 12px;
-}
-
-.floating-search-bar {
-  width: calc(100vw - 24px);
-  max-width: 560px;
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.97);
-  backdrop-filter: blur(8px);
-  border-radius: 16px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
-  z-index: 300;
-}
-
-.floating-filter-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-}
-
-.float-search-enter-active,
-.float-search-leave-active {
-  transition: transform 0.25s ease, opacity 0.25s ease;
-}
-.float-search-enter-from,
-.float-search-leave-to {
-  transform: translateY(-110%);
-  opacity: 0;
-}
-
-.scroll-top-btn {
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
-  border: 1px solid rgba(0, 0, 0, 0.06);
-}
-
-.scroll-top-fade-enter-active,
-.scroll-top-fade-leave-active {
-  transition: transform 0.25s ease, opacity 0.25s ease;
-}
-.scroll-top-fade-enter-from,
-.scroll-top-fade-leave-to {
-  transform: translateY(20px);
-  opacity: 0;
-}
-
-.filter-btn {
-  border-radius: 12px;
-  width: 40px;
-  height: 40px;
-}
-
-.active-filter-badge {
-  display: inline-flex;
-  align-items: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 600;
-  box-shadow: 0 4px 10px rgba(102, 126, 234, 0.4);
-}
-
-.logout-btn {
-  background: #ffebee;
-  color: #e53935;
-  padding: 4px 10px;
-  border-radius: 8px;
-  font-size: 11px;
-  font-weight: 600;
-  min-width: auto;
-}
-
-.session-dots {
-  background: #f5f5f5;
-  padding: 4px 10px;
-  border-radius: 20px;
-  flex-wrap: nowrap;
-}
-
-.home-profile {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  grid-template-areas:
-    "user logout"
-    "session session";
-  gap: 4px 8px;
-  align-items: center;
-}
-
-.home-profile__user {
-  grid-area: user;
-}
-
-.home-profile__name {
-  color: #37474f;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.home-profile__role {
-  color: #90a4ae;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.1;
-}
-
-.home-profile__session {
-  grid-area: session;
-}
-
-.home-profile__logout {
-  grid-area: logout;
-}
-
-.home-toolbar {
-  display: grid;
-  grid-template-areas:
-    "search"
-    "actions";
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.home-actions {
-  grid-area: actions;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
-}
-
-.dashboard-action-btn {
-  width: 100%;
-  min-height: 36px;
-  box-shadow: none;
-}
-
-.home-search {
-  grid-area: search;
-  gap: 8px;
-}
-
-.search-input {
-  box-shadow: none;
-}
-
-/* En pantallas grandes, ocultamos la fila inferior */
-@media (min-width: 600px) {
-  .session-dots {
-    max-width: none;
-  }
-}
-
 @media (max-width: 1023px) {
   .theme-green {
     background: linear-gradient(145deg, #e8f6ee 0%, #ffffff 100%);
@@ -1598,14 +1478,6 @@ export default defineComponent({
 
   .modern-card::before {
     height: 22%;
-  }
-
-  .filter-btn {
-    box-shadow: none;
-  }
-
-  .home-records-row {
-    margin-bottom: 8px;
   }
 }
 
@@ -1647,15 +1519,136 @@ export default defineComponent({
   }
 }
 
+.fab-btn {
+  background-color: var(--brand) !important;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(23, 24, 26, 0.18);
+  z-index: 1000 !important;
+}
+
+.fab-btn:hover {
+  background-color: var(--brand-hover) !important;
+}
+
+.search-input {
+  width: 100%;
+}
+
+.search-input :deep(.q-field__control) {
+  min-height: 44px;
+  padding-right: 4px;
+  border-radius: var(--radius-md);
+}
+
+.search-input :deep(.q-field__append) {
+  padding-left: 0;
+}
+
+.search-filter-btn {
+  margin-left: 2px;
+}
+
+.floating-search-bar {
+  width: calc(100vw - 32px);
+  max-width: 560px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 2px 8px rgba(23, 24, 26, 0.06);
+  z-index: 300;
+}
+
+.float-search-enter-active,
+.float-search-leave-active {
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+.float-search-enter-from,
+.float-search-leave-to {
+  transform: translateY(-110%);
+  opacity: 0;
+}
+
+.scroll-top-btn {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--border);
+}
+
+.scroll-top-fade-enter-active,
+.scroll-top-fade-leave-active {
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+.scroll-top-fade-enter-from,
+.scroll-top-fade-leave-to {
+  transform: translateY(20px);
+  opacity: 0;
+}
+
+.active-filter-row {
+  margin-bottom: 12px;
+}
+
+.active-filter-badge {
+  display: inline-flex;
+  align-items: center;
+  background: var(--brand-soft);
+  color: var(--brand);
+  border: 1px solid rgba(34, 37, 42, 0.14);
+  padding: 4px 6px 4px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.home-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.dashboard-action-btn {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: var(--radius-md);
+  background: var(--teal) !important;
+  color: #fff !important;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  box-shadow: none !important;
+}
+
+.dashboard-action-btn:hover,
+.dashboard-action-btn:active {
+  background: var(--teal-hover) !important;
+}
+
+.dashboard-action-btn :deep(.q-icon) {
+  font-size: 20px;
+  color: #fff;
+}
+
+.filter-dialog {
+  width: 90%;
+  max-width: 400px;
+  border-radius: var(--radius-lg);
+}
+
+.filter-field :deep(.q-field__control) {
+  border-radius: var(--radius-md);
+}
+
 .rounded-btn {
-  border-radius: 12px;
+  border-radius: var(--radius-md);
 }
 
 /* Desktop Table Styles */
 .table-container {
   background: white;
-  border-radius: 16px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
   overflow: auto;
   margin-top: 16px;
 }
@@ -1666,7 +1659,7 @@ export default defineComponent({
 }
 
 .modern-table .q-table__top {
-  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  background: #fafbfc;
   position: sticky;
   top: 0;
   z-index: 50;
@@ -1694,8 +1687,8 @@ export default defineComponent({
 }
 
 .table-header-cell {
-  font-weight: 700 !important;
-  color: #424242 !important;
+  font-weight: 600 !important;
+  color: var(--text-secondary) !important;
   background: #f5f5f5 !important;
   text-transform: uppercase;
   font-size: 10px;
@@ -1712,7 +1705,7 @@ export default defineComponent({
 }
 
 .table-row:hover {
-  background: #f0f7ff !important;
+  background: #f3f4f6 !important;
 }
 
 .modern-table :deep(.q-td) {
@@ -1720,7 +1713,7 @@ export default defineComponent({
 }
 
 .casita-cell {
-  font-weight: 800;
+  font-weight: 700;
   font-size: 13px;
   color: #1a1a1a;
 }
@@ -1761,7 +1754,7 @@ export default defineComponent({
 .table-container :deep(tr:hover td:nth-child(2)),
 .table-container :deep(tr:hover td:nth-child(3)),
 .table-container :deep(tr:hover td:nth-child(4)) {
-  background: #e3f2fd;
+  background: #f3f4f6;
 }
 
 /* Horizontal scroll for table on smaller desktops */
@@ -1781,84 +1774,37 @@ export default defineComponent({
     padding: 16px 24px 24px !important;
   }
 
-  .home-top {
-    padding: 10px 14px 12px;
-    margin-bottom: 12px;
-    border: 1px solid #eceff1;
-    border-radius: 14px;
-    background: #fff;
-  }
-
   .home-profile {
-    grid-template-columns: auto auto 1fr auto;
-    grid-template-areas: "user session . logout";
-    gap: 0 12px;
-    padding-bottom: 8px;
     margin-bottom: 8px;
-    border-bottom: 1px solid #f0f2f4;
-  }
-
-  .logout-btn {
-    background: #ffebee;
-    color: #e53935;
-    font-weight: 600;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #eceff1;
   }
 
   .home-toolbar {
-    display: flex;
+    flex-direction: row-reverse;
     flex-wrap: wrap;
     align-items: center;
+    justify-content: space-between;
     gap: 8px 12px;
     margin-bottom: 10px;
   }
 
-  .home-search {
-    flex: 1 1 240px;
-    max-width: 360px;
-    min-width: 200px;
-    margin-left: auto;
-  }
-
-  .home-search .search-input {
-    box-shadow: none;
-  }
-
-  .home-actions {
-    display: flex;
-    flex: 0 0 auto;
-    gap: 6px;
+  .home-toolbar .search-input {
+    flex: 0 1 380px;
+    width: auto;
+    min-width: 220px;
   }
 
   .dashboard-action-btn {
     width: auto;
-    min-width: 0;
-    height: 34px;
-    padding: 0 12px;
-    box-shadow: none;
-  }
-
-  .records-badge {
-    background: #eceff1;
-    color: #607d8b;
-    box-shadow: none;
-  }
-
-  .home-records-row {
-    justify-content: flex-start !important;
+    min-width: 140px;
+    min-height: 44px;
+    height: 44px;
+    padding: 0 20px;
   }
 
   .table-container {
     margin-top: 0;
-  }
-
-  .filter-btn {
-    flex-shrink: 0;
-    box-shadow: none;
-  }
-
-  :global(.body--dark) .home-top {
-    border-color: rgba(255, 255, 255, 0.08);
-    background: #1e1e1e;
   }
 
   :global(.body--dark) .home-profile {

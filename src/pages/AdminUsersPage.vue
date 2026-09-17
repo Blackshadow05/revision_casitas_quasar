@@ -589,7 +589,7 @@
               </div>
 
               <div
-                v-if="!isAuthGoogle || (needsManagerPassword && authForm.auth_user_id)"
+                v-if="!isAuthGoogle"
                 class="mfa-panel__fields"
               >
                 <q-input
@@ -628,24 +628,6 @@
                 <p v-if="!isAuthGoogle" class="auth-field-hint">
                   Mínimo 6 caracteres. Independiente de la contraseña de arriba.
                 </p>
-                <q-input
-                  v-if="needsManagerPassword && (!isAuthGoogle || authForm.auth_user_id)"
-                  v-model="authForm.managerPassword"
-                  label="Tu contraseña de administrador"
-                  :type="showManagerPassword ? 'text' : 'password'"
-                  outlined
-                  rounded
-                  dense
-                  hide-bottom-space
-                  autocomplete="off"
-                >
-                  <template v-slot:prepend>
-                    <q-icon name="admin_panel_settings" color="primary" />
-                  </template>
-                  <template v-slot:append>
-                    <password-visibility-toggle v-model="showManagerPassword" />
-                  </template>
-                </q-input>
               </div>
 
               <div v-if="!isAuthGoogle || authForm.auth_user_id" class="mfa-panel__actions">
@@ -722,7 +704,6 @@ export default defineComponent({
     const showAuthDialog = ref(false);
     const showPassword = ref(false);
     const showAuthPassword = ref(false);
-    const showManagerPassword = ref(false);
     const authLoading = ref(false);
     const searchQuery = ref("");
     const tablePagination = ref({
@@ -748,7 +729,6 @@ export default defineComponent({
       password_hash: "",
       metodo_login: LOGIN_METHODS.password,
       authPassword: "",
-      managerPassword: "",
       auth_user_id: null,
       totp_enrolled: false,
     });
@@ -764,7 +744,6 @@ export default defineComponent({
     const canManageUsers = computed(() => authStore.canManageUsers);
     const isSuperAdmin = computed(() => authStore.isSuperAdmin);
     const canDeleteUsers = computed(() => currentUser.value?.Usuario === "Esteban B");
-    const needsManagerPassword = computed(() => authStore.authMode === "legacy" || !authStore.authMode);
 
     const columns = computed(() => {
       const base = [
@@ -1104,7 +1083,6 @@ export default defineComponent({
     const openAuthDialog = (user) => {
       showPassword.value = false;
       showAuthPassword.value = false;
-      showManagerPassword.value = false;
       authForm.value = {
         id: user.id,
         usuario: user.Usuario,
@@ -1112,7 +1090,6 @@ export default defineComponent({
         password_hash: user.password_hash || "",
         metodo_login: user.metodo_login || LOGIN_METHODS.password,
         authPassword: "",
-        managerPassword: "",
         auth_user_id: user.auth_user_id || null,
         totp_enrolled: Boolean(user.totp_enrolled),
       };
@@ -1189,21 +1166,12 @@ export default defineComponent({
         return;
       }
 
-      if (needsManagerPassword.value && !authForm.value.managerPassword) {
-        notify({
-          color: "warning",
-          message: "Confirma tu contraseña de administrador",
-        });
-        return;
-      }
-
       authLoading.value = true;
       try {
         const result = await inviteAuthenticatorUser({
           usuario: authForm.value.usuario,
           email: authForm.value.email,
           authPassword: authForm.value.authPassword,
-          managerPassword: authForm.value.managerPassword,
         });
         notify({
           color: "positive",
@@ -1222,19 +1190,10 @@ export default defineComponent({
     };
 
     const resetUserAuthenticator = async () => {
-      if (needsManagerPassword.value && !authForm.value.managerPassword) {
-        notify({
-          color: "warning",
-          message: "Confirma tu contraseña de administrador",
-        });
-        return;
-      }
-
       authLoading.value = true;
       try {
         const result = await resetAuthenticatorFactor({
           usuario: authForm.value.usuario,
-          managerPassword: authForm.value.managerPassword,
         });
         notify({
           color: "positive",
@@ -1298,7 +1257,6 @@ export default defineComponent({
       showAuthDialog,
       showPassword,
       showAuthPassword,
-      showManagerPassword,
       authLoading,
       newUser,
       editingUser,
@@ -1309,7 +1267,6 @@ export default defineComponent({
       columns,
       canDeleteUsers,
       isSuperAdmin,
-      needsManagerPassword,
       isGoogleLogin,
       isAuthGoogle,
       isNewUserGoogle,

@@ -1,12 +1,10 @@
 import { supabase } from '../supabase'
 
-export const recordLogin = async ({ userId, usuario, metodo }) => {
-  if (!userId || !usuario || !metodo) return null
+export const recordLogin = async ({ metodo }) => {
+  if (!metodo) return null
 
   const { data, error } = await supabase.functions.invoke('record-login', {
     body: {
-      userId,
-      usuario,
       metodo,
       userAgent: typeof navigator === 'undefined' ? null : navigator.userAgent
     }

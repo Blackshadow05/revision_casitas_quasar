@@ -1,7 +1,12 @@
 <template>
   <q-layout view="lHh Lpr lFf" :class="{ 'app-shell': isMobileNav }">
-    <q-header class="app-header bg-primary text-white">
+    <q-header class="app-header">
       <q-toolbar class="app-header__toolbar">
+        <div class="app-header__brand row no-wrap items-center">
+          <q-icon name="home" size="22px" color="primary" />
+          <span class="app-header__title">Casitas</span>
+        </div>
+
         <div v-if="authStore.isLoggedIn && $q.screen.gt.md" class="desktop-shortcuts row no-wrap items-center">
           <q-btn
             flat
@@ -9,7 +14,8 @@
             dense
             icon="home"
             label="Inicio"
-            class="appbar-nav-btn text-white"
+            class="appbar-nav-btn"
+            :class="{ 'appbar-nav-btn--active': isActive('/') }"
             @click="goToHome"
           />
           <q-btn
@@ -18,7 +24,8 @@
             dense
             icon="restaurant"
             label="Menús"
-            class="appbar-nav-btn text-white"
+            class="appbar-nav-btn"
+            :class="{ 'appbar-nav-btn--active': isActive('/menus') }"
             @click="goToMenus"
           />
           <q-btn
@@ -27,7 +34,8 @@
             dense
             icon="schedule"
             label="Horarios"
-            class="appbar-nav-btn text-white"
+            class="appbar-nav-btn"
+            :class="{ 'appbar-nav-btn--active': isActive('/dashboard-horario') }"
             @click="goTo('/dashboard-horario')"
           />
           <q-btn
@@ -37,7 +45,8 @@
             dense
             icon="local_police"
             label="Puesto 01"
-            class="appbar-nav-btn text-white"
+            class="appbar-nav-btn"
+            :class="{ 'appbar-nav-btn--active': isActive('/puesto-01') }"
             @click="goTo('/puesto-01')"
           />
           <q-btn
@@ -48,14 +57,15 @@
             dense
             :icon="item.icon"
             :label="item.label"
-            class="appbar-nav-btn text-white"
+            class="appbar-nav-btn"
+            :class="{ 'appbar-nav-btn--active': isActive(item.path) }"
             @click="goTo(item.path)"
           />
         </div>
 
         <q-space />
 
-        <q-btn v-if="authStore.isLoggedIn" flat round dense icon="menu" class="menu-button text-white" aria-label="Abrir navegación">
+        <q-btn v-if="authStore.isLoggedIn" flat round dense icon="menu" class="menu-button text-grey-8" aria-label="Abrir navegación">
           <q-menu anchor="bottom right" self="top right" class="menu-dropdown">
             <q-list role="menu" style="min-width: 220px">
               <q-item clickable v-close-popup @click="goToHome">
@@ -132,12 +142,11 @@
       <q-tabs
         v-model="tab"
         dense
-        class="text-grey-8"
-        active-color="primary"
-        active-bg-color="light-blue-1"
+        class="bottom-nav"
         indicator-color="transparent"
         align="justify"
         no-caps
+        switch-indicator
       >
         <q-tab name="home" icon="home" label="Inicio" @click="goToHome" />
         <q-tab name="menus" icon="restaurant" label="Menús" @click="goToMenus" />
@@ -196,6 +205,7 @@ export default defineComponent({
         document.documentElement.style.removeProperty("--app-visual-offset");
         document.documentElement.style.removeProperty("--app-keyboard-inset");
         document.documentElement.classList.remove("auth-keyboard-open");
+        document.documentElement.classList.remove("app-keyboard-open");
         return;
       }
 
@@ -204,22 +214,29 @@ export default defineComponent({
       let keyboardInset = 0;
       const vv = window.visualViewport;
       const editing = isEditableFocused();
-      // Solo encoger al visualViewport con un input activo (teclado).
-      // Si usáramos visualViewport siempre, bugs de iOS dejarían el menú a media pantalla.
+      const inAuth = Boolean(document.activeElement?.closest?.(".auth-sheet"));
       if (vv && editing) {
+        keyboardInset = Math.max(0, window.innerHeight - vv.height - (vv.offsetTop || 0));
+      }
+      // Encoger el shell solo en el login. En el formulario un cambio de altura
+      // en el focus cierra el teclado de iOS; ahí elevamos con padding + scroll.
+      if (vv && editing && inAuth) {
         height = vv.height;
         offset = vv.offsetTop || 0;
-        keyboardInset = Math.max(0, window.innerHeight - vv.height - offset);
       }
       document.documentElement.style.setProperty("--app-shell-height", `${Math.round(height)}px`);
       document.documentElement.style.setProperty("--app-visual-offset", `${Math.round(offset)}px`);
       document.documentElement.style.setProperty("--app-keyboard-inset", `${Math.round(keyboardInset)}px`);
       document.documentElement.classList.toggle(
+        "app-keyboard-open",
+        editing && keyboardInset > 80
+      );
+      document.documentElement.classList.toggle(
         "auth-keyboard-open",
         editing && Boolean(document.activeElement?.closest?.(".auth-sheet"))
       );
 
-      if (document.scrollingElement && document.scrollingElement.scrollTop !== 0) {
+      if (!editing && document.scrollingElement && document.scrollingElement.scrollTop !== 0) {
         document.scrollingElement.scrollTop = 0;
       }
     };
@@ -325,7 +342,9 @@ export default defineComponent({
         window.visualViewport.removeEventListener("scroll", syncMobileShell);
       }
       document.documentElement.classList.remove("mobile-app-shell");
+      document.documentElement.classList.remove("app-keyboard-open");
       document.documentElement.classList.remove("auth-keyboard-open");
+      document.documentElement.classList.remove("nr-field-editing");
       document.body.classList.remove("mobile-app-shell");
       document.documentElement.style.removeProperty("--app-shell-height");
       document.documentElement.style.removeProperty("--app-visual-offset");
@@ -356,6 +375,11 @@ export default defineComponent({
       router.push("/seguridad");
     };
 
+    const isActive = (path) => {
+      if (path === "/") return route.path === "/";
+      return route.path === path || route.path.startsWith(path + "/");
+    };
+
     return {
       q,
       tab,
@@ -364,6 +388,7 @@ export default defineComponent({
       isMobileNav,
       appPageScrollId: APP_PAGE_SCROLL_ID,
       desktopSecurityLinks,
+      isActive,
       goTo,
       goToHome,
       goToMenus,
@@ -376,27 +401,71 @@ export default defineComponent({
 </script>
 
 <style>
+/* Header blanco y compacto: el azul queda para el estado activo */
 .app-header {
-  border-bottom: none;
+  background: var(--surface);
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border);
+  box-shadow: none;
   padding-top: env(safe-area-inset-top);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
 }
 
 .app-header__toolbar {
-  min-height: 52px;
+  min-height: 48px;
+  padding: 0 8px 0 16px;
+}
+
+.app-header__brand {
+  gap: 8px;
+}
+
+.app-header__title {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  color: var(--text-primary);
 }
 
 .appbar-nav-btn {
-  border-radius: 999px;
-  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  padding: 0 10px;
+  min-height: 32px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.appbar-nav-btn .q-icon {
+  font-size: 18px;
+}
+
+.appbar-nav-btn--active {
+  color: var(--brand);
+  background: var(--brand-soft);
+  font-weight: 600;
 }
 
 .desktop-shortcuts {
-  gap: 4px;
-  margin-left: 16px;
+  gap: 2px;
+  margin-left: 20px;
   overflow-x: auto;
   scrollbar-width: none;
+}
+
+.body--dark .app-header {
+  background: #1e1e1e;
+  color: #eceff1;
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.body--dark .app-header__title {
+  color: #eceff1;
+}
+
+.body--dark .appbar-nav-btn {
+  color: #b0bec5;
 }
 
 .desktop-shortcuts::-webkit-scrollbar {
@@ -404,21 +473,62 @@ export default defineComponent({
 }
 
 .custom-footer {
-  background: white;
-  border-top: 1px solid #eee;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
   padding-bottom: env(safe-area-inset-bottom, 0px);
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
 }
 
-.custom-footer .q-tab--active .q-tab__icon {
-  background: #e1f5fe;
-  padding: 8px 16px;
-  border-radius: 15px;
+/* Bottom nav tipo sistema móvil */
+.bottom-nav .q-tab {
+  min-height: 64px;
+  padding: 10px 8px 12px;
+  color: #8e8e93;
+}
+
+.bottom-nav .q-tab__content {
+  min-width: 0;
+  padding: 0;
+  gap: 2px;
+}
+
+.bottom-nav .q-tab__icon {
+  font-size: 22px;
+}
+
+.bottom-nav .q-tab__label {
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
+}
+
+.bottom-nav .q-tab--active {
+  color: var(--teal, #0f766e);
+}
+
+.bottom-nav .q-tab--active .q-tab__label {
+  font-weight: 600;
+}
+
+.bottom-nav .q-tab__indicator {
+  height: 2px;
+  width: 20px;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  border-radius: 0 0 2px 2px;
+  background: var(--teal, #0f766e) !important;
+}
+
+/* Sin ondas ni fondo en el tap */
+.bottom-nav .q-focus-helper {
+  display: none;
 }
 
 .menu-dropdown {
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
 }
 

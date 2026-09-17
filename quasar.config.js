@@ -27,7 +27,16 @@ export default defineConfig((ctx) => {
       open: true
     },
     framework: {
-      config: {},
+      config: {
+        brand: {
+          // Grafito como color de marca; el naranja queda para "Horario" y acciones destacadas.
+          primary: '#22252A',
+          secondary: '#71717A',
+          accent: '#F28C28',
+          dark: '#17181A',
+          'dark-page': '#121212'
+        }
+      },
       plugins: [
         'Dialog',
         'Notify',

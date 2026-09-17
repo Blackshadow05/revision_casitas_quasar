@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { supabase } from '../supabase'
 import { useCasasStore } from './casas'
 import { recordLogin } from '../services/recordLogin'
+import { fetchSessionProfile, passwordLogin } from '../services/authLogin'
 
 export const USER_MANAGERS = ['Esteban B', 'JosephR', 'Ramiro Q']
 
@@ -10,7 +11,13 @@ export const LOGIN_METHODS = {
   google: 'google'
 }
 
-const LEGACY_SESSION_DAYS = 6
+export const AUTH_MODES = {
+  password: 'password',
+  authenticator: 'supabase',
+  google: 'google'
+}
+
+const PASSWORD_SESSION_DAYS = 6
 const SUPABASE_SESSION_HOURS = 8
 const USER_STORAGE_KEY = 'user'
 const EXPIRY_STORAGE_KEY = 'sessionExpiry'
@@ -83,11 +90,23 @@ const mapMfaEnrollError = (error) => {
 
 const loadStoredAuthMode = () => {
   const mode = localStorage.getItem(AUTH_MODE_KEY)
-  return mode === 'supabase' || mode === 'legacy' || mode === 'google' ? mode : null
+  return mode === AUTH_MODES.password || mode === AUTH_MODES.authenticator || mode === AUTH_MODES.google
+    ? mode
+    : null
 }
 
 const usesSupabaseSession = (mode = loadStoredAuthMode()) => {
-  return mode === 'supabase' || mode === 'google'
+  return mode === AUTH_MODES.password || mode === AUTH_MODES.authenticator || mode === AUTH_MODES.google
+}
+
+const usesHourlySession = (mode) => {
+  return mode === AUTH_MODES.authenticator || mode === AUTH_MODES.google
+}
+
+const sessionMaxAgeMs = (mode) => {
+  return usesHourlySession(mode)
+    ? SUPABASE_SESSION_HOURS * 60 * 60 * 1000
+    : PASSWORD_SESSION_DAYS * 24 * 60 * 60 * 1000
 }
 
 const isGoogleProvider = (authUser) => {
@@ -96,39 +115,10 @@ const isGoogleProvider = (authUser) => {
   return provider === 'google' || identities.some((identity) => identity.provider === 'google')
 }
 
-const loadStoredUser = () => {
-  if (usesSupabaseSession()) {
-    return null
-  }
-
-  try {
-    const stored = JSON.parse(localStorage.getItem(USER_STORAGE_KEY))
-    const profile = toProfile(stored)
-
-    if (!profile) {
-      return null
-    }
-
-    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(profile))
-    return profile
-  } catch (_error) {
-    localStorage.removeItem(USER_STORAGE_KEY)
-    return null
-  }
-}
-
-const loadStoredExpiry = () => {
-  if (usesSupabaseSession()) {
-    return null
-  }
-
-  return readDate(localStorage.getItem(EXPIRY_STORAGE_KEY))
-}
-
 export const useAuthStore = defineStore('auth', {
   state: () => ({
-    user: loadStoredUser(),
-    sessionExpiry: loadStoredExpiry(),
+    user: null,
+    sessionExpiry: null,
     authMode: loadStoredAuthMode(),
     loading: false,
     restoring: false,
@@ -152,7 +142,7 @@ export const useAuthStore = defineStore('auth', {
     },
     userId: (state) => state.user?.id || null,
     daysRemaining: (state) => {
-      if (!state.sessionExpiry || usesSupabaseSession(state.authMode)) return 0
+      if (!state.sessionExpiry || usesHourlySession(state.authMode)) return 0
       const diffTime = new Date(state.sessionExpiry) - new Date()
       return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)))
     },
@@ -161,7 +151,7 @@ export const useAuthStore = defineStore('auth', {
       const diffMs = new Date(state.sessionExpiry) - Date.now()
       if (diffMs <= 0) return 'Expirada'
 
-      if (usesSupabaseSession(state.authMode)) {
+      if (usesHourlySession(state.authMode)) {
         const hours = Math.floor(diffMs / (1000 * 60 * 60))
         const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
         return hours > 0 ? `${hours} h ${minutes} min` : `${minutes} min`
@@ -175,9 +165,10 @@ export const useAuthStore = defineStore('auth', {
     canView: (state) => Boolean(state.user),
     isSuperAdmin: (state) => state.user?.Rol === 'SuperAdmin',
     canManageUsers: (state) => USER_MANAGERS.includes(state.user?.Usuario),
-    usesAuthenticator: (state) => state.authMode === 'supabase',
-    usesGoogle: (state) => state.authMode === 'google',
-    usesHourlySession: (state) => usesSupabaseSession(state.authMode)
+    usesAuthenticator: (state) => state.authMode === AUTH_MODES.authenticator,
+    usesGoogle: (state) => state.authMode === AUTH_MODES.google,
+    usesPassword: (state) => state.authMode === AUTH_MODES.password,
+    usesHourlySession: (state) => usesHourlySession(state.authMode)
   },
 
   actions: {
@@ -197,13 +188,11 @@ export const useAuthStore = defineStore('auth', {
       this.authMode = mode
       this.error = null
 
-      if (safeProfile) {
+      if (mode === AUTH_MODES.password && safeProfile) {
         localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(safeProfile))
-      } else {
-        localStorage.removeItem(USER_STORAGE_KEY)
+        localStorage.setItem(EXPIRY_STORAGE_KEY, expiryDate.toISOString())
       }
 
-      localStorage.setItem(EXPIRY_STORAGE_KEY, expiryDate.toISOString())
       localStorage.setItem(AUTH_MODE_KEY, mode)
       localStorage.setItem(SESSION_STARTED_KEY, startedAt.toISOString())
     },
@@ -223,16 +212,18 @@ export const useAuthStore = defineStore('auth', {
 
     buildExpiry(mode) {
       const expiryDate = new Date()
-      if (usesSupabaseSession(mode)) {
+      if (usesHourlySession(mode)) {
         expiryDate.setHours(expiryDate.getHours() + SUPABASE_SESSION_HOURS)
       } else {
-        expiryDate.setDate(expiryDate.getDate() + LEGACY_SESSION_DAYS)
+        expiryDate.setDate(expiryDate.getDate() + PASSWORD_SESSION_DAYS)
       }
       return expiryDate
     },
 
     sessionModeForAuthUser(authUser) {
-      return isGoogleProvider(authUser) ? 'google' : 'supabase'
+      if (isGoogleProvider(authUser)) return AUTH_MODES.google
+      if (authUser?.app_metadata?.auth_source === AUTH_MODES.password) return AUTH_MODES.password
+      return AUTH_MODES.authenticator
     },
 
     unauthorizedMessageForAuthUser(authUser) {
@@ -266,11 +257,10 @@ export const useAuthStore = defineStore('auth', {
       return { ...nextProfile, auth_user_id: authUser.id, email }
     },
 
-    isSupabaseSessionExpired() {
+    isSessionExpired(mode = this.authMode) {
       const startedAt = readDate(localStorage.getItem(SESSION_STARTED_KEY))
       if (!startedAt) return true
-      const maxAgeMs = SUPABASE_SESSION_HOURS * 60 * 60 * 1000
-      return Date.now() - startedAt.getTime() > maxAgeMs
+      return Date.now() - startedAt.getTime() > sessionMaxAgeMs(mode)
     },
 
     async fetchProfileForAuthUser(authUser) {
@@ -341,18 +331,12 @@ export const useAuthStore = defineStore('auth', {
       this.persistLocalSession(enrolledProfile, this.buildExpiry(mode), mode)
       this.googleLoginPending = false
       this.clearMfaState()
-      this.recordSuccessfulLogin(enrolledProfile, mode === 'google' ? 'google' : 'authenticator')
+      this.recordSuccessfulLogin(mode === AUTH_MODES.google ? 'google' : 'authenticator')
       return { success: true, userId: enrolledProfile.id }
     },
 
-    recordSuccessfulLogin(profile, metodo) {
-      if (!profile?.id || !profile?.Usuario) return
-
-      void recordLogin({
-        userId: profile.id,
-        usuario: profile.Usuario,
-        metodo
-      }).catch((error) => {
+    recordSuccessfulLogin(metodo) {
+      void recordLogin({ metodo }).catch((error) => {
         console.error('No se pudo registrar IP y hora del acceso:', error)
       })
     },
@@ -363,7 +347,7 @@ export const useAuthStore = defineStore('auth', {
 
       const linked = await this.linkAuthUserToProfile(profile, authUser)
       const startedAt = readDate(localStorage.getItem(SESSION_STARTED_KEY)) || new Date()
-      const expiryDate = new Date(startedAt.getTime() + SUPABASE_SESSION_HOURS * 60 * 60 * 1000)
+      const expiryDate = new Date(startedAt.getTime() + sessionMaxAgeMs(mode))
 
       if (Date.now() > expiryDate.getTime()) {
         await supabase.auth.signOut({ scope: 'global' }).catch(() => null)
@@ -539,8 +523,15 @@ export const useAuthStore = defineStore('auth', {
             return false
           }
 
+          const detectedMode = this.sessionModeForAuthUser(session.user)
+          const isPasswordSession = this.authMode === AUTH_MODES.password || detectedMode === AUTH_MODES.password
+
+          if (isPasswordSession && detectedMode !== AUTH_MODES.google) {
+            return this.restorePasswordSession()
+          }
+
           const { profile, error } = await this.fetchAuthorizedProfile(session.user)
-          const mode = this.sessionModeForAuthUser(session.user)
+          const mode = detectedMode
 
           if (error || !profile) {
             if (isGoogleProvider(session.user) || usesSupabaseSession(this.authMode)) {
@@ -561,19 +552,58 @@ export const useAuthStore = defineStore('auth', {
           }
         }
 
-        if (usesSupabaseSession(this.authMode)) {
+        if (this.authMode) {
+          await supabase.auth.signOut({ scope: 'local' }).catch(() => null)
           this.clearLocalSession()
           return false
         }
 
-        return this.checkSessionExpiry()
+        this.clearLocalSession()
+        return false
       } finally {
         this.restoring = false
       }
     },
 
+    loadCachedProfile() {
+      try {
+        return toProfile(JSON.parse(localStorage.getItem(USER_STORAGE_KEY)))
+      } catch (_error) {
+        localStorage.removeItem(USER_STORAGE_KEY)
+        return null
+      }
+    },
+
+    async restorePasswordSession() {
+      const startedAt = readDate(localStorage.getItem(SESSION_STARTED_KEY)) || new Date()
+      const expiryDate = new Date(startedAt.getTime() + sessionMaxAgeMs(AUTH_MODES.password))
+
+      if (Date.now() > expiryDate.getTime()) {
+        await this.logout()
+        return false
+      }
+
+      const result = await fetchSessionProfile()
+
+      if (result.ok && result.profile) {
+        const profile = toProfile(result.profile)
+        this.persistLocalSession(profile, expiryDate, AUTH_MODES.password, startedAt)
+        return true
+      }
+
+      if (result.code === 'network_error') {
+        const cachedProfile = this.loadCachedProfile()
+        if (cachedProfile?.Usuario) {
+          this.persistLocalSession(cachedProfile, expiryDate, AUTH_MODES.password, startedAt)
+          return true
+        }
+      }
+
+      return this.rejectUnauthorizedAuthSession(result.error || 'No se pudo verificar la sesión.')
+    },
+
     async checkSessionExpiry() {
-      if (usesSupabaseSession(this.authMode) && this.isSupabaseSessionExpired()) {
+      if (usesSupabaseSession(this.authMode) && this.isSessionExpired(this.authMode)) {
         await this.logout()
         return false
       }
@@ -590,37 +620,37 @@ export const useAuthStore = defineStore('auth', {
       this.loading = true
       this.error = null
       try {
-        const { data, error } = await supabase
-          .from('Usuarios')
-          .select(PROFILE_COLUMNS)
-          .eq('Usuario', username)
-          .eq('password_hash', password)
-          .single()
+        const result = await passwordLogin({ usuario: username, password })
 
-        if (error || !data) {
-          this.error = 'Usuario o contraseña incorrectos'
+        if (!result.ok) {
+          this.error = result.error || 'Usuario o contraseña incorrectos'
+          return {
+            success: false,
+            message: this.error,
+            useGoogle: Boolean(result.useGoogle),
+            useAuthenticator: Boolean(result.useAuthenticator)
+          }
+        }
+
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: result.credentials.email,
+          password: result.credentials.password
+        })
+
+        if (error || !data?.session) {
+          this.error = 'No se pudo iniciar la sesión. Inténtalo de nuevo.'
           return { success: false, message: this.error }
         }
 
-        if (data.Rol === 'inactivo') {
-          this.error = 'Usuario inactivo. Contacte al administrador.'
+        const profile = toProfile(result.profile)
+        if (!profile) {
+          await supabase.auth.signOut({ scope: 'local' }).catch(() => null)
+          this.error = 'Tu cuenta no está autorizada. Contacte al administrador.'
           return { success: false, message: this.error }
         }
 
-        if (data.metodo_login === LOGIN_METHODS.google) {
-          this.error = 'Este usuario entra con Google. Usa el botón de Google.'
-          return { success: false, message: this.error, useGoogle: true }
-        }
-
-        if (data.totp_enrolled) {
-          this.error = 'Tu cuenta ya usa Google Authenticator. Entra con el botón Authenticator.'
-          return { success: false, message: this.error, useAuthenticator: true }
-        }
-
-        this.persistLocalSession(data, this.buildExpiry('legacy'), 'legacy')
-        await supabase.auth.signOut({ scope: 'local' }).catch(() => null)
-        this.recordSuccessfulLogin(data, 'password')
-        return { success: true, userId: data.id }
+        this.persistLocalSession(profile, this.buildExpiry(AUTH_MODES.password), AUTH_MODES.password)
+        return { success: true, userId: profile.id }
       } catch (err) {
         this.error = 'Ocurrió un error inesperado'
         console.error('Login error:', err)
@@ -716,7 +746,7 @@ export const useAuthStore = defineStore('auth', {
           profile.email = normalizedEmail
         }
 
-        this.authMode = 'supabase'
+        this.authMode = AUTH_MODES.authenticator
         return this.prepareMfaStep()
       } catch (err) {
         this.error = 'Ocurrió un error inesperado'

@@ -32,9 +32,14 @@
             borderless
             dense
             hide-bottom-space
+            no-error-icon
             autocomplete="username"
             :rules="[val => !!val || 'El correo es requerido']"
-          />
+          >
+            <template v-slot:prepend>
+              <q-icon name="mail_outline" size="22px" />
+            </template>
+          </q-input>
         </div>
 
         <div class="auth-sheet__field">
@@ -45,9 +50,13 @@
             borderless
             dense
             hide-bottom-space
+            no-error-icon
             autocomplete="current-password"
             :rules="[val => !!val || 'La contraseña es requerida']"
           >
+            <template v-slot:prepend>
+              <q-icon name="lock_outline" size="22px" />
+            </template>
             <template v-slot:append>
               <password-visibility-toggle v-model="showPassword" />
             </template>
@@ -55,7 +64,8 @@
         </div>
 
         <div v-if="authStore.error" class="auth-sheet__alert" role="alert">
-          {{ authStore.error }}
+          <q-icon name="error_outline" size="18px" />
+          <span>{{ authStore.error }}</span>
         </div>
 
         <div
@@ -65,6 +75,7 @@
         >
           <q-btn
             label="Continuar"
+            icon-right="arrow_forward"
             type="submit"
             class="auth-sheet__submit"
             unelevated
@@ -112,15 +123,21 @@
             borderless
             dense
             hide-bottom-space
+            no-error-icon
             mask="######"
             inputmode="numeric"
             autocomplete="one-time-code"
             :rules="[val => /^\d{6}$/.test(String(val || '')) || 'Ingresa el código de 6 dígitos']"
-          />
+          >
+            <template v-slot:prepend>
+              <q-icon name="pin" size="22px" />
+            </template>
+          </q-input>
         </div>
 
         <div v-if="authStore.error" class="auth-sheet__alert q-mt-md" role="alert">
-          {{ authStore.error }}
+          <q-icon name="error_outline" size="18px" />
+          <span>{{ authStore.error }}</span>
         </div>
 
         <div
@@ -130,6 +147,7 @@
         >
           <q-btn
             label="Activar Authenticator"
+            icon-right="arrow_forward"
             type="submit"
             class="auth-sheet__submit"
             unelevated
@@ -144,6 +162,7 @@
           :disabled="authStore.loading"
           @click="regenerateQr"
         >
+          <q-icon name="refresh" size="16px" />
           Generar nuevo QR
         </button>
       </q-form>
@@ -164,16 +183,22 @@
             borderless
             dense
             hide-bottom-space
+            no-error-icon
             mask="######"
             inputmode="numeric"
             autocomplete="one-time-code"
             autofocus
             :rules="[val => /^\d{6}$/.test(String(val || '')) || 'Ingresa el código de 6 dígitos']"
-          />
+          >
+            <template v-slot:prepend>
+              <q-icon name="pin" size="22px" />
+            </template>
+          </q-input>
         </div>
 
         <div v-if="authStore.error" class="auth-sheet__alert q-mt-md" role="alert">
-          {{ authStore.error }}
+          <q-icon name="error_outline" size="18px" />
+          <span>{{ authStore.error }}</span>
         </div>
 
         <div
@@ -183,6 +208,7 @@
         >
           <q-btn
             label="Verificar"
+            icon-right="arrow_forward"
             type="submit"
             class="auth-sheet__submit"
             unelevated

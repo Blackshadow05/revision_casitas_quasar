@@ -1,0 +1,16 @@
+project_id = "snkyczysawxjrpmvtzqy"
+
+[functions.auth-login]
+verify_jwt = false
+
+[functions.session-profile]
+verify_jwt = false
+
+[functions.record-login]
+verify_jwt = false
+
+[functions.manage-auth-user]
+verify_jwt = false
+
+[functions.scan-menu]
+verify_jwt = false

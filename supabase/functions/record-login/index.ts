@@ -1,157 +1,130 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.95.3'
+import {
+  isGoogleAuthUser,
+  LOGIN_METHODS,
+  PROFILE_COLUMNS,
+  type UsuarioRecord,
+} from '../_shared/auth-rules.ts'
+import {
+  getBearerToken,
+  getClientIp,
+  jsonResponse,
+  preflightResponse,
+  readJsonBody,
+  resolveServiceKey,
+  resolveSupabaseUrl,
+  truncate,
+} from '../_shared/http.ts'
+import { recordLoginEvent, type LoginMetodo } from '../_shared/login-log.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+const VALID_METHODS = new Set<string>(Object.values(LOGIN_METHODS))
 
-const LOGIN_METHODS = new Set(['password', 'google', 'authenticator'])
-const DEDUPE_WINDOW_MS = 90 * 1000
+const methodAllowedForProfile = (
+  metodo: string,
+  profile: UsuarioRecord,
+  authUser: { app_metadata?: Record<string, unknown> | null; identities?: { provider?: string }[] | null } | null | undefined,
+): boolean => {
+  if (metodo === LOGIN_METHODS.password) {
+    return profile.metodo_login !== LOGIN_METHODS.google && !profile.totp_enrolled
+  }
 
-const jsonResponse = (body: Record<string, unknown>, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      ...corsHeaders,
-      'Content-Type': 'application/json',
-    },
-  })
+  if (metodo === LOGIN_METHODS.authenticator) {
+    return Boolean(profile.totp_enrolled)
+  }
 
-const firstForwardedIp = (value: string | null) => {
-  if (!value) return null
-  const first = value.split(',')[0]?.trim()
-  return first || null
-}
+  if (metodo === LOGIN_METHODS.google) {
+    return isGoogleAuthUser(authUser)
+  }
 
-const getClientIp = (request: Request) => {
-  return (
-    firstForwardedIp(request.headers.get('x-forwarded-for')) ||
-    request.headers.get('cf-connecting-ip') ||
-    request.headers.get('x-real-ip') ||
-    request.headers.get('x-client-ip') ||
-    null
-  )
-}
-
-const truncate = (value: unknown, max = 512) => {
-  const text = String(value || '').trim()
-  if (!text) return null
-  return text.slice(0, max)
+  return false
 }
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return preflightResponse()
   }
 
   if (request.method !== 'POST') {
-    return jsonResponse({ error: 'Método no permitido.' }, 405)
+    return jsonResponse({ ok: false, error: 'Método no permitido.' }, 405)
   }
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
+  const supabaseUrl = resolveSupabaseUrl()
+  const serviceKey = resolveServiceKey()
 
-  if (!supabaseUrl || !serviceRoleKey || !anonKey) {
-    return jsonResponse({ error: 'La función no está configurada.' }, 500)
+  if (!supabaseUrl || !serviceKey) {
+    console.error('record-login: falta configuración de Supabase.')
+    return jsonResponse({ ok: false, error: 'La función no está configurada.' }, 500)
   }
 
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
+  const jwt = getBearerToken(request)
+  if (!jwt) {
+    return jsonResponse({ ok: false, error: 'Sesión no válida o expirada.' }, 401)
+  }
+
+  const body = await readJsonBody(request)
+  if (!body) {
+    return jsonResponse({ ok: false, error: 'Solicitud inválida.' }, 400)
+  }
+
+  const metodo = String(body.metodo || '').trim()
+  if (!VALID_METHODS.has(metodo)) {
+    return jsonResponse({ ok: false, error: 'El método de acceso no es válido.' }, 400)
+  }
 
   try {
-    const body = await request.json()
-    const userId = Number(body?.userId)
-    const usuario = String(body?.usuario || '').trim()
-    const metodo = String(body?.metodo || '').trim()
-    const userAgent = truncate(body?.userAgent || request.headers.get('user-agent'))
-    const ipAddress = getClientIp(request)
+    const userClient = createClient(supabaseUrl, serviceKey, {
+      global: { headers: { Authorization: `Bearer ${jwt}` } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
 
-    if (!Number.isInteger(userId) || userId <= 0 || !usuario) {
-      return jsonResponse({ error: 'El usuario es obligatorio.' }, 400)
+    const { data: authData, error: authError } = await userClient.auth.getUser()
+    const authUser = authData?.user
+
+    if (authError || !authUser?.id) {
+      return jsonResponse({ ok: false, error: 'Sesión no válida o expirada.' }, 401)
     }
 
-    if (!LOGIN_METHODS.has(metodo)) {
-      return jsonResponse({ error: 'El método de acceso no es válido.' }, 400)
-    }
+    const admin = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    })
 
     const { data: profile, error: profileError } = await admin
       .from('Usuarios')
-      .select('id, Usuario, auth_user_id')
-      .eq('id', userId)
-      .maybeSingle()
+      .select(PROFILE_COLUMNS)
+      .eq('auth_user_id', authUser.id)
+      .maybeSingle<UsuarioRecord>()
 
-    if (profileError || !profile || profile.Usuario !== usuario) {
-      return jsonResponse({ error: 'No se encontró ese usuario.' }, 404)
+    if (profileError) {
+      console.error('record-login: error consultando Usuarios:', profileError.message)
+      return jsonResponse({ ok: false, error: 'Ocurrió un error inesperado.' }, 500)
     }
 
-    const authHeader = request.headers.get('Authorization') || ''
-    const jwt = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
-
-    if (jwt && jwt !== anonKey) {
-      const userClient = createClient(supabaseUrl, anonKey, {
-        global: { headers: { Authorization: `Bearer ${jwt}` } },
-        auth: { persistSession: false, autoRefreshToken: false },
-      })
-      const { data: authData } = await userClient.auth.getUser()
-      if (authData?.user?.id && profile.auth_user_id && authData.user.id !== profile.auth_user_id) {
-        return jsonResponse({ error: 'La sesión no coincide con este usuario.' }, 403)
-      }
+    if (!profile) {
+      return jsonResponse({ ok: false, error: 'No se encontró ese usuario.' }, 404)
     }
 
-    const loggedAt = new Date().toISOString()
-
-    const { data: lastLog } = await admin
-      .from('login_logs')
-      .select('id, logged_at, ip_address')
-      .eq('user_id', profile.id)
-      .order('logged_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    const lastLoggedAt = lastLog?.logged_at ? new Date(lastLog.logged_at).getTime() : 0
-    const isDuplicate =
-      Boolean(lastLog) &&
-      lastLog.ip_address === ipAddress &&
-      Number.isFinite(lastLoggedAt) &&
-      Date.now() - lastLoggedAt < DEDUPE_WINDOW_MS
-
-    if (!isDuplicate) {
-      const { error: insertError } = await admin.from('login_logs').insert({
-        user_id: profile.id,
-        usuario: profile.Usuario,
-        ip_address: ipAddress,
-        user_agent: userAgent,
-        metodo,
-        logged_at: loggedAt,
-      })
-
-      if (insertError) {
-        return jsonResponse({ error: insertError.message }, 400)
-      }
+    if (!methodAllowedForProfile(metodo, profile, authUser)) {
+      return jsonResponse({ ok: false, error: 'La sesión no coincide con este usuario.' }, 403)
     }
 
-    const { error: updateError } = await admin
-      .from('Usuarios')
-      .update({
-        ultimo_login_at: loggedAt,
-        ultimo_login_ip: ipAddress,
-      })
-      .eq('id', profile.id)
+    const result = await recordLoginEvent(admin, profile, {
+      metodo: metodo as LoginMetodo,
+      ipAddress: getClientIp(request),
+      userAgent: truncate(body.userAgent || request.headers.get('user-agent')),
+    })
 
-    if (updateError) {
-      return jsonResponse({ error: updateError.message }, 400)
+    if (!result.ok) {
+      return jsonResponse({ ok: false, error: result.error || 'No se pudo registrar el acceso.' }, 400)
     }
 
     return jsonResponse({
       ok: true,
-      ip_address: ipAddress,
-      logged_at: loggedAt,
-      duplicated: isDuplicate,
+      ip_address: result.ipAddress,
+      logged_at: result.loggedAt,
+      duplicated: result.duplicated,
     })
   } catch (error) {
     console.error('record-login error:', error)
-    return jsonResponse({ error: 'Ocurrió un error inesperado.' }, 500)
+    return jsonResponse({ ok: false, error: 'Ocurrió un error inesperado.' }, 500)
   }
 })
